@@ -10,11 +10,16 @@ function passView(name, msg, go) {
     h('button.btn.primary', { type: 'button', on: { click: () => { Sfx.init(); Sfx.play('ui'); go(); } } }, `${name} 준비됐어요`)));
 }
 function revealView(entries, actions, note) {
+  const cards = entries.map((e, i) => fighterCard(e, i));
+  // 카드마다 MC가 나와서 능력과 부작용을 차례로 소개한다
+  const boxes = cards.map((c, i) => { const b = mcBox(c, entries[i], i); c.insertBefore(b.box, c.children[1] || null); return b; });
+  const key = entries.map((e) => e.name + ':' + (e.spec ? e.spec.title : '')).join('|');
+  setTimeout(() => { if (cards[0] && cards[0].isConnected) mcStart(boxes, key); }, 700);
   return h('main.page',
     h('p.step', 'STEP 3 / 3'),
     h('h2', '설계서 공개'),
-    h('p.hint', '능력이 어떻게 구현됐는지, 상대가 붙인 부작용이 어떤 규칙이 됐는지 확인하세요.'),
-    h('div.cards', entries.map((e, i) => fighterCard(e, i))),
+    h('p.hint', `${MC_NAME}이 한 명씩 능력과 부작용을 소개해요. 말풍선을 누르면 다음으로 넘어가요.`),
+    h('div.cards', cards),
     h('div.sticky', actions, note ? h('span.hint', note) : null));
 }
 function forgeList(entries, note) {

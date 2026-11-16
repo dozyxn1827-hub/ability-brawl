@@ -1,6 +1,6 @@
 const fs = require('fs');
 const src = (f) => fs.readFileSync(__dirname + '/src/' + f, 'utf8');
-const js = ['01-util.js', '02-spec.js', '025-compose.js', '026-pix.js', '027-words-a.js', '027-words-b.js', '027-words-c.js', '03-art.js', '04-engine.js', '05-input.js', '055-audio.js', '06-net.js', '07-ui.js', '08-flow.js'].map(src).join('\n');
+const js = ['01-util.js', '02-spec.js', '025-compose.js', '026-pix.js', '027-words-a.js', '027-words-b.js', '027-words-c.js', '03-art.js', '04-engine.js', '05-input.js', '055-audio.js', '06-net.js', '07-ui.js', '075-mc.js', '08-flow.js'].map(src).join('\n');
 const html = `<!DOCTYPE html>
 <html lang="ko">
 <head>

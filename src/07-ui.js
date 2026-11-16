@@ -300,18 +300,18 @@ function fighterCard(e, idx) {
   const locks = lockedSlots(sp);
   const moves = h('ul.moves', SLOTS.map((s) => {
     const m = sp.moves[s], lk = locks.has(s);
-    return h('li' + (lk ? '.locked' : ''), h('span.slot', { style: { '--mc': m.color } }, SLOT_KO[s]),
+    return h('li' + (lk ? '.locked' : ''), { 'data-mcf': s }, h('span.slot', { style: { '--mc': m.color } }, SLOT_KO[s]),
       h('span.mn', glyphIcon(rowsOf(m.shape, m.pix), m.color, 28), m.name, lk ? h('span.lock-tag', '봉인') : null, m.was ? h('span.was-tag', '바뀜') : null),
       h('span.cd', m.cd + '초'),
       h('span.md', m.was ? h('s', m.was) : null, m.was ? ' → ' : null, [m.desc, m.say ? ` “${m.say}”` : '', ` · ${VFX_KO[m.vfx] || ''}`].join('')));
   }));
   return h('article.fcard', { style: { '--pc': color } },
-    h('header', poseStrip(sp), h('div', h('p.fname', e.name), h('h3', sp.title), sp.concept ? h('p.concept', sp.concept) : null)),
-    h('div.sec', h('p.ability.quote', e.ability),
+    h('header', { 'data-mcf': 'head' }, poseStrip(sp), h('div', h('p.fname', e.name), h('h3', sp.title), sp.concept ? h('p.concept', sp.concept) : null)),
+    h('div.sec', { 'data-mcf': 'ability' }, h('p.ability.quote', e.ability),
       h('p.stats', h('span', '체력 ', h('b', Math.round(st.hp * HP_SCALE))), h('span', '속도 ', h('b', '×' + st.speed)), h('span', '몸집 ', h('b', '×' + st.size)), h('span', '옷 ', h('b', { text: { plain: '기본', robe: '로브', armor: '갑옷', stripes: '줄무늬', suit: '정장', dress: '드레스', spots: '점박이' }[sp.look.outfit] || '기본' })))),
-    h('div.sec', moves, sp.passive ? h('p.passive', h('b', '패시브 · ' + PASSIVE_KO[sp.passive.k]), ' ', sp.passive.desc) : null),
-    sp.drawbacks.length ? h('div.sec', h('div', h('span.hazard-tag', '부작용')), h('ul.draws', sp.drawbacks.map((d) =>
-      h('li', h('span.by', d.by + ' 작성'), h('span.quote', d.text), h('span.dh', d.how), allRules(d).filter((r) => r !== d.how).map((r) => h('span.mech', '규칙: ' + r)))))) : null,
+    h('div.sec', { 'data-mcf': 'moves' }, moves, sp.passive ? h('p.passive', { 'data-mcf': 'passive' }, h('b', '패시브 · ' + PASSIVE_KO[sp.passive.k]), ' ', sp.passive.desc) : null),
+    sp.drawbacks.length ? h('div.sec', { 'data-mcf': 'draws' }, h('div', h('span.hazard-tag', '부작용')), h('ul.draws', sp.drawbacks.map((d, di) =>
+      h('li', { 'data-mcf': 'draw-' + di }, h('span.by', d.by + ' 작성'), h('span.quote', d.text), h('span.dh', d.how), allRules(d).filter((r) => r !== d.how).map((r) => h('span.mech', '규칙: ' + r)))))) : null,
     sp.lines && (sp.lines.ko || sp.lines.win) ? h('div.sec.lines', sp.lines.ko ? h('span', '쓰러질 때 “' + sp.lines.ko + '”') : null, sp.lines.win ? h('span', '이길 때 “' + sp.lines.win + '”') : null) : null,
     h('p.src', sp.ai ? 'DESIGNED BY AI' : 'BASIC INTERPRETER'));
 }

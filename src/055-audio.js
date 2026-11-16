@@ -163,6 +163,9 @@ const Sfx = {
         case 'go': [0, 4, 7, 12].forEach((s) => O('p25', 523 * Math.pow(2, s / 12), 0, t, 0.5, 0.06, { verb: 0.3 })); N(t, 0.3, 0.15, { type: 'highpass', f: 5000 }); break;
         case 'storm': for (let i = 0; i < 3; i++) O('sawtooth', 500, 900, t + i * 0.35, 0.33, 0.06, { lp: 2400, lin: true }); break;
         case 'ui': O('p25', 660, 990, t, 0.06, 0.05); break;
+        case 'blip': O('square', 620 + Math.random() * 260, 0, t, 0.025, 0.016); break;
+        case 'mcin': O('square', 523, 0, t, 0.07, 0.035); O('square', 659, 0, t + 0.08, 0.07, 0.035); O('square', 784, 0, t + 0.16, 0.07, 0.035); O('square', 1047, 0, t + 0.24, 0.18, 0.045); break;
+        case 'mcuh': O('sawtooth', 330, 150, t, 0.4, 0.035, { lp: 900 }); O('sawtooth', 220, 100, t + 0.18, 0.45, 0.03, { lp: 800 }); break;
         case 'ready': O('sine', 1320, 0, t, 0.12, 0.05); O('sine', 1980, 0, t + 0.04, 0.12, 0.035); break;
         case 'win': [[0, 0], [4, 0.12], [7, 0.24], [12, 0.36], [7, 0.52], [12, 0.62]].forEach(([s, d]) => O('p25', 523 * Math.pow(2, s / 12), 0, t + d, d > 0.5 ? 0.6 : 0.14, 0.07, { verb: 0.3 })); break;
         case 'shoot': this.kind(VFX_SOUND[S] || 'pew', t, 1.2, 0.6, 0.7); break;

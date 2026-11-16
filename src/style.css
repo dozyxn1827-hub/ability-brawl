@@ -268,6 +268,28 @@ table.score th { color: var(--muted); font-weight: 400; font-size: 12px; }
 table.score td:first-child { font-family: var(--display); font-size: 16px; }
 
 .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--paper); color: var(--ink); padding: 8px 14px; font-size: 14px; z-index: 20; box-shadow: 4px 4px 0 var(--shadow); max-width: calc(100% - 32px); }
+/* ----- 설계서 공개 MC ----- */
+.mcbox { position: sticky; top: 6px; z-index: 3; display: grid; grid-template-columns: 66px 1fr; gap: 4px 10px; align-items: end; padding: 8px 10px; background: var(--ink); border-top: 3px solid var(--panel-2); border-bottom: 3px solid var(--panel-2); }
+.mc-spr { width: 66px; height: 94px; image-rendering: pixelated; grid-row: span 2; }
+.mc-b { position: relative; min-height: 70px; background: #fff7e0; color: #15122b; border: 3px solid #15122b; box-shadow: 3px 3px 0 var(--shadow); padding: 7px 10px 14px; font-size: 14px; line-height: 1.45; cursor: pointer; word-break: keep-all; overflow-wrap: anywhere; }
+.mc-b::before { content: ''; position: absolute; left: -13px; bottom: 16px; border: 6px solid transparent; border-right: 8px solid #15122b; }
+.mc-b b { color: #c2185b; }
+.mc-who { display: block; font-family: var(--pix); font-size: 8px; color: #7a5a00; margin-bottom: 3px; letter-spacing: 0.04em; }
+.mc-nx { position: absolute; right: 7px; bottom: 2px; font-size: 10px; animation: mcblink 0.7s steps(2) infinite; }
+.mc-ctl { display: flex; gap: 6px; justify-content: flex-end; }
+.mc-btn { font: inherit; font-size: 11px; padding: 2px 8px; color: var(--muted); background: transparent; border: 2px solid var(--line); cursor: pointer; }
+.mc-btn:hover, .mc-btn:focus-visible { color: #fff; border-color: var(--gold); }
+.mcbox:not(.live) .mc-btn:first-child, .mcbox:not(.done) .mc-btn:last-child { display: none; }
+.mcbox.wait .mc-b { opacity: 0.55; cursor: default; }
+.mcbox.wait .mc-nx, .mcbox.done .mc-nx { display: none; }
+.mcbox.done .mc-b { min-height: 0; font-size: 12px; color: #5a5070; cursor: default; }
+.mcbox.done { grid-template-columns: 44px 1fr; }
+.mcbox.done .mc-spr { width: 44px; height: 63px; }
+.fcard.mc-live { box-shadow: 0 0 0 3px var(--gold), 6px 6px 0 var(--shadow); }
+.fcard.mc-live .mcbox { background: linear-gradient(180deg, #2a2050, var(--ink)); }
+.mc-hi { outline: 3px solid var(--gold); outline-offset: -3px; background: rgba(255, 207, 58, 0.1); animation: mchi 0.6s ease-out; }
+@keyframes mchi { from { background: rgba(255, 207, 58, 0.45); } }
+@keyframes mcblink { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 /* 봉인·바뀐 기술 */
