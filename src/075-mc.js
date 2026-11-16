@@ -1,6 +1,5 @@
-/* ===== 설계서 공개 MC: 각 캐릭터 카드 안에서 능력과 부작용을 차례로 소개한다 ===== */
+/* ===== MC 왕수다: 그림·대사 도우미 (경매 쇼 076-stage.js가 쓴다) ===== */
 const MC_NAME = 'MC 왕수다';
-const MC = { played: new Map(), sprites: new Set(), raf: 0, run: null };
 const MC_REDUCED = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
 
 /** MC 그림 (24×34 픽셀). pose: talk | point | hype | shock | wait | done */
@@ -47,55 +46,8 @@ function mcDraw(g, t, pose, open) {
   // 신났을 때 반짝이
   if ((pose === 'hype' || pose === 'done') && !MC_REDUCED) { const k = Math.floor(t * 8); g.fillStyle = '#ffffff'; g.fillRect(1 + (k * 7) % 22, 1 + (k * 11) % 10, 1, 1); g.fillRect(2 + (k * 13) % 20, 2 + (k * 5) % 12, 1, 1); }
 }
-function mcLoop() {
-  MC.raf = 0;
-  const now = performance.now() / 1000;
-  for (const s of MC.sprites) {
-    if (!s.cv.isConnected) { MC.sprites.delete(s); continue; }
-    if (now - s.last < 1 / 14) continue;
-    s.last = now;
-    s.g.clearRect(0, 0, 24, 34);
-    mcDraw(s.g, now, s.pose, s.talking && (MC_REDUCED || Math.floor(now * 9) % 2 === 0));
-  }
-  if (MC.sprites.size) MC.raf = requestAnimationFrame(mcLoop);
-}
-function mcSprite() {
-  const [cv, g] = makeCanvas(24, 34);
-  cv.className = 'mc-spr';
-  cv.setAttribute('aria-hidden', 'true');
-  const s = { cv, g, pose: 'wait', talking: false, last: 0 };
-  MC.sprites.add(s);
-  if (!MC.raf) MC.raf = requestAnimationFrame(mcLoop);
-  return s;
-}
-
-/* ---- 대본: 이 캐릭터의 칭호·능력·기술·패시브·부작용을 병맛 MC 말투로 ---- */
 const mcPick = (a) => a[Math.floor(Math.random() * a.length)];
 const mcCut = (s, n) => { const a = Array.from(String(s || '')); return a.length > n ? a.slice(0, n - 1).join('') + '…' : a.join(''); };
-function mcLines(e, idx) {
-  const sp = e.spec, M = sp.moves, st = sp.stats, nm = e.name, L = [];
-  L.push({ p: 'point', f: 'head', s: mcPick([`자~ ${idx + 1}번 선수 입장! **${nm}**!!`, `다음 선수! 박수 주세요~ **${nm}**!`, `여러분 주목! **${nm}** 선수 등장입니다!`, `두구두구두구… **${nm}** 선수!!`]) });
-  L.push({ p: 'talk', f: 'head', s: mcPick([`칭호는… **『${sp.title}』**! 벌써부터 냄새가 납니다.`, `오늘의 칭호, **『${sp.title}』**! 누가 지었죠 이거?`, `별명은 **『${sp.title}』**! 멋있… 나요?`, `**『${sp.title}』**! 칭호부터 범상치 않습니다.`]) });
-  if (e.ability) {
-    L.push({ p: 'point', f: 'ability', s: `직접 쓴 능력은 바로~ **“${mcCut(e.ability, 60)}”**!` });
-    L.push({ p: 'talk', f: 'ability', s: mcPick(['심사위원석이 술렁입니다!', '이걸 진짜 적었다고요? 네, 적었습니다.', '해석하는 데 3초 걸렸습니다.', '저도 갖고 싶네요, 이 능력.', '와… 상상력 무엇?', '방금 관중석에서 누가 웃었어요.']) });
-  }
-  L.push({ p: 'point', f: 'moves', s: `기본 공격은 **${M.basic.name}**, 능력 1은 **${M.s1.name}**!` });
-  L.push({ p: 'point', f: 's2', s: `능력 2는 **${M.s2.name}**! ${mcCut(M.s2.desc, 34)}` });
-  L.push({ p: 'hype', f: 'ult', s: `그리고 궁극기!! **${M.ult.name}**!! ${mcCut(M.ult.desc, 34)}` });
-  const quip = st.hp >= 120 ? `체력 ${Math.round(st.hp * HP_SCALE)}, 맷집 하나는 인정!` : st.speed >= 1.12 ? '발도 엄청 빠릅니다!' : st.speed <= 0.9 ? '대신 좀 느려요.' : st.hp <= 88 ? '근데 몸이 좀 약해요.' : '';
-  if (sp.passive) L.push({ p: 'talk', f: 'passive', s: `숨은 특기는 **${PASSIVE_KO[sp.passive.k]}**! ${quip}` });
-  else if (quip) L.push({ p: 'talk', f: 'head', s: quip });
-  if (sp.drawbacks.length) {
-    L.push({ p: 'shock', f: 'draws', s: mcPick(['하지만!! 세상에 공짜는 없죠.', '그런데 말입니다… 부작용이 있습니다.', '자, 이제 제일 웃긴 시간! 부작용 공개!', '잠깐! 상대들이 선물을 준비했다는데요?']), sfx: 'mcuh' });
-    sp.drawbacks.forEach((d, i) => {
-      L.push({ p: 'point', f: 'draw-' + i, s: `**${d.by}**님이 붙인 부작용, **“${mcCut(d.text, 50)}”**!` });
-      L.push({ p: 'shock', f: 'draw-' + i, s: `결과는… **${mcCut(d.how, 48)}**! ${mcPick(['아이고…', '이건 좀 심했다!', '본인 표정 보세요.', '박수!! 아니 위로를!', '이거 이길 수 있나요?', '부작용 맛집이네요.', '작성자 나와!'])}` });
-    });
-  }
-  L.push({ p: 'hype', f: null, s: mcPick([`**${nm}** 선수, 과연 살아남을 수 있을까요!`, '이상 해설이었습니다! 다음!', `**『${sp.title}』**의 활약, 기대해 주세요!`, '여기까지! 박수 한 번 주세요~']) });
-  return L;
-}
 /** "**굵게**" 표시를 조각으로 */
 function mcSegs(s) { return String(s).split(/\*\*/).map((t, i) => ({ t, b: i % 2 === 1 })).filter((x) => x.t); }
 function mcRender(bub, segs, n) {
@@ -125,111 +77,3 @@ function mcSpeak(text, onEnd) {
   } catch (e) { return false; }
 }
 
-/** 카드 하나에 MC 자리를 만든다 */
-function mcBox(card, e, idx) {
-  const spr = mcSprite();
-  const text = h('span.mc-t', '곧 소개해 드릴게요!');
-  const nx = h('span.mc-nx', '▶');
-  const bub = h('div.mc-b', { role: 'button', tabIndex: 0, 'aria-live': 'polite' }, h('span.mc-who', MC_NAME), text, nx);
-  const replay = h('button.mc-btn', { type: 'button' }, '다시 듣기 ↻');
-  const skip = h('button.mc-btn', { type: 'button' }, '건너뛰기 ▶▶');
-  const box = h('div.mcbox.wait', spr.cv, bub, h('div.mc-ctl', skip, replay));
-  return { card, e, idx, spr, bub, text, nx, box, replay, skip, lines: null };
-}
-function mcSet(b, state) {
-  b.box.classList.toggle('wait', state === 'wait');
-  b.box.classList.toggle('live', state === 'live');
-  b.box.classList.toggle('done', state === 'done');
-  b.card.classList.toggle('mc-live', state === 'live');
-  b.spr.talking = false;
-  if (state === 'wait') { b.spr.pose = 'wait'; b.text.replaceChildren('앞 선수 소개 중… 잠시만요!'); }
-  if (state === 'done') { b.spr.pose = 'done'; b.text.replaceChildren('소개 끝! 다시 들으려면 “다시 듣기”를 눌러요.'); mcFocus(b, null); }
-}
-function mcFocus(b, f) {
-  b.card.querySelectorAll('.mc-hi').forEach((x) => x.classList.remove('mc-hi'));
-  if (!f) return;
-  const el = b.card.querySelector(`[data-mcf="${f}"]`) || (f.startsWith('draw-') ? b.card.querySelector('[data-mcf="draws"]') : null);
-  if (!el) return;
-  el.classList.add('mc-hi');
-  const r = el.getBoundingClientRect(), vh = window.innerHeight || 600;
-  if (r.top < 120 || r.bottom > vh - 70) el.scrollIntoView({ behavior: MC_REDUCED ? 'auto' : 'smooth', block: 'center' });
-}
-
-/** 공개 화면의 카드들에서 MC 소개를 차례로 진행한다. only: 그 카드만 다시 */
-function mcStart(boxes, key, only) {
-  if (MC.run) MC.run.stop();
-  if (!boxes.length) return;
-  const run = { stopped: false, timers: [], typer: 0, stop() { this.stopped = true; this.timers.forEach(clearTimeout); clearInterval(this.typer); try { if (window.speechSynthesis) window.speechSynthesis.cancel(); } catch (e) { /* 없어도 됨 */ } } };
-  MC.run = run;
-  const alive = () => !run.stopped && boxes[0].card.isConnected;
-  const later = (fn, ms) => run.timers.push(setTimeout(() => { if (alive()) fn(); else run.stop(); }, ms));
-  let ci = only != null ? only : Math.min(MC.played.get(key) || 0, boxes.length), li = 0, typing = false, next = null;
-  const finishAll = () => { run.stop(); MC.played.set(key, boxes.length); boxes.forEach((b) => mcSet(b, 'done')); };
-  boxes.forEach((b, i) => {
-    b.skip.onclick = () => { Sfx.play('ui'); finishAll(); };
-    b.replay.onclick = () => { Sfx.init(); Sfx.play('ui'); mcStart(boxes, key, i); };
-    b.bub.onclick = b.bub.onkeydown = (ev) => {
-      if (ev.type === 'keydown' && ev.key !== 'Enter' && ev.key !== ' ') return;
-      if (ev.type === 'keydown') ev.preventDefault();
-      if (MC.run !== run || !b.box.classList.contains('live')) return;
-      if (typing) { typing = 'skip'; return; }
-      if (next) { try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (e) { /* 없음 */ } const n = next; next = null; n(); }
-    };
-    const played = MC.played.get(key) || 0;
-    mcSet(b, only != null ? (i === only ? 'live' : i < played ? 'done' : 'wait') : i < ci ? 'done' : i === ci ? 'live' : 'wait');
-  });
-  if (ci >= boxes.length) return;
-  const startCard = () => {
-    const b = boxes[ci];
-    b.lines = mcLines(b.e, b.idx);
-    li = 0;
-    mcSet(b, 'live');
-    const r = b.card.getBoundingClientRect();
-    if (r.top < 0 || r.top > (window.innerHeight || 600) * 0.6) b.card.scrollIntoView({ behavior: MC_REDUCED ? 'auto' : 'smooth', block: 'start' });
-    Sfx.play('mcin');
-    later(showLine, 450);
-  };
-  const endCard = () => {
-    const b = boxes[ci];
-    mcSet(b, 'done');
-    if (only != null) { run.stop(); setTimeout(() => { if (b.card.isConnected && MC.run === run) mcStart(boxes, key); }, 600); return; }
-    ci++;
-    MC.played.set(key, ci);
-    if (ci < boxes.length) {
-      if (boxes[ci].box.classList.contains('done')) { endCard(); return; }
-      later(startCard, 500);
-    } else run.stop();
-  };
-  const showLine = () => {
-    const b = boxes[ci], ln = b.lines[li];
-    if (!ln) { endCard(); return; }
-    b.spr.pose = ln.p; b.spr.talking = true;
-    mcFocus(b, ln.f);
-    if (ln.sfx) Sfx.play(ln.sfx);
-    const segs = mcSegs(ln.s), total = segs.reduce((a, x) => a + Array.from(x.t).length, 0);
-    let n = 0, spoke = false, said = false;
-    b.nx.hidden = true;
-    const advance = () => { next = null; li++; later(showLine, 160); };
-    const settle = () => {
-      if (run.stopped) return;
-      typing = false; b.nx.hidden = false;
-      mcRender(b.text, segs, total);
-      if (!spoke) b.spr.talking = false;
-      next = advance;
-      const len = Array.from(segs.map((x) => x.t).join('')).length;
-      later(() => { if (next === advance) advance(); }, spoke ? (said ? 450 : Math.max(1500, len * 150)) : 650 + len * 38);
-    };
-    spoke = mcSpeak(ln.s, () => { said = true; b.spr.talking = false; if (next === advance && !typing) later(() => { if (next === advance) advance(); }, 350); });
-    if (MC_REDUCED) { settle(); return; }
-    typing = true;
-    clearInterval(run.typer);
-    run.typer = setInterval(() => {
-      if (!alive()) { run.stop(); return; }
-      if (typing === 'skip') n = total; else n += 1;
-      mcRender(b.text, segs, n);
-      if (n % 2 === 0) Sfx.play('blip');
-      if (n >= total) { clearInterval(run.typer); settle(); }
-    }, 26);
-  };
-  startCard();
-}

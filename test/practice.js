@@ -23,6 +23,7 @@ const { chromium } = require('playwright');
     }
     await p.waitForSelector('text=연습하고 시작', { timeout: 20000 });
     await p.screenshot({ path: __dirname + `/prac-reveal-${label}.png` });
+    await p.waitForSelector('.ss', { timeout: 5000 }).catch(() => {}); await p.click('text=쇼 건너뛰기').catch(() => {}); await p.waitForTimeout(700);
     await p.click('text=연습하고 시작'); await p.waitForTimeout(600);
     // 모든 기술을 한 번씩 눌러 본다 (화면 버튼)
     const info0 = await p.evaluate(() => { const bt = App.root.querySelector('.prac') ? true : false; return { overlay: bt }; });

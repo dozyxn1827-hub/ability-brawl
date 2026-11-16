@@ -10,17 +10,19 @@ function passView(name, msg, go) {
     h('button.btn.primary', { type: 'button', on: { click: () => { Sfx.init(); Sfx.play('ui'); go(); } } }, `${name} 준비됐어요`)));
 }
 function revealView(entries, actions, note) {
-  const cards = entries.map((e, i) => fighterCard(e, i));
-  // 카드마다 MC가 나와서 능력과 부작용을 차례로 소개한다
-  const boxes = cards.map((c, i) => { const b = mcBox(c, entries[i], i); c.insertBefore(b.box, c.children[1] || null); return b; });
   const key = entries.map((e) => e.name + ':' + (e.spec ? e.spec.title : '')).join('|');
-  setTimeout(() => { if (cards[0] && cards[0].isConnected) mcStart(boxes, key); }, 700);
-  return h('main.page',
+  const replay = h('button.btn.small.ghost', { type: 'button' }, '경매 쇼 다시 보기 ▶');
+  const page = h('main.page',
     h('p.step', 'STEP 3 / 3'),
-    h('h2', '설계서 공개'),
-    h('p.hint', `${MC_NAME}이 한 명씩 능력과 부작용을 소개해요. 말풍선을 누르면 다음으로 넘어가요.`),
-    h('div.cards', cards),
+    h('div.reveal-head', h('h2', '설계서 공개'), replay),
+    h('p.hint', '능력이 어떻게 구현됐는지, 상대가 붙인 부작용이 어떤 규칙이 됐는지 확인하세요.'),
+    h('div.cards', entries.map((e, i) => fighterCard(e, i))),
     h('div.sticky', actions, note ? h('span.hint', note) : null));
+  // 처음 공개할 때는 경매 무대 쇼부터: MC가 한 명씩 상품처럼 소개한다
+  const play = () => { if (!page.querySelector('.ss')) page.append(stageShow(entries, key)); };
+  replay.addEventListener('click', () => { Sfx.init(); Sfx.play('ui'); SHOW.seen.delete(key); SHOW.pos.delete(key); play(); });
+  if (!SHOW.seen.has(key)) play();
+  return page;
 }
 function forgeList(entries, note) {
   const bars = [], badges = [];

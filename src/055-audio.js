@@ -165,6 +165,12 @@ const Sfx = {
         case 'ui': O('p25', 660, 990, t, 0.06, 0.05); break;
         case 'blip': O('square', 620 + Math.random() * 260, 0, t, 0.025, 0.016); break;
         case 'mcin': O('square', 523, 0, t, 0.07, 0.035); O('square', 659, 0, t + 0.08, 0.07, 0.035); O('square', 784, 0, t + 0.16, 0.07, 0.035); O('square', 1047, 0, t + 0.24, 0.18, 0.045); break;
+        case 'drumroll': for (let i = 0; i < 20; i++) N(t + i * 0.045, 0.05, 0.04 + i * 0.003, { type: 'bandpass', f: 1800, q: 0.8 }); break;
+        case 'cymbal': N(t, 1.3, 0.09, { type: 'highpass', f: 6000, verb: 0.4 }); O('sine', 98, 60, t, 0.35, 0.12); break;
+        case 'crowd': for (let i = 0; i < 6; i++) N(t + i * 0.1, 1, 0.045, { type: 'bandpass', f: 500 + Math.random() * 1000, q: 1.4, att: 0.18 }); break;
+        case 'gavel': O('square', 200, 90, t, 0.08, 0.09); N(t, 0.06, 0.14, { type: 'bandpass', f: 1300, q: 2 }); break;
+        case 'siren': for (let i = 0; i < 6; i++) O('square', i % 2 ? 660 : 880, 0, t + i * 0.2, 0.18, 0.028); break;
+        case 'boo': N(t, 0.9, 0.05, { type: 'bandpass', f: 320, q: 2, att: 0.12 }); O('sawtooth', 170, 110, t, 0.8, 0.02, { lp: 500 }); break;
         case 'mcuh': O('sawtooth', 330, 150, t, 0.4, 0.035, { lp: 900 }); O('sawtooth', 220, 100, t + 0.18, 0.45, 0.03, { lp: 800 }); break;
         case 'ready': O('sine', 1320, 0, t, 0.12, 0.05); O('sine', 1980, 0, t + 0.04, 0.12, 0.035); break;
         case 'win': [[0, 0], [4, 0.12], [7, 0.24], [12, 0.36], [7, 0.52], [12, 0.62]].forEach(([s, d]) => O('p25', 523 * Math.pow(2, s / 12), 0, t + d, d > 0.5 ? 0.6 : 0.14, 0.07, { verb: 0.3 })); break;

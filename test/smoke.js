@@ -27,6 +27,7 @@ const { chromium } = require('playwright');
   await page.waitForTimeout(600);
   await page.screenshot({ path: __dirname + '/s5-reveal.png', fullPage: true });
   await page.evaluate(() => { window.__snd = {}; const o = Sfx.play.bind(Sfx); Sfx.play = (n, st, ex) => { const k = n === 'move' && ex ? 'move:' + ((ex.mv.sfx && ex.mv.sfx.kind) || ex.mv.vfx) : n; window.__snd[k] = (window.__snd[k] || 0) + 1; return o(n, st, ex); }; });
+  await page.waitForSelector('.ss', { timeout: 5000 }).catch(() => {}); await page.click('text=쇼 건너뛰기').catch(() => {}); await page.waitForTimeout(700);
   await page.click('text=바로 전투');
   await page.waitForTimeout(4500);
   await page.screenshot({ path: __dirname + '/s6-battle.png' });

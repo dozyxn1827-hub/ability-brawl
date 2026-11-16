@@ -44,6 +44,7 @@ const mock = require('./mock.js');
   await B.waitForSelector('text=설계서 공개', { timeout: 15000 });
   await B.screenshot({ path: __dirname + '/o5-revealB.png', fullPage: true });
   await A.waitForSelector('button:has-text("연습하고 시작"):not([disabled])', { timeout: 15000 });
+  await A.waitForSelector('.ss', { timeout: 5000 }).catch(() => {}); await A.click('text=쇼 건너뛰기').catch(() => {}); await A.waitForTimeout(700);
   await A.click('button:has-text("연습하고 시작")');
   await A.waitForSelector('.prac', { timeout: 8000 });
   await B.waitForSelector('.prac', { timeout: 8000 });
