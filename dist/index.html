@@ -383,19 +383,19 @@ const light = (c, t = 0.45) => mix(c, '#ffffff', t);
 
 /* ----- 열거형 ----- */
 const DEBUFFS = ['burn', 'poison', 'slow', 'root', 'stun', 'freeze', 'silence', 'confuse', 'weak', 'vuln', 'slip', 'heavy', 'dance', 'sleep', 'morph'];
-const BUFFS = ['haste', 'shield', 'regen', 'power', 'armor', 'invis', 'giant', 'tiny', 'fly', 'reflect', 'invuln'];
+const BUFFS = ['haste', 'shield', 'regen', 'power', 'armor', 'invis', 'giant', 'tiny', 'fly', 'reflect', 'invuln', 'counter'];
 const ST_ALL = DEBUFFS.concat(BUFFS);
 const ST_KO = {
   burn: '화상', poison: '중독', slow: '둔화', root: '속박', stun: '기절', freeze: '빙결', silence: '침묵',
   confuse: '혼란', weak: '약화', vuln: '취약', slip: '미끄러짐', heavy: '무거움', dance: '춤', sleep: '잠', morph: '변신',
   haste: '가속', shield: '보호막', regen: '재생', power: '강화', armor: '단단함', invis: '은신',
-  giant: '거대화', tiny: '축소', fly: '비행', reflect: '반사', invuln: '무적',
+  giant: '거대화', tiny: '축소', fly: '비행', reflect: '반사', invuln: '무적', counter: '반격 자세',
 };
 const ST_COLOR = {
   burn: '#ff7a2f', poison: '#9be04a', slow: '#7fb4ff', root: '#b58a4a', stun: '#ffe14a', freeze: '#9fe8ff',
   silence: '#b9a7ff', confuse: '#ff7ad9', weak: '#9aa0b8', vuln: '#ff5a5a', slip: '#c9f5ff', dance: '#ff8ad0', sleep: '#c8d8ff', morph: '#b6f24a', heavy: '#8d7f6a',
   haste: '#6dffb0', shield: '#7fd0ff', regen: '#7dff8a', power: '#ffb23f', armor: '#c9c9d6', invis: '#d9d9ff',
-  giant: '#ffa64a', tiny: '#ffd9f0', fly: '#bfe9ff', reflect: '#e7f6ff', invuln: '#fff3a0',
+  giant: '#ffa64a', tiny: '#ffd9f0', fly: '#bfe9ff', reflect: '#e7f6ff', invuln: '#fff3a0', counter: '#ffffff',
 };
 const HEADS = ['short', 'spiky', 'long', 'ponytail', 'bald', 'hood', 'hat', 'helmet', 'crown', 'horns', 'halo', 'cap', 'mask', 'ears', 'robot'];
 const WEAPONS = ['none', 'sword', 'staff', 'wand', 'gun', 'bow', 'hammer', 'scythe', 'book', 'orb', 'shield', 'dagger', 'axe', 'spear'];
@@ -471,7 +471,21 @@ function sanFx(e, slot) {
         from: oneOf(e.from, ['hand', 'sky', 'ground', 'around'], 'hand'), kb: num(e.kb, 0, 10, 2), st,
       };
     case 'beam':
-      return { t: 'beam', dmg: num(e.dmg, 1, 20, 5), len: num(e.len, 24, 320, 110), w: num(e.w, 2, 14, 4), ticks: Math.round(num(e.ticks, 1, 6, 2)), dur: num(e.dur, 0.1, 1.5, 0.4), both: bool(e.both), kb: num(e.kb, 0, 10, 1), st };
+      return { t: 'beam', dmg: num(e.dmg, 1, 20, 5), len: num(e.len, 24, 320, 110), w: num(e.w, 2, 14, 4), ticks: Math.round(num(e.ticks, 1, 6, 2)), dur: num(e.dur, 0.1, 1.5, 0.4), both: bool(e.both), sweep: num(e.sweep, 0, 220, 0), kb: num(e.kb, 0, 10, 1), st };
+    case 'swing':
+      return { t: 'swing', dmg: num(e.dmg, 1, 30, 9), r: num(e.r, 10, 44, 20), arc: num(e.arc, 40, 360, 120), n: Math.round(num(e.n, 1, 4, 1)), kb: num(e.kb, 0, 10, 4), st };
+    case 'cone':
+      return { t: 'cone', dmg: num(e.dmg, 1, 10, 3), len: num(e.len, 24, 120, 60), arc: num(e.arc, 20, 100, 50), dur: num(e.dur, 0.2, 1.6, 0.6), ticks: Math.round(num(e.ticks, 1, 8, 4)), kb: num(e.kb, 0, 6, 1), st };
+    case 'wave':
+      return { t: 'wave', dmg: num(e.dmg, 1, 40, 10), r: num(e.r, 16, 100, 44), at: oneOf(e.at, ['self', 'front', 'target'], 'self'), off: num(e.off, 0, 140, 40), n: Math.round(num(e.n, 1, 3, 1)), kb: num(e.kb, -10, 10, 6), st };
+    case 'line':
+      return { t: 'line', dmg: num(e.dmg, 1, 30, 10), n: Math.round(num(e.n, 3, 9, 5)), step: num(e.step, 10, 28, 18), r: num(e.r, 5, 16, 9), kb: num(e.kb, 0, 10, 4), st };
+    case 'chain':
+      return { t: 'chain', dmg: num(e.dmg, 1, 25, 9), n: Math.round(num(e.n, 1, 6, 3)), range: num(e.range, 40, 140, 90), kb: num(e.kb, 0, 6, 1), st };
+    case 'hook':
+      return { t: 'hook', dmg: num(e.dmg, 1, 25, 8), speed: num(e.speed, 150, 340, 280), range: num(e.range, 50, 200, 130), st };
+    case 'lob':
+      return { t: 'lob', dmg: num(e.dmg, 1, 45, 14), r: num(e.r, 8, 50, 20), n: Math.round(num(e.n, 1, 5, 1)), kb: num(e.kb, 0, 10, 5), st };
     case 'blast':
       return { t: 'blast', dmg: num(e.dmg, 1, 50, 14), r: num(e.r, 6, 56, 18), at, off: num(e.off, 0, 140, 26), delay: num(e.delay, 0, 1.5, 0.15), kb: num(e.kb, -10, 10, 5), st };
     case 'zone':
@@ -484,7 +498,7 @@ function sanFx(e, slot) {
       if (slot === 'basic') return null;
       const k = oneOf(e.k, BUFFS, null);
       if (!k) return null;
-      const cap = k === 'invuln' ? (slot === 'ult' ? 2.5 : 1.5) : k === 'invis' ? 5 : k === 'fly' ? 6 : 8;
+      const cap = k === 'invuln' ? (slot === 'ult' ? 2.5 : 1.5) : k === 'counter' ? 2 : k === 'invis' ? 5 : k === 'fly' ? 6 : 8;
       const o = { t: 'buff', k, d: r1(num(e.d, 1, cap, Math.min(4, cap))) };
       if (k === 'shield') o.pow = num(e.pow, 10, 60, 25);
       if (k === 'regen') o.pow = num(e.pow, 2, 8, 4);
@@ -515,6 +529,13 @@ function fxExpected(e) {
     case 'beam': return e.dmg * e.ticks;
     case 'zone': return e.dmg * (e.dur / 0.5) * 0.4;
     case 'all': return e.dmg * 1.5;
+    case 'swing': return e.dmg * e.n * (e.arc >= 300 ? 1.2 : 1);
+    case 'cone': return e.dmg * e.ticks * 0.7;
+    case 'wave': return e.dmg * e.n;
+    case 'line': return e.dmg * 1.2;
+    case 'chain': return e.dmg * Math.min(2.2, 1 + e.n * 0.3);
+    case 'hook': return e.dmg;
+    case 'lob': return e.dmg * (1 + (e.n - 1) * 0.5);
     case 'summon':
       if (e.kind === 'turret') return e.dmg * e.rate * e.dur * 0.35 * e.n;
       if (e.kind === 'chaser') return e.dmg * e.n * 1.5;
@@ -1018,7 +1039,7 @@ ${sideList}
 
 [설계 순서] 아래 순서대로 속으로 깊이 생각한 뒤 결과만 출력한다(생각 과정은 출력하지 않는다).
 1. 해석: 능력 글을 단어 하나하나 글자 그대로 읽는다. 그 능력이 진짜로 있다면 싸움판에서 벌어질 웃긴 장면을 여러 개 떠올리고, 글에 가장 충실하면서 가장 황당한 해석을 고른다. 말장난, 과장, 일상 소재의 엉뚱한 활용, 숫자·조건의 지나치게 성실한 해석을 적극 쓴다. 가장 먼저 떠오르는 뻔한 해석은 한 번 더 비틀어 본다.
-2. 콩트 구성: 네 기술이 한 편의 콩트처럼 이어지게 한다.
+2. 콩트 구성: 네 기술이 한 편의 콩트처럼 이어지게 한다. 네 기술의 공격 방식이 모두 달라야 한다(발사체만 네 개는 금지). 액션 게임처럼 휘두르기(swing), 분사(cone), 충격파(wave), 땅 가르기(line), 연쇄(chain), 갈고리(hook), 포물선 투척(lob), 광선 쓸기(beam sweep), 반격 자세(buff counter), 돌진·순간이동·소환·장판을 섞는다.
    · basic: 그 능력의 대표 개그를 가볍고 빠르게 연타. 쏠 때마다 손맛이 나게.
    · s1: 예상 밖으로 비튼 활용. 상태이상이나 장판으로 판을 깐다.
    · s2: 능력을 엉뚱하게 써서 도망·접근·방어·소환. 위기 탈출이나 기습.
@@ -1082,7 +1103,14 @@ SOUND: ${SOUND_KINDS.join('|')}
 SHAPE(pix가 없을 때 쓰는 기본 모양): ${SHAPES.join('|')}
 EFFECT (아레나 480x320px, 캐릭터 키 10px, 이동 속도 약 96px/초, 거리 px, 속도 px/초, 모두 가장 가까운 적 방향 기준):
  {"t":"shot","dmg":2~30,"n":1~8,"spread":0~120,"speed":80~340,"size":1~4,"homing":0~1,"pierce":bool,"bounce":0~3,"life":0.3~3,"boom":0~34,"ret":bool,"split":0~6,"from":"hand|sky|ground|around","kb":0~10,"st":ST} 발사체(hand 손에서 날아감, sky 적 주변에 하늘에서 떨어짐, ground 적 쪽으로 땅에서 차례로 솟음, around 사방으로, boom 폭발 반경, bounce 벽에 튕김, ret 부메랑처럼 돌아옴, split 터질 때 작은 조각 개수)
- {"t":"beam","dmg":2~20,"len":24~320,"w":2~14,"ticks":1~6,"dur":0.1~1.5,"both":bool,"kb":0~10,"st":ST} 광선(ticks번 dmg씩, both는 앞뒤로)
+ {"t":"beam","dmg":2~20,"len":24~320,"w":2~14,"ticks":1~6,"dur":0.1~1.5,"both":bool,"sweep":0~220,"kb":0~10,"st":ST} 광선(ticks번 dmg씩, both는 앞뒤로) (sweep: 각도만큼 휙 쓸면서 지나감)
+ {"t":"swing","dmg":2~30,"r":10~44,"arc":40~360,"n":1~4,"kb":0~10,"st":ST} 휘두르기(능력으로 만든 무언가를 앞쪽 부채꼴로 쓸어 벤다. arc 360이면 한 바퀴 회전베기, n은 좌우로 번갈아 몇 번)
+ {"t":"cone","dmg":1~10,"len":24~120,"arc":20~100,"dur":0.2~1.6,"ticks":1~8,"kb":0~6,"st":ST} 부채꼴 분사(숨결·물줄기·가스·소리를 앞으로 쏟아낸다)
+ {"t":"wave","dmg":2~40,"r":16~100,"at":"self|front|target","off":0~140,"n":1~3,"kb":-10~10,"st":ST} 충격파(한 점에서 고리가 퍼져 나간다. 내려찍기·고함·발 구르기. n번 연속)
+ {"t":"line","dmg":2~30,"n":3~9,"step":10~28,"r":5~16,"kb":0~10,"st":ST} 땅 가르기(조준 방향으로 기둥·가시·불기둥이 차례로 솟는다)
+ {"t":"chain","dmg":2~25,"n":1~6,"range":40~140,"st":ST} 연쇄(가장 가까운 적에게 꽂히고 옆 적으로 n번 튄다)
+ {"t":"hook","dmg":2~25,"speed":150~340,"range":50~200,"st":ST} 갈고리(줄 달린 무언가를 던져 맞은 적을 내 쪽으로 끌어온다)
+ {"t":"lob","dmg":2~45,"r":8~50,"n":1~5,"kb":0~10,"st":ST} 포물선 투척(머리 위로 던져 표시된 곳에 떨어져 터진다. 벽을 넘어간다)
  {"t":"blast","dmg":4~50,"r":6~56,"at":"self|front|target","off":0~140,"delay":0~1.5,"kb":-10~10,"st":ST} 폭발(kb 음수는 끌어당김, front는 적 방향 off만큼 앞, target은 적 위치)
  {"t":"zone","dmg":0~8,"r":8~50,"dur":1.5~8,"at":"self|front|target","off":0~140,"follow":bool,"heal":0~6,"st":ST} 장판(0.5초마다 dmg, heal은 안에 선 자신 회복, follow는 자신을 따라다님)
  {"t":"trail","dmg":0~6,"r":6~16,"dur":1~6,"life":1~4,"st":ST} dur초 동안 지나간 자리에 흔적 장판을 남김
@@ -1095,7 +1123,7 @@ EFFECT (아레나 480x320px, 캐릭터 키 10px, 이동 속도 약 96px/초, 거
  {"t":"swap"} 가장 가까운 적과 자리 바꾸기
  basic에는 buff, heal, all, swap을 쓸 수 없다. "st"는 생략 가능. ST: {"k":DEBUFF,"d":0.5~5}
 DEBUFF: burn(화상 지속피해)|poison(중독 지속피해)|slow|root(이동 불가)|stun(기절)|freeze(빙결)|silence(능력 봉인)|confuse(방향 반전)|weak(공격력 감소)|vuln(받는 피해 증가)|slip(미끄러짐)|heavy(무거움: 느려지고 돌진·순간이동 불가)|dance(강제로 춤춤: 아무것도 못 함)|sleep(잠듦: 맞으면 깸)|morph(변신: 그 기술의 pix 모양 생물로 변해 능력을 못 쓰고 느려짐)
-BUFF: haste|shield|regen|power|armor|invis|giant|tiny|fly|reflect|invuln
+BUFF: haste|shield|regen|power|armor|invis|giant|tiny|fly|reflect|invuln|counter(반격 자세: 그 시간 안에 처음 맞는 공격을 막고 되돌려 줌, 최대 2초)
 PASSIVE: {"k":"regen|thorns|lifesteal|armor|rage|aura|revive|swift|crit|dodge","desc":"설명(30자 이내)"}
 DRAWBACK: {"how":"게임에서 실제로 벌어지는 일(50자 이내)","say":"부작용이 터질 때 하는 말(14자 이내, 없으면 빈 문자열)","fx":DFX,"more":[DFX, ...]}
 ON: basic|s1|s2|ult|skills(네 능력 모두)
@@ -1428,17 +1456,17 @@ const STYLES = {
     re: /총|저격|쏘|쏜|쏴|발사|활|화살|사격|명중|스나이퍼|탄|헤드샷/, keys: ['metal', 'ball'], mech: ['shot'],
     title: ['스나이퍼', '총잡이', '명사수'], stats: { hp: 90, speed: 1.05 }, passive: 'crit', weapon: 'gun',
     basic: { m: 'shot', fx: (P, S, o) => [{ t: 'shot', dmg: 7 * P, speed: 320, size: 1, pierce: o.pierce, homing: o.homing ? 0.4 : 0 }], name: ['{n} 따발총', '{n} 연사', '{n} 탕탕'], desc: ['{n을} 기관총처럼 갈긴다. 탄창 개념 없음', '{n을} 빛의 속도로 쏜다. 조준은 감'] },
-    s1: { m: 'shot', fx: (P, S, o) => [{ t: 'shot', dmg: 9 * P, n: 3, spread: 36, speed: 280, size: 2, bounce: 2, st: SX(S, 1.2) }], name: ['{n} 샷건', '{n} 3연발', '{n} 산탄'], desc: ['{n} 세 발을 부채꼴로 뿌린다. 벽에 맞으면 튕긴다'] },
+    s1: { m: 'cone', fx: (P, S) => [{ t: 'cone', dmg: 11 * P, len: 58, arc: 48, dur: 0.2, ticks: 1, kb: 6, st: SX(S, 1.2) }], name: ['{n} 샷건', '{n} 산탄 한 방'], desc: ['코앞에 {n} 산탄을 부채꼴로 쾅! 가까울수록 아프다'] },
     s2: { m: 'blink', fx: (P) => [{ t: 'blink', to: 'back', dist: 90 }, { t: 'summon', kind: 'mine', n: 2, dmg: 11 * P, dur: 9 }], name: ['전략적 {n} 후퇴', '{n} 백스텝'], desc: ['뒤로 빠지면서 {n} 지뢰를 놓고 간다. 비겁하지만 효과적'] },
-    ult: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 10 * P, len: 320, w: 6, ticks: 4, dur: 0.6, kb: 6, st: SX(S || 'stun', 1.5) }], name: ['{n} 레일건', '{n} 헤드샷', '{n} 저격 한 방'], desc: ['맵 끝까지 꿰뚫는 {n} 한 발. 벽 따윈 신경 안 쓴다'] },
+    ult: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 8 * P, len: 300, w: 6, ticks: 5, dur: 0.9, sweep: 120, kb: 5, st: SX(S || 'stun', 1.2) }], name: ['{n} 회전 난사', '{n} 레일건 쓸기'], desc: ['{n} 레이저를 쥐고 앞을 싹 쓸어 버린다. 피하려면 엎드려'] },
   },
   bomber: {
     re: /폭탄|폭발|터뜨|터지|터진|펑|폭파|다이너마이트|수류탄|폭죽|불꽃놀이|자폭/, keys: ['fire'], mech: ['boom'],
     title: ['폭탄마', '불꽃놀이 장인', '철거 전문가'], stats: { hp: 100, speed: 1 }, passive: 'rage', weapon: 'none',
-    basic: { m: 'boom', fx: (P, S) => [{ t: 'blast', at: 'front', off: 34, r: 14, dmg: 9 * P, delay: 0.25, kb: 5, st: SX(S, 0.8) }], name: ['{n} 수류탄', '{n} 딱총', '{n} 폭죽'], desc: ['{n을} 던지면 앞에서 펑! 터진다'] },
-    s1: { m: 'boom', fx: (P, S) => [{ t: 'shot', dmg: 10 * P, size: 3, speed: 210, boom: 22, split: 4, st: SX(S, 1.2) }], name: ['{n} 집속탄', '{n} 분열 폭탄'], desc: ['{n} 폭탄이 터지면서 작은 {n} 네 개로 갈라진다'] },
+    basic: { m: 'lob', fx: (P, S) => [{ t: 'lob', dmg: 9 * P, r: 15, kb: 5, st: SX(S, 0.8) }], name: ['{n} 수류탄', '{n} 휙 던지기', '{n} 폭죽'], desc: ['{n을} 머리 위로 휙 던지면 떨어진 곳이 펑!'] },
+    s1: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 10 * P, size: 3, speed: 210, boom: 22, split: 4, st: SX(S, 1.2) }], name: ['{n} 집속탄', '{n} 분열 폭탄'], desc: ['{n} 폭탄이 터지면서 작은 {n} 네 개로 갈라진다'] },
     s2: { m: 'mine', fx: (P) => [{ t: 'summon', kind: 'mine', n: 3, dmg: 12 * P, dur: 10 }, { t: 'blink', to: 'back', dist: 60 }], name: ['{n} 지뢰밭', '{n} 깜짝 선물'], desc: ['{n} 지뢰를 깔고 튄다. 밟는 사람 책임'] },
-    ult: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 8, dmg: 8 * P, size: 3, boom: 18, speed: 240, st: SX(S, 1.5) }, { t: 'all', dmg: 3 * P, st: SX(S || 'stun', 1) }], name: ['{n} 융단 폭격', '{n} 불꽃놀이 대참사'], desc: ['하늘에서 {n} 폭탄이 비처럼 쏟아진다. 대피는 늦었다'] },
+    ult: { m: 'lob', fx: (P, S) => [{ t: 'lob', dmg: 14 * P, r: 26, n: 5, kb: 7, st: SX(S || 'stun', 1.3) }, { t: 'wave', at: 'target', dmg: 8 * P, r: 70, kb: 6 }], name: ['{n} 융단 폭격', '{n} 불꽃놀이 대참사'], desc: ['{n} 폭탄 다섯 개를 하늘 높이 던진다. 대피는 늦었다'] },
   },
   summoner: {
     re: /소환|부르|불러|군단|부하|떼|무리|친구들|키우|애완|펫|동물|조련/, keys: ['animal', 'bug'], mech: ['summon'],
@@ -1446,31 +1474,31 @@ const STYLES = {
     basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 220, size: 2, homing: 0.6, st: SX(S, 0.8) }], name: ['{n} 물어!', '{n} 던지기', '{n} 출동'], desc: ['{n} 한 마리를 던진다. 알아서 따라가서 문다'] },
     s1: { m: 'summon', fx: (P, S, o) => [{ t: 'summon', kind: 'chaser', n: Math.max(3, Math.min(o.n, 4)), dmg: 7 * P, dur: 7, st: SX(S, 1) }], name: ['{n} 군단', '{n} 우르르', '{n} 친구들'], desc: ['{n}들이 우르르 몰려가 들이받는다'] },
     s2: { m: 'orbit', fx: (P) => [{ t: 'summon', kind: 'orbit', n: 3, dmg: 5 * P, dur: 6 }, { t: 'buff', k: 'shield', d: 3, pow: 20 }], name: ['{n} 경호원', '{n} 호위대'], desc: ['{n} 경호원들이 주위를 빙빙 돌며 지켜 준다'] },
-    ult: { m: 'summon', fx: (P, S) => [{ t: 'summon', kind: 'chaser', n: 4, dmg: 9 * P, dur: 9, st: SX(S, 1.4) }, { t: 'summon', kind: 'turret', n: 1, dmg: 5 * P, rate: 1.2, dur: 8 }, { t: 'all', dmg: 3 * P, st: SX(S || 'weak', 1.5) }], name: ['{n} 민족 대이동', '{n} 총동원령'], desc: ['온 동네 {n이} 다 몰려온다. 감당은 각자'] },
+    ult: { m: 'wave', fx: (P, S) => [{ t: 'summon', kind: 'chaser', n: 4, dmg: 9 * P, dur: 9, st: SX(S, 1.4) }, { t: 'wave', at: 'self', dmg: 14 * P, r: 80, n: 2, kb: 8, st: SX(S || 'weak', 1.4) }], name: ['{n} 민족 대이동', '{n} 대폭주'], desc: ['온 동네 {n이} 땅을 울리며 몰려온다. 감당은 각자'] },
   },
   brawler: {
     re: /주먹|펀치|박치기|태권도|복싱|권투|씨름|레슬링|발차기|돌려차기|힘|괴력|근육|격투|싸움|때리|패|두들|헤드락|드롭킥|태클/, keys: ['power'], mech: ['dash'],
     title: ['파이터', '동네 깡패', '근육맨'], stats: { hp: 115, speed: 1.05 }, passive: 'rage', weapon: 'none',
-    basic: { m: 'boom', fx: (P, S) => [{ t: 'blast', at: 'front', off: 12, r: 13, dmg: 10 * P, delay: 0, kb: 6, st: SX(S, 0.8) }], name: ['{n} 펀치', '{n} 싸대기', '{n} 잽'], desc: ['{n} 힘을 실은 주먹. 가까이서만 닿는다'] },
+    basic: { m: 'swing', fx: (P, S) => [{ t: 'swing', dmg: 9 * P, r: 18, arc: 110, kb: 6, st: SX(S, 0.8) }], name: ['{n} 싸대기', '{n} 훅', '{n} 잽'], desc: ['{n} 힘을 실어 옆으로 후려친다'] },
     s1: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 100, dmg: 14 * P, invuln: true, kb: 8, st: SX(S || 'stun', 1) }], name: ['{n} 태클', '{n} 박치기', '{n} 돌진'], desc: ['머리부터 {n} 기운으로 냅다 들이받는다'] },
-    s2: { m: 'big', fx: (P) => [{ t: 'buff', k: 'giant', d: 4 }, { t: 'buff', k: 'armor', d: 4 }, { t: 'blast', at: 'self', r: 26, dmg: 10 * P, kb: 9 }], name: ['{n} 벌크업', '{n} 근육 펌핑'], desc: ['근육이 {n}처럼 부풀어 오르며 주변을 날려 버린다'] },
-    ult: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 130, dmg: 18 * P, invuln: true, kb: 6 }, { t: 'blast', at: 'self', r: 44, dmg: 30 * P, delay: 0.1, kb: 10, st: SX(S || 'stun', 1.6) }], name: ['{n} 필살 드롭킥', '{n} 지구 내려찍기'], desc: ['날아올라 {n} 기운으로 땅을 내려찍는다. 지진 주의'] },
+    s2: { m: 'wave', fx: (P) => [{ t: 'buff', k: 'armor', d: 4 }, { t: 'wave', at: 'self', dmg: 10 * P, r: 44, kb: 9, st: { k: 'slow', d: 1 } }], name: ['{n} 발 구르기', '{n} 근육 펌핑'], desc: ['발을 쿵 굴러 주변을 날려 버리고 단단해진다'] },
+    ult: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 130, dmg: 16 * P, invuln: true, kb: 6 }, { t: 'wave', at: 'self', dmg: 28 * P, r: 70, n: 2, kb: 10, st: SX(S || 'stun', 1.4) }], name: ['{n} 필살 드롭킥', '{n} 지구 내려찍기'], desc: ['날아올라 {n} 기운으로 땅을 내려찍는다. 지진 주의'] },
   },
   assassin: {
     re: /닌자|암살|그림자|몰래|숨|은신|투명|기습|뒤통수|등 뒤|사라|순간이동|텔레포트/, keys: ['dark', 'ghost'], mech: ['invis', 'blink'],
     title: ['암살자', '닌자', '뒤통수 전문가'], stats: { hp: 85, speed: 1.2 }, passive: 'dodge', weapon: 'dagger',
-    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 330, size: 1, homing: 0.3, st: SX(S, 0.8) }], name: ['{n} 표창', '{n} 암기', '{n} 비수'], desc: ['소리 없이 {n을} 날린다. 맞아도 뭔지 모른다'] },
-    s1: { m: 'blink', fx: (P, S) => [{ t: 'blink', to: 'behind', dist: 90 }, { t: 'blast', at: 'self', r: 16, dmg: 14 * P, delay: 0.05, kb: 4, st: SX(S, 1.2) }], name: ['뒤통수 {n}', '{n} 기습'], desc: ['순식간에 적 뒤로 가서 {n을} 꽂는다'] },
+    basic: { m: 'swing', fx: (P, S) => [{ t: 'swing', dmg: 5 * P, r: 16, arc: 80, n: 2, kb: 2, st: SX(S, 0.6) }], name: ['{n} 난도질', '{n} 두 번 베기'], desc: ['{n으로} 좌우로 쉭쉭 두 번 벤다'] },
+    s1: { m: 'blink', fx: (P, S) => [{ t: 'blink', to: 'behind', dist: 90 }, { t: 'swing', dmg: 13 * P, r: 22, arc: 360, kb: 4, st: SX(S, 1.2) }], name: ['뒤통수 {n}', '{n} 기습'], desc: ['순식간에 적 뒤로 가서 {n으로} 한 바퀴 휙'] },
     s2: { m: 'invis', fx: () => [{ t: 'buff', k: 'invis', d: 3.5 }, { t: 'buff', k: 'haste', d: 3.5 }], name: ['{n} 위장술', '나는 {n}이다', '{n} 은신'], desc: ['{n}인 척 숨는다. 아무도 못 알아본다(아마도)'] },
-    ult: { m: 'blink', fx: (P, S) => [{ t: 'blink', to: 'behind', dist: 120 }, { t: 'blast', at: 'self', r: 30, dmg: 28 * P, delay: 0.1, kb: 6, st: SX(S || 'silence', 2) }, { t: 'buff', k: 'invis', d: 2 }], name: ['{n} 그림자 처형', '{n} 무영각'], desc: ['그림자처럼 사라졌다가 {n으로} 한 방에 끝낸다'] },
+    ult: { m: 'chain', fx: (P, S) => [{ t: 'blink', to: 'behind', dist: 120 }, { t: 'chain', dmg: 18 * P, n: 4, range: 110, st: SX(S || 'silence', 1.6) }, { t: 'buff', k: 'invis', d: 2 }], name: ['{n} 그림자 처형', '{n} 무영각'], desc: ['그림자처럼 사라졌다가 적들을 차례로 {n으로} 베고 지나간다'] },
   },
   tank: {
     re: /단단|튼튼|철벽|방패|벽|버티|막|지키|보호|갑옷|탱크|거대|거인|뚱뚱|무거|바위/, keys: ['earth'], mech: ['shield', 'big'],
     title: ['철벽', '인간 방패', '움직이는 벽'], stats: { hp: 135, speed: 0.85, size: 1.15 }, passive: 'armor', weapon: 'shield',
-    basic: { m: 'boom', fx: (P, S) => [{ t: 'blast', at: 'front', off: 16, r: 15, dmg: 9 * P, delay: 0, kb: 9, st: SX(S || 'heavy', 0.8) }], name: ['{n} 몸빵', '{n} 밀치기', '{n} 엉덩이 공격'], desc: ['{n} 같은 몸으로 밀쳐 버린다'] },
-    s1: { m: 'pull', fx: (P, S) => [{ t: 'blast', at: 'target', r: 34, kb: -9, dmg: 10 * P, delay: 0.3, st: SX(S || 'root', 1.2) }], name: ['{n} 이리 와', '{n} 끌어안기'], desc: ['{n} 힘으로 적을 내 쪽으로 끌어온다. 포옹은 덤'] },
-    s2: { m: 'shield', fx: () => [{ t: 'summon', kind: 'barrier', n: 2, dur: 7 }, { t: 'buff', k: 'shield', d: 4, pow: 40 }], name: ['{n} 철벽', '{n} 성벽', '{n} 방패'], desc: ['{n} 벽을 세우고 그 뒤에 숨는다'] },
-    ult: { m: 'big', fx: (P, S) => [{ t: 'buff', k: 'giant', d: 5 }, { t: 'blast', at: 'self', r: 52, dmg: 30 * P, kb: 10, delay: 0.2, st: SX(S || 'stun', 1.6) }, { t: 'all', dmg: 3 * P, st: { k: 'heavy', d: 2 } }], name: ['거대 {n} 강림', '{n} 대지진'], desc: ['집채만큼 커져서 땅을 쿵! 모두 휘청인다'] },
+    basic: { m: 'swing', fx: (P, S) => [{ t: 'swing', dmg: 9 * P, r: 19, arc: 150, kb: 9, st: SX(S || 'heavy', 0.8) }], name: ['{n} 몸빵', '{n} 밀치기', '{n} 엉덩이 공격'], desc: ['{n} 같은 몸으로 앞을 싹 밀쳐 버린다'] },
+    s1: { m: 'hook', fx: (P, S) => [{ t: 'hook', dmg: 9 * P, speed: 260, range: 140, st: SX(S || 'root', 1) }], name: ['{n} 이리 와', '{n} 갈고리'], desc: ['{n} 줄을 던져 적을 내 쪽으로 질질 끌어온다'] },
+    s2: { m: 'counter', fx: () => [{ t: 'buff', k: 'counter', d: 1.6 }, { t: 'buff', k: 'shield', d: 4, pow: 35 }], name: ['{n} 철벽 반격', '건드리면 {n}'], desc: ['{n} 자세로 버틴다. 때리면 그대로 되돌려 준다'] },
+    ult: { m: 'wave', fx: (P, S) => [{ t: 'buff', k: 'giant', d: 5 }, { t: 'wave', at: 'self', dmg: 26 * P, r: 90, n: 3, kb: 9, st: SX(S || 'stun', 1.4) }], name: ['거대 {n} 강림', '{n} 대지진'], desc: ['집채만큼 커져서 땅을 세 번 쿵쿵쿵! 모두 휘청인다'] },
   },
   healer: {
     re: /회복|치유|치료|살리|간호|의사|약|힐|낫게|돌봐|보살|응원|기도/, keys: ['plant', 'love', 'holy'], mech: ['heal'],
@@ -1478,111 +1506,111 @@ const STYLES = {
     basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 240, size: 2, st: SX(S || 'weak', 0.8) }], name: ['{n} 주사', '{n} 처방', '{n} 링거'], desc: ['{n을} 한 방 놓아 준다. 맞는 쪽은 아프다'] },
     s1: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'target', r: 26, dur: 4, dmg: 3 * P, heal: 4, st: SX(S, 1) }], name: ['{n} 힐링존', '{n} 치료실'], desc: ['{n} 기운이 퍼지는 구역. 나는 낫고 적은 괴롭다'] },
     s2: { m: 'heal', fx: () => [{ t: 'heal', amt: 22 }, { t: 'buff', k: 'regen', d: 4, pow: 4 }], name: ['{n} 보약', '{n} 응급처치', '{n} 한 그릇'], desc: ['{n으로} 기운을 쭉 채운다'] },
-    ult: { m: 'heal', fx: (P, S) => [{ t: 'heal', amt: 40 }, { t: 'all', dmg: 6 * P, st: SX(S || 'weak', 2) }, { t: 'buff', k: 'shield', d: 4, pow: 30 }], name: ['{n}의 기적', '{n} 대학병원'], desc: ['{n}의 기적! 나는 다 낫고 모두에게 {n} 폭격'] },
+    ult: { m: 'wave', fx: (P, S) => [{ t: 'heal', amt: 38 }, { t: 'wave', at: 'self', dmg: 16 * P, r: 90, n: 2, kb: 7, st: SX(S || 'weak', 1.6) }, { t: 'buff', k: 'shield', d: 4, pow: 30 }], name: ['{n}의 기적', '{n} 대학병원'], desc: ['{n}의 기적! 나는 다 낫고 치유의 파동이 적을 날려 버린다'] },
   },
   beamer: {
-    re: /광선|빔|레이저|뿜|내뿜|발사광|에너지파|파동|고함|외침|소리|비명/, keys: ['elec', 'holy', 'ki', 'sound'], mech: ['beam'],
+    re: /광선|빔|레이저|뿜|내뿜|발사광|에너지파|파동|고함|외침|소리|비명|번개|전기/, keys: ['elec', 'holy', 'ki', 'sound'], mech: ['beam'],
     title: ['빔 마니아', '인간 레이저', '발광체'], stats: { hp: 95, speed: 1 }, passive: 'crit', weapon: 'orb',
     basic: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 4 * P, len: 120, w: 3, ticks: 2, dur: 0.3, st: SX(S, 0.6) }], name: ['{n} 빔', '{n} 광선', '{n} 레이저'], desc: ['{n을} 짧게 쭉 뿜는다'] },
-    s1: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 6 * P, len: 210, w: 6, ticks: 3, dur: 0.5, kb: 4, st: SX(S || 'slow', 1.2) }], name: ['굵은 {n} 빔', '{n} 대포'], desc: ['{n} 광선을 굵고 길게 뿜는다. 눈부심 주의'] },
+    s1: { m: 'chain', fx: (P, S) => [{ t: 'chain', dmg: 10 * P, n: 4, range: 100, st: SX(S || 'stun', 0.8) }], name: ['{n} 연쇄', '{n} 튕기기'], desc: ['{n이} 적에게 꽂힌 뒤 옆 사람에게 계속 튄다'] },
     s2: { m: 'reflect', fx: () => [{ t: 'buff', k: 'reflect', d: 2.5 }, { t: 'blink', to: 'back', dist: 70 }], name: ['{n} 반사막', '{n} 거울'], desc: ['{n} 막으로 공격을 튕겨 내고 뒤로 빠진다'] },
-    ult: { m: 'beam', fx: (P, S) => [{ t: 'beam', both: true, dmg: 9 * P, len: 320, w: 12, ticks: 5, dur: 1, kb: 5, st: SX(S || 'stun', 1.5) }], name: ['{n} 파멸의 광선', '{n} 앞뒤 빔'], desc: ['앞뒤로 동시에 {n} 광선 발사. 옆은 안전하다'] },
+    ult: { m: 'beam', fx: (P, S) => [{ t: 'beam', both: true, dmg: 9 * P, len: 300, w: 12, ticks: 6, dur: 1.2, sweep: 200, kb: 5, st: SX(S || 'stun', 1.2) }], name: ['{n} 파멸의 광선', '{n} 앞뒤 회전빔'], desc: ['앞뒤로 {n} 광선을 뿜으며 빙글 돈다. 숨을 곳이 없다'] },
   },
   polluter: {
     re: /냄새|방귀|독|오염|뿌리|뿌려|퍼뜨|흩뿌|더럽|침|콧물|코딱지|똥|썩|악취|구린/, keys: ['stink', 'poison', 'gross'], mech: ['zone', 'trail'],
     title: ['테러리스트', '환경 파괴범', '민폐왕'], stats: { hp: 105, speed: 1 }, passive: 'thorns', weapon: 'none',
-    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 230, size: 2, st: SX(S || 'poison', 1.2) }], name: ['{n} 투척', '{n} 한 방울', '{n} 묻히기'], desc: ['{n을} 묻혀 버린다. 냄새가 오래간다'] },
-    s1: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'target', r: 30, dur: 5, dmg: 4 * P, st: SX(S || 'poison', 1.5) }], name: ['{n} 지옥', '{n} 늪', '{n} 장판'], desc: ['바닥이 {n으로} 뒤덮인다. 들어가면 후회한다'] },
+    basic: { m: 'cone', fx: (P, S) => [{ t: 'cone', dmg: 4 * P, len: 52, arc: 55, dur: 0.4, ticks: 2, st: SX(S || 'poison', 1) }], name: ['{n} 분사', '{n} 뿌리기', '{n} 살포'], desc: ['{n을} 앞으로 칙칙 뿌린다. 냄새가 오래간다'] },
+    s1: { m: 'lob', fx: (P, S) => [{ t: 'lob', dmg: 8 * P, r: 20, kb: 3, st: SX(S || 'poison', 1.2) }, { t: 'zone', at: 'target', r: 28, dur: 4.5, dmg: 3 * P, st: SX(S || 'poison', 1.2) }], name: ['{n} 폭탄', '{n} 투하'], desc: ['{n} 덩어리를 던지면 떨어진 곳이 {n} 늪이 된다'] },
     s2: { m: 'trail', fx: (P, S) => [{ t: 'trail', dmg: 3 * P, dur: 5, life: 3, st: SX(S || 'slow', 1) }, { t: 'buff', k: 'haste', d: 4 }], name: ['{n} 자국', '{n} 질주'], desc: ['빨리 달리면서 지나간 자리에 {n을} 남긴다'] },
-    ult: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'self', follow: true, r: 46, dur: 6, dmg: 5 * P, st: SX(S || 'poison', 1.5) }, { t: 'all', dmg: 4 * P, st: SX(S || 'confuse', 1.5) }], name: ['{n} 국가 재난', '{n} 대환장 파티'], desc: ['내 주변 전체가 {n} 구역이 된다. 숨 참으세요'] },
+    ult: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'self', follow: true, r: 46, dur: 6, dmg: 5 * P, st: SX(S || 'poison', 1.5) }, { t: 'wave', at: 'self', dmg: 10 * P, r: 70, kb: 7, st: SX(S || 'confuse', 1.5) }], name: ['{n} 국가 재난', '{n} 대환장 파티'], desc: ['{n} 폭발! 내 주변 전체가 {n} 구역이 된다. 숨 참으세요'] },
   },
   artillery: {
     re: /하늘에서|쏟아|소나기|우박|떨어|폭우|비처럼|퍼붓|폭격|공습|내리/, keys: ['money', 'water', 'space', 'sweet'], mech: ['rain'],
     title: ['기상캐스터', '포병', '하늘의 장난꾼'], stats: { hp: 90, speed: 0.95 }, passive: 'crit', weapon: 'wand',
-    basic: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 2, dmg: 6 * P, size: 2, speed: 240, st: SX(S, 0.6) }], name: ['{n} 낙하', '{n} 떨구기'], desc: ['하늘에서 {n} 두 개가 떨어진다'] },
+    basic: { m: 'lob', fx: (P, S) => [{ t: 'lob', dmg: 8 * P, r: 13, kb: 3, st: SX(S, 0.6) }], name: ['{n} 낙하', '{n} 떨구기'], desc: ['{n을} 포물선으로 던져 정수리에 떨군다'] },
     s1: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 5, dmg: 6 * P, size: 3, boom: 10, speed: 240, st: SX(S || 'slow', 1.2) }], name: ['{n} 소나기', '{n} 우박'], desc: ['{n이} 소나기처럼 쏟아진다'] },
-    s2: { m: 'fly', fx: (P) => [{ t: 'buff', k: 'fly', d: 4 }, { t: 'shot', from: 'sky', n: 3, dmg: 5 * P, size: 2, speed: 220 }], name: ['{n} 열기구', '공중 {n} 투하'], desc: ['하늘로 둥실 떠올라 {n을} 떨군다'] },
+    s2: { m: 'fly', fx: (P) => [{ t: 'buff', k: 'fly', d: 4 }, { t: 'lob', dmg: 6 * P, r: 16, n: 3 }], name: ['{n} 열기구', '공중 {n} 투하'], desc: ['하늘로 둥실 떠올라 {n을} 마구 떨군다'] },
     ult: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 8, dmg: 8 * P, size: 3, boom: 16, speed: 250, st: SX(S || 'stun', 1.4) }, { t: 'all', dmg: 4 * P, st: SX(S || 'slow', 2) }], name: ['{n} 대홍수', '{n} 종말의 비'], desc: ['하늘이 뚫린 듯 {n이} 쏟아진다. 우산은 소용없다'] },
   },
   trickster: {
     re: /마술|마법|홀리|혼란|최면|장난|거짓말|속이|사기|변신|헷갈|바꿔|웃기|웃게|간지|시간|멈추|되감|요술|주문/, keys: ['magic', 'time', 'ice'], mech: ['swap', 'all'],
     title: ['마술사', '사기꾼', '장난꾸러기'], stats: { hp: 90, speed: 1.05 }, passive: 'dodge', weapon: 'wand',
-    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 250, size: 2, bounce: 1, st: SX(S || 'confuse', 0.8) }], name: ['{n} 장난', '{n} 깜짝 상자', '{n} 트릭'], desc: ['{n을} 던진다. 맞으면 정신이 없다'] },
-    s1: { m: 'all', fx: (P, S) => [{ t: 'all', dmg: 3 * P, st: SX(S || 'confuse', 1.5) }], name: ['{n} 최면', '{n} 마술 쇼'], desc: ['모두가 {n}에 홀린다. 박수는 강제'] },
-    s2: { m: 'swap', fx: () => [{ t: 'swap' }, { t: 'buff', k: 'haste', d: 2.5 }], name: ['{n} 바꿔치기', '{n} 눈속임'], desc: ['{n} 마술로 적과 자리를 바꾼다. 어리둥절'] },
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 250, size: 2, bounce: 2, st: SX(S || 'confuse', 0.8) }], name: ['{n} 장난', '{n} 깜짝 상자', '{n} 트릭'], desc: ['{n을} 던지면 벽에 튕겨 다닌다. 맞으면 정신이 없다'] },
+    s1: { m: 'chain', fx: (P, S) => [{ t: 'chain', dmg: 6 * P, n: 5, range: 110, st: SX(S || 'confuse', 1.4) }], name: ['{n} 카드 마술', '{n} 최면 연쇄'], desc: ['{n이} 이 사람 저 사람 튀어 다니며 홀린다'] },
+    s2: { m: 'swap', fx: () => [{ t: 'swap' }, { t: 'buff', k: 'counter', d: 1.2 }], name: ['{n} 바꿔치기', '{n} 눈속임'], desc: ['적과 자리를 바꾸고 반격 자세로 히죽 웃는다'] },
     ult: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'target', r: 44, dur: 5, dmg: 3 * P, st: { k: 'morph', d: 2 } }, { t: 'all', dmg: 4 * P, st: SX(S || 'dance', 1.5) }], name: ['{n} 변신 쇼', '{n} 대환장 마술'], desc: ['구역 안의 모두가 {n} 때문에 변신한다'] },
   },
   speedster: {
     re: /빠르|빨라|달리|질주|스피드|속도|번개처럼|총알처럼|광속|순식간|폭주|드리프트/, keys: ['speed', 'wind'], mech: ['haste', 'dash'],
     title: ['폭주족', '배달의 달인', '스피드광'], stats: { hp: 85, speed: 1.3 }, passive: 'swift', weapon: 'none',
-    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 5 * P, n: 2, spread: 10, speed: 330, size: 1, st: SX(S, 0.6) }], name: ['{n} 따다닥', '{n} 연타'], desc: ['{n을} 엄청 빠르게 두 번 날린다'] },
+    basic: { m: 'swing', fx: (P, S) => [{ t: 'swing', dmg: 5 * P, r: 17, arc: 90, n: 2, kb: 3, st: SX(S, 0.6) }], name: ['{n} 따다닥', '{n} 연타'], desc: ['{n으로} 눈에 안 보이게 두 번 후린다'] },
     s1: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 115, dmg: 12 * P, kb: 6, st: SX(S, 1) }, { t: 'trail', dmg: 2 * P, dur: 3, life: 2, st: SX(S || 'slow', 1) }], name: ['{n} 드리프트', '{n} 질주'], desc: ['{n} 속도로 돌진하며 바퀴 자국을 남긴다'] },
     s2: { m: 'haste', fx: () => [{ t: 'buff', k: 'haste', d: 4 }, { t: 'blink', to: 'side', dist: 70 }], name: ['{n} 잔상', '{n} 부스터'], desc: ['{n}보다 빨라져 잔상만 남는다'] },
-    ult: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 130, dmg: 14 * P, invuln: true, kb: 4 }, { t: 'dash', dist: 130, dmg: 14 * P, invuln: true, kb: 4 }, { t: 'blast', at: 'self', r: 34, dmg: 18 * P, kb: 8, st: SX(S || 'stun', 1.2) }], name: ['{n} 마하 왕복', '{n} 광속 배달'], desc: ['눈에 안 보이는 속도로 왕복 돌진한다'] },
+    ult: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 130, dmg: 14 * P, invuln: true, kb: 4 }, { t: 'dash', dist: 130, dmg: 14 * P, invuln: true, kb: 4 }, { t: 'swing', dmg: 16 * P, r: 30, arc: 360, n: 2, kb: 8, st: SX(S || 'stun', 1.2) }], name: ['{n} 마하 왕복', '{n} 광속 배달'], desc: ['눈에 안 보이는 속도로 왕복한 뒤 제자리에서 회오리'] },
   },
   gravity: {
     re: /중력|끌어당|당기|빨아들|흡입|블랙홀|자석|무게|무겁|짓눌|청소기/, keys: ['gravity'], mech: ['pull'],
     title: ['블랙홀', '인간 자석', '진공청소기'], stats: { hp: 110, speed: 0.9 }, passive: 'aura', weapon: 'orb',
     basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 7 * P, speed: 210, size: 3, st: SX(S || 'heavy', 0.8) }], name: ['무거운 {n}', '{n} 중력탄'], desc: ['맞으면 몸이 {n}처럼 무거워진다'] },
-    s1: { m: 'pull', fx: (P, S) => [{ t: 'blast', at: 'target', r: 36, kb: -10, dmg: 12 * P, delay: 0.3, st: SX(S || 'heavy', 1.5) }], name: ['{n} 블랙홀', '{n} 흡입'], desc: ['{n} 힘으로 주변을 한곳에 빨아들인다'] },
-    s2: { m: 'blink', fx: (P) => [{ t: 'blink', to: 'front', dist: 80 }, { t: 'blast', at: 'self', r: 22, dmg: 10 * P, kb: 8 }], name: ['{n} 공간 도약', '{n} 워프'], desc: ['공간을 접어서 {n}처럼 툭 나타난다'] },
-    ult: { m: 'pull', fx: (P, S) => [{ t: 'blast', at: 'target', r: 54, kb: -10, dmg: 22 * P, delay: 0.4, st: SX(S || 'heavy', 2) }, { t: 'all', dmg: 4 * P, st: { k: 'heavy', d: 2 } }, { t: 'shot', from: 'sky', n: 4, dmg: 6 * P, size: 3, speed: 240 }], name: ['{n} 특이점', '{n} 우주 붕괴'], desc: ['거대한 {n} 블랙홀이 모든 걸 빨아들인다'] },
+    s1: { m: 'hook', fx: (P, S) => [{ t: 'hook', dmg: 9 * P, speed: 240, range: 160, st: SX(S || 'heavy', 1.4) }], name: ['{n} 끌어당기기', '{n} 흡입'], desc: ['{n} 힘으로 적 하나를 쭉 빨아들인다'] },
+    s2: { m: 'blink', fx: (P) => [{ t: 'blink', to: 'front', dist: 80 }, { t: 'wave', at: 'self', dmg: 10 * P, r: 40, kb: 8 }], name: ['{n} 공간 도약', '{n} 워프'], desc: ['공간을 접어서 툭 나타나며 주변을 밀어낸다'] },
+    ult: { m: 'pull', fx: (P, S) => [{ t: 'wave', at: 'target', dmg: 14 * P, r: 70, n: 2, kb: -10, st: SX(S || 'heavy', 2) }, { t: 'blast', at: 'target', r: 40, dmg: 18 * P, delay: 0.6, kb: 8 }], name: ['{n} 특이점', '{n} 우주 붕괴'], desc: ['거대한 {n} 블랙홀이 모두 빨아들인 뒤 쾅 터진다'] },
   },
   engineer: {
     re: /로봇|기계|설치|포탑|만들|조립|발명|공구|드론|컴퓨터|코딩|해킹/, keys: ['tech'], mech: ['turret'],
     title: ['공돌이', '발명왕', '수리 기사'], stats: { hp: 100, speed: 0.95 }, passive: 'armor', weapon: 'hammer',
-    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 270, size: 1, st: SX(S, 0.6) }], name: ['{n} 볼트', '{n} 부품 발사'], desc: ['{n} 부품을 쏜다. 반품 불가'] },
+    basic: { m: 'line', fx: (P, S) => [{ t: 'line', dmg: 8 * P, n: 4, step: 15, r: 7, kb: 3, st: SX(S, 0.6) }], name: ['{n} 드릴', '{n} 레일'], desc: ['땅속으로 {n} 드릴을 박아 앞쪽이 차례로 솟는다'] },
     s1: { m: 'turret', fx: (P, S) => [{ t: 'summon', kind: 'turret', n: 1, dmg: 5 * P, rate: 1.4, dur: 9, st: SX(S, 0.8) }], name: ['{n} 포탑', '{n} 자동 사격기'], desc: ['{n} 포탑을 세워 대신 싸우게 한다'] },
-    s2: { m: 'shield', fx: () => [{ t: 'summon', kind: 'barrier', n: 2, dur: 7 }, { t: 'buff', k: 'shield', d: 3, pow: 25 }], name: ['{n} 바리케이드', '{n} 방어벽'], desc: ['{n으로} 벽을 뚝딱 쌓는다'] },
-    ult: { m: 'turret', fx: (P, S) => [{ t: 'summon', kind: 'turret', n: 3, dmg: 5 * P, rate: 1.3, dur: 10, st: SX(S, 1) }, { t: 'shot', from: 'sky', n: 5, dmg: 6 * P, size: 2, boom: 10, speed: 240 }], name: ['{n} 공장 가동', '{n} 로봇 군단'], desc: ['{n} 포탑이 줄줄이 세워지고 하늘에서도 쏟아진다'] },
+    s2: { m: 'hook', fx: (P) => [{ t: 'hook', dmg: 7 * P, speed: 300, range: 150, st: { k: 'stun', d: 0.6 } }, { t: 'summon', kind: 'barrier', n: 1, dur: 6 }], name: ['{n} 로봇 팔', '{n} 집게'], desc: ['{n} 집게를 쭉 뻗어 적을 잡아 온다'] },
+    ult: { m: 'turret', fx: (P, S) => [{ t: 'summon', kind: 'turret', n: 3, dmg: 5 * P, rate: 1.3, dur: 10, st: SX(S, 1) }, { t: 'line', dmg: 14 * P, n: 8, step: 20, r: 11, kb: 6 }], name: ['{n} 공장 가동', '{n} 로봇 군단'], desc: ['{n} 포탑이 줄줄이 세워지고 땅에서 기계 기둥이 솟는다'] },
   },
   glutton: {
     re: /먹|삼키|마시|배고프|먹방|폭식|식욕|씹|맛있|요리|굽|구워|튀겨|끓/, keys: ['food'], mech: ['heal', 'pull'],
     title: ['먹방러', '대식가', '요리왕'], stats: { hp: 120, speed: 0.95, size: 1.1 }, passive: 'lifesteal', weapon: 'hammer',
-    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 7 * P, speed: 220, size: 2, st: SX(S || 'heavy', 0.8) }], name: ['{n} 투척', '남은 {n} 퉤', '{n} 배달'], desc: ['먹던 {n을} 퉤 뱉는다. 아깝다'] },
-    s1: { m: 'pull', fx: (P, S) => [{ t: 'blast', at: 'target', r: 30, kb: -9, dmg: 10 * P, delay: 0.25, st: SX(S || 'slow', 1.2) }], name: ['{n} 흡입', '후루룩 {n}'], desc: ['{n} 먹듯이 적을 후루룩 빨아들인다'] },
+    basic: { m: 'cone', fx: (P, S) => [{ t: 'cone', dmg: 8 * P, len: 46, arc: 45, dur: 0.22, ticks: 1, kb: 4, st: SX(S || 'heavy', 0.8) }], name: ['{n} 퉤', '먹던 {n} 뿜기'], desc: ['먹던 {n을} 앞으로 퉤 뿜는다. 아깝다'] },
+    s1: { m: 'hook', fx: (P, S) => [{ t: 'hook', dmg: 9 * P, speed: 260, range: 140, st: SX(S || 'slow', 1.2) }], name: ['{n} 젓가락', '후루룩 {n}'], desc: ['{n} 먹듯이 적을 젓가락으로 집어 온다'] },
     s2: { m: 'heal', fx: () => [{ t: 'heal', amt: 22 }, { t: 'buff', k: 'giant', d: 3 }], name: ['{n} 먹방', '{n} 폭식'], desc: ['{n을} 허겁지겁 먹고 기운이 난다(살도 찐다)'] },
-    ult: { m: 'big', fx: (P, S) => [{ t: 'buff', k: 'giant', d: 5 }, { t: 'blast', at: 'target', r: 50, kb: -10, dmg: 24 * P, delay: 0.3, st: SX(S || 'heavy', 1.6) }, { t: 'heal', amt: 20 }], name: ['{n} 무한 리필', '세상 {n} 정식'], desc: ['거대해져서 세상을 {n}처럼 먹어 치운다'] },
+    ult: { m: 'big', fx: (P, S) => [{ t: 'buff', k: 'giant', d: 5 }, { t: 'wave', at: 'self', dmg: 12 * P, r: 70, kb: -9, st: SX(S || 'heavy', 1.6) }, { t: 'swing', dmg: 20 * P, r: 34, arc: 360, kb: 9 }], name: ['{n} 무한 리필', '세상 {n} 정식'], desc: ['거대해져서 모두를 빨아들인 뒤 한입에 꿀꺽'] },
   },
   lazy: {
     re: /멍|게으|귀찮|눕|누워|빈둥|뒹굴|아무것도|잠|졸|낮잠|하품|쉬|백수|침대|이불/, keys: ['sleep'], mech: [],
     title: ['백수', '프로 낮잠러', '귀차니스트'], stats: { hp: 110, speed: 0.85 }, passive: 'regen', weapon: 'none',
-    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 180, size: 2, st: SX(S || 'slow', 0.8) }], name: ['{n} 하품', '대충 {n}', '{n} 휴'], desc: ['귀찮게 {n을} 대충 던진다'] },
+    basic: { m: 'lob', fx: (P, S) => [{ t: 'lob', dmg: 7 * P, r: 13, kb: 2, st: SX(S || 'slow', 0.8) }], name: ['{n} 하품', '대충 {n}', '{n} 휴'], desc: ['누운 채로 {n을} 대충 던진다'] },
     s1: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'target', r: 30, dur: 4, dmg: 2 * P, st: SX(S || 'sleep', 1.2) }], name: ['{n} 자장가', '{n} 낮잠 구역'], desc: ['여기 들어오면 누구든 {n}처럼 잠든다'] },
-    s2: { m: 'heal', fx: () => [{ t: 'heal', amt: 20 }, { t: 'buff', k: 'armor', d: 3 }], name: ['{n} 드러눕기', '{n} 이불 속'], desc: ['그냥 눕는다. 의외로 회복된다'] },
+    s2: { m: 'counter', fx: () => [{ t: 'buff', k: 'counter', d: 2 }, { t: 'heal', amt: 16 }], name: ['건드리지 마', '{n} 이불 속'], desc: ['이불 속에 눕는다. 깨우면 그대로 되돌려 준다'] },
     ult: { m: 'all', fx: (P, S) => [{ t: 'all', dmg: 4 * P, st: SX(S || 'sleep', 2) }, { t: 'zone', at: 'self', r: 44, dur: 5, dmg: 2 * P, heal: 5, st: { k: 'sleep', d: 1.5 } }], name: ['{n} 주말 낮잠', '{n} 겨울잠'], desc: ['세상 모두가 {n} 때문에 잠든다. 나만 쉰다'] },
   },
   idol: {
     re: /노래|춤|댄스|아이돌|가수|랩|떼창|콘서트|공연|무대|팬|케이팝|트로트|박수/, keys: ['sound', 'love'], mech: [],
     title: ['아이돌', '트로트 신동', '춤신춤왕'], stats: { hp: 95, speed: 1.1 }, passive: 'aura', weapon: 'none',
-    basic: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 4 * P, len: 110, w: 3, ticks: 2, dur: 0.3, st: SX(S, 0.6) }], name: ['{n} 고음', '{n} 샤우팅'], desc: ['{n} 고음을 빔처럼 쏜다. 귀가 아프다'] },
+    basic: { m: 'cone', fx: (P, S) => [{ t: 'cone', dmg: 3 * P, len: 70, arc: 40, dur: 0.35, ticks: 2, st: SX(S, 0.6) }], name: ['{n} 고음', '{n} 샤우팅'], desc: ['{n} 고음을 앞으로 내지른다. 귀가 아프다'] },
     s1: { m: 'all', fx: (P, S) => [{ t: 'all', dmg: 3 * P, st: SX(S || 'dance', 1.4) }], name: ['{n} 챌린지', '{n} 떼창'], desc: ['모두가 {n}에 맞춰 춤을 춘다(강제)'] },
     s2: { m: 'orbit', fx: (P) => [{ t: 'summon', kind: 'orbit', n: 3, dmg: 5 * P, dur: 6 }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 백댄서', '{n} 응원단'], desc: ['{n} 백댄서들이 주위를 돈다. 칼군무'] },
-    ult: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'self', follow: true, r: 46, dur: 6, dmg: 4 * P, st: SX(S || 'dance', 1.5) }, { t: 'all', dmg: 4 * P, st: { k: 'confuse', d: 1.5 } }], name: ['{n} 월드 투어', '{n} 앙코르'], desc: ['{n} 콘서트 개최! 근처 모두 강제 관객'] },
+    ult: { m: 'wave', fx: (P, S) => [{ t: 'zone', at: 'self', follow: true, r: 46, dur: 6, dmg: 3 * P, st: SX(S || 'dance', 1.5) }, { t: 'wave', at: 'self', dmg: 9 * P, r: 80, n: 3, kb: 6, st: { k: 'confuse', d: 1.2 } }], name: ['{n} 월드 투어', '{n} 앙코르'], desc: ['{n} 콘서트 개최! 베이스가 쿵쿵쿵 울린다'] },
   },
   nagger: {
     re: /잔소리|숙제|시험|공부|훈화|설교|회의|야근|보고서|수행평가|과제|출근|월요일|엄마|선생님|상사|부장/, keys: ['nag'], mech: [],
     title: ['잔소리꾼', '교장 선생님', '부장님'], stats: { hp: 105, speed: 0.95 }, passive: 'aura', weapon: 'book',
-    basic: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 4 * P, len: 120, w: 3, ticks: 2, dur: 0.3, st: SX(S || 'slow', 0.8) }], name: ['{n} 한마디', '{n} 잔소리'], desc: ['{n} 잔소리가 귀에 꽂힌다'] },
+    basic: { m: 'cone', fx: (P, S) => [{ t: 'cone', dmg: 3 * P, len: 78, arc: 38, dur: 0.45, ticks: 3, st: SX(S || 'slow', 0.8) }], name: ['{n} 한마디', '{n} 잔소리'], desc: ['{n} 잔소리를 앞으로 줄줄 쏟아낸다'] },
     s1: { m: 'all', fx: (P, S) => [{ t: 'all', dmg: 3 * P, st: SX(S || 'sleep', 1.3) }], name: ['{n} 훈화 말씀', '{n} 1시간 강의'], desc: ['끝나지 않는 {n} 이야기에 모두 존다'] },
-    s2: { m: 'shield', fx: () => [{ t: 'buff', k: 'shield', d: 3, pow: 30 }, { t: 'buff', k: 'reflect', d: 2 }], name: ['못 들은 척', '{n} 귀 막기'], desc: ['{n이고} 뭐고 귀를 막는다. 공격도 튕긴다'] },
+    s2: { m: 'counter', fx: () => [{ t: 'buff', k: 'counter', d: 1.6 }, { t: 'buff', k: 'shield', d: 3, pow: 25 }], name: ['{n} 말대꾸', '어디서 {n}'], desc: ['어디서 말대꾸야! 맞으면 그대로 되받아친다'] },
     ult: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 8, dmg: 7 * P, size: 3, boom: 10, speed: 240 }, { t: 'all', dmg: 4 * P, st: SX(S || 'weak', 2) }], name: ['{n} 폭탄 투하', '{n} 지옥 주간'], desc: ['{n이} 비처럼 쏟아진다. 마감은 오늘까지'] },
   },
   spinner: {
     re: /부메랑|회전|팽이|빙빙|돌려|돌린|휘둘|토네이도|소용돌이|원반|요요/, keys: ['ball'], mech: ['orbit'],
     title: ['팽이', '회전왕', '어지러운 사람'], stats: { hp: 100, speed: 1.05 }, passive: 'thorns', weapon: 'none',
     basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 7 * P, speed: 240, size: 2, ret: true, st: SX(S, 0.6) }], name: ['{n} 부메랑', '돌아오는 {n}'], desc: ['{n을} 던지면 다시 돌아온다. 받을 때 아프다'] },
-    s1: { m: 'orbit', fx: (P, S) => [{ t: 'summon', kind: 'orbit', n: 3, dmg: 6 * P, dur: 5, st: SX(S, 0.8) }], name: ['빙빙 {n}', '{n} 회전'], desc: ['{n이} 몸 주위를 빙빙 돈다'] },
-    s2: { m: 'dash', fx: (P) => [{ t: 'dash', dist: 95, dmg: 10 * P, kb: 9 }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 팽이 돌진', '{n} 토네이도'], desc: ['팽이처럼 돌면서 들이받는다. 본인도 어지럽다'] },
+    s1: { m: 'swing', fx: (P, S) => [{ t: 'swing', dmg: 8 * P, r: 24, arc: 360, n: 3, kb: 5, st: SX(S, 0.8) }], name: ['{n} 회전베기', '빙빙 {n}'], desc: ['{n을} 쥐고 제자리에서 세 바퀴. 본인도 어지럽다'] },
+    s2: { m: 'dash', fx: (P) => [{ t: 'dash', dist: 95, dmg: 10 * P, kb: 9 }, { t: 'summon', kind: 'orbit', n: 2, dmg: 4 * P, dur: 4 }], name: ['{n} 팽이 돌진', '{n} 토네이도'], desc: ['팽이처럼 돌면서 들이받는다'] },
     ult: { m: 'orbit', fx: (P, S) => [{ t: 'summon', kind: 'orbit', n: 4, dmg: 8 * P, dur: 7, st: SX(S, 1) }, { t: 'shot', from: 'around', n: 8, dmg: 6 * P, size: 2, speed: 250, ret: true }], name: ['{n} 허리케인', '{n} 대회전'], desc: ['{n이} 사방으로 회전하며 날아갔다 돌아온다'] },
   },
   flyer: {
     re: /날아|날개|비행|하늘을 나|공중|떠다|날 수|새처럼|글라이더|헬리콥터|비행기/, keys: [], mech: ['fly'],
     title: ['비행사', '하늘의 무법자', '조류'], stats: { hp: 90, speed: 1.15 }, passive: 'dodge', weapon: 'none',
     basic: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 1, dmg: 7 * P, size: 2, speed: 260, st: SX(S, 0.6) }], name: ['{n} 투하', '{n} 공습'], desc: ['하늘에서 {n을} 떨어뜨린다'] },
-    s1: { m: 'fly', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 4 }, { t: 'shot', dmg: 8 * P, n: 3, spread: 30, speed: 250, size: 2, st: SX(S, 1) }], name: ['{n} 날갯짓', '{n} 비행 사격'], desc: ['{n} 날개로 날아올라 공격한다'] },
-    s2: { m: 'blink', fx: () => [{ t: 'blink', to: 'side', dist: 80 }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 활공', '{n} 급강하'], desc: ['{n}처럼 휙 활공한다'] },
-    ult: { m: 'rain', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 5 }, { t: 'shot', from: 'sky', n: 8, dmg: 8 * P, size: 3, boom: 12, speed: 250, st: SX(S, 1.4) }], name: ['{n} 대공습', '{n} 하늘 지배'], desc: ['하늘을 지배하며 {n} 폭탄을 쏟아붓는다'] },
+    s1: { m: 'fly', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 4 }, { t: 'cone', dmg: 4 * P, len: 60, arc: 70, dur: 0.4, ticks: 2, kb: 5, st: SX(S, 1) }], name: ['{n} 날갯짓', '{n} 돌풍'], desc: ['{n} 날개로 날아오르며 앞에 돌풍을 일으킨다'] },
+    s2: { m: 'blink', fx: (P) => [{ t: 'blink', to: 'side', dist: 80 }, { t: 'wave', at: 'self', dmg: 8 * P, r: 34, kb: 7 }], name: ['{n} 급강하', '{n} 착지'], desc: ['{n}처럼 휙 내려꽂혀 주변을 밀어낸다'] },
+    ult: { m: 'rain', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 5 }, { t: 'lob', dmg: 10 * P, r: 22, n: 5, kb: 6, st: SX(S, 1.4) }], name: ['{n} 대공습', '{n} 하늘 지배'], desc: ['하늘을 지배하며 {n} 폭탄을 사방에 떨군다'] },
   },
 };
 const THEME_STYLE = { fire: 'bomber', ice: 'trickster', elec: 'beamer', water: 'artillery', wind: 'speedster', earth: 'tank', plant: 'healer', stink: 'polluter', poison: 'polluter', holy: 'beamer', dark: 'assassin', space: 'gravity', time: 'trickster', sound: 'idol', love: 'healer', sleep: 'lazy', metal: 'gunner', tech: 'engineer', food: 'glutton', sweet: 'artillery', animal: 'summoner', bug: 'summoner', money: 'artillery', gross: 'polluter', ghost: 'assassin', magic: 'trickster', nag: 'nagger', gravity: 'gravity', speed: 'speedster', power: 'brawler', ball: 'gunner', ki: 'beamer' };
@@ -1846,9 +1874,9 @@ function smartDrawback(side, ctx) {
   }
   if (has(/가끔|때때로|종종|어쩌다|확률|랜덤하게|간혹/)) for (const x of out) if (x.chance != null) x.chance = 40;
   if (ctx && ctx.moves) {
-    const COND = [[/숨으면|숨을 때|은신하면/, 'invis'], [/던지면|던질 때|쏘면|쏠 때|발사하면/, 'shot'], [/날면|날 때|날아오르면/, 'fly'], [/먹으면|먹을 때|마시면/, 'heal'], [/부르면|소환하면|부를 때/, 'summon'], [/터뜨리면|터질 때|폭발하면/, 'boom'], [/돌진하면|달려들면|박치기하면/, 'dash'], [/순간이동하면|사라지면/, 'blink'], [/뿜으면|광선을 쏘면/, 'beam']];
+    const COND = [[/숨으면|숨을 때|은신하면/, ['invis']], [/던지면|던질 때|쏘면|쏠 때|발사하면/, ['shot', 'lob', 'hook', 'rain']], [/휘두르면|벨 때|베면|때리면|칠 때/, ['swing', 'dash']], [/날면|날 때|날아오르면/, ['fly']], [/먹으면|먹을 때|마시면/, ['heal', 'big']], [/부르면|소환하면|부를 때/, ['summon', 'orbit', 'turret']], [/터뜨리면|터질 때|폭발하면/, ['boom', 'lob', 'wave']], [/돌진하면|달려들면|박치기하면/, ['dash']], [/순간이동하면|사라지면/, ['blink', 'invis']], [/뿜으면|광선을 쏘면|뿌리면|노래하면|소리 지르면/, ['beam', 'cone', 'chain']], [/구르면|내려찍으면|발을 구르면/, ['wave']], [/막으면|버티면|반격하면/, ['counter', 'shield', 'reflect']]];
     const c = COND.find(([re]) => re.test(t));
-    const slot = c && SLOTS.find((s) => ctx.moves[s]._m === c[1]);
+    const slot = c && SLOTS.find((s) => c[1].includes(ctx.moves[s]._m));
     if (slot) for (const x of out) if (x.on === 'skills') x.on = slot;
   }
   const clean = out.map((x) => [x, sanDfx(x)]).filter(([, c]) => c);
@@ -3395,10 +3423,89 @@ class Battle {
           break;
         case 'beam': {
           const o = base(i, 0, 'beam', e);
-          Object.assign(o, { follow: c, ang, len: e.len, w: e.w, life: e.dur, dur: e.dur, rehit: e.dur / e.ticks - 0.001, both: e.both });
+          Object.assign(o, { follow: c, ang, ang0: ang, sweep: (e.sweep || 0) * Math.PI / 180, len: e.len, w: e.w, life: e.dur, dur: e.dur, rehit: e.dur / e.ticks - 0.001, both: e.both });
           this.objs.push(o); this.sfx('beam', style);
           break;
         }
+        case 'swing':
+          // 휘두르기: 앞쪽 부채꼴을 쓸어 벤다 (n번이면 좌우로 번갈아)
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'swing', e), big = e.arc >= 300;
+            Object.assign(o, { follow: c, ang, r: e.r, arc: e.arc * Math.PI / 180, life: big ? 0.3 : 0.2, max: big ? 0.3 : 0.2, delay: j * 0.17, dirS: j % 2 ? -1 : 1 });
+            this.objs.push(o);
+          }
+          this.sfx('dash', style);
+          break;
+        case 'cone': {
+          // 부채꼴 분사: 앞으로 쏟아내는 숨결·물줄기·가스
+          const o = base(i, 0, 'cone', e);
+          Object.assign(o, { follow: c, ang, len: e.len, arc: e.arc * Math.PI / 180, life: e.dur, max: e.dur, rehit: e.dur / e.ticks - 0.001 });
+          this.objs.push(o); this.sfx('beam', style);
+          break;
+        }
+        case 'wave':
+          // 충격파: 한 점에서 고리가 퍼져 나간다
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'wave', e);
+            let ox = x, oy = y;
+            if (e.at === 'front') { ox = x + ca * e.off; oy = y + sa * e.off; } else if (e.at === 'target') { ox = tx; oy = ty; }
+            Object.assign(o, { x: cx(ox), y: cyy(oy), r: e.r, cur: 2, prev: 0, life: 0.42, max: 0.42, delay: j * 0.22 });
+            this.objs.push(o);
+          }
+          this.shake = Math.max(this.shake, 2.5);
+          break;
+        case 'line': {
+          // 땅 가르기: 조준한 방향으로 기둥이 차례로 솟는다 (한 줄에 한 번만 맞는다)
+          const hm = new Map();
+          for (let j = 0; j < e.n; j++) {
+            const dd = 14 + j * e.step, px = x + ca * dd, py = y + sa * dd;
+            if (px < B || px > W - B || py < B || py > H - B || this.wallAt(px, py - 2)) break;
+            const o = base(i, j, 'spike', e);
+            Object.assign(o, { x: px, y: py, delay: j * 0.055, life: 0.34, r: e.r, hit: hm, big: true });
+            this.objs.push(o);
+          }
+          break;
+        }
+        case 'chain': {
+          // 연쇄: 가장 가까운 적에게 꽂힌 뒤 옆 적으로 튄다
+          const o = base(i, 0, 'chain', e);
+          const used = new Set([c.idx]), path = [];
+          let px = x + ca * 5, py = cy + sa * 5;
+          for (let k = 0; k < e.n; k++) {
+            let best = null, bd = k === 0 ? e.range * 1.2 : e.range;
+            for (const v of this.fighters) {
+              if (!v.alive || v.gone || used.has(v.idx)) continue;
+              const dx = v.x - px, dy = this.bodyY(v) - py, d = Math.hypot(dx, dy);
+              if (k === 0) { let da = Math.atan2(dy, dx) - ang; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > 1.2) continue; }
+              if (d < bd) { bd = d; best = v; }
+            }
+            if (!best) break;
+            used.add(best.idx); path.push(best.idx); px = best.x; py = this.bodyY(best);
+          }
+          Object.assign(o, { x: x + ca * 5, y: cy + sa * 5, path, life: 0.38, max: 0.38, endA: ang, endL: e.range * 0.7 });
+          for (const k of path) { const v = this.fighters[k]; this.vfxImpact(style, mv.color, v.x, this.bodyY(v), 0.8); }
+          this.objs.push(o);
+          this.sfx('beam', 'electric');
+          break;
+        }
+        case 'hook': {
+          // 갈고리: 날아가서 맞으면 내 쪽으로 끌려온다
+          const o = base(i, 0, 'shot', e);
+          Object.assign(o, { x: x + ca * 5, y: cy + sa * 5, vx: ca * e.speed, vy: sa * e.speed, r: 2, life: e.range / e.speed, kb: -11, hook: true, homing: 0, bounce: 0, boom: 0 });
+          this.objs.push(o);
+          break;
+        }
+        case 'lob':
+          // 포물선 투척: 머리 위로 휙 던져 표시된 곳에 떨어져 터진다
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'blast', e);
+            const lx = cx(tx + (j ? (R() - 0.5) * 34 : 0)), ly = cyy(ty - 4 + (j ? (R() - 0.5) * 26 : 0));
+            const fl = 0.42 + Math.hypot(lx - x, ly - cy) / 520;
+            Object.assign(o, { x: lx, y: ly, r: e.r, delay0: fl, life: fl + 0.4, trig: false, lob: { x0: x + ca * 4, y0: cy - 2 }, delay: j * 0.12 });
+            this.objs.push(o);
+          }
+          this.sfx('dash', style);
+          break;
         case 'blast': case 'zone': {
           const o = base(i, 0, e.t, e);
           let ox = x, oy = e.t === 'zone' ? y - 1 : cy;
@@ -3591,10 +3698,58 @@ class Battle {
           if (!o.puffed) { o.puffed = true; this.vfxImpact(o.vfx, o.color, o.x, o.y, 0.5); this.decal(o.x, o.y, 3, o.dk); }
           this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y - 3, o.r));
           break;
+        case 'swing': {
+          const c = o.follow;
+          if (!c.alive) { o.dead = true; break; }
+          o.x = c.x; o.y = this.bodyY(c);
+          const p = clamp(1 - o.life / o.max, 0, 1), half = o.arc / 2;
+          o.cur = o.ang + o.dirS * (-half + o.arc * p);
+          const tx2 = o.x + Math.cos(o.cur) * o.r, ty2 = o.y + Math.sin(o.cur) * o.r * 0.8;
+          this.vfxTrail(o.vfx, o.color, tx2, ty2, -Math.sin(o.cur) * 40 * o.dirS, Math.cos(o.cur) * 40 * o.dirS, 1);
+          if (Math.random() < 0.5) this.addP('px', tx2, ty2, rnd(-20, 20), rnd(-30, 0), 0.25, '#ffffff', 1);
+          this.checkHits(o, (v) => {
+            const dx = v.x - o.x, dy = this.bodyY(v) - o.y, d = Math.hypot(dx, dy);
+            if (d > o.r + 5 * v.size) return false;
+            if (o.arc >= Math.PI * 1.9 || d < 7) return true;
+            let da = Math.atan2(dy, dx) - o.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+            return Math.abs(da) <= half + 0.3;
+          });
+          break;
+        }
+        case 'cone': {
+          const c = o.follow;
+          if (!c.alive || c.st.stun || c.st.freeze || c.st.sleep) { o.dead = true; break; }
+          o.x = c.x; o.y = this.bodyY(c);
+          const half = o.arc / 2;
+          for (let k = 0; k < 3; k++) {
+            const an = o.ang + rnd(-half, half), sp = o.len * rnd(2.2, 3.2);
+            this.vfxTrail(o.vfx, k ? o.color : o.cl, o.x + Math.cos(an) * 6, o.y + Math.sin(an) * 6, Math.cos(an) * sp, Math.sin(an) * sp * 0.8, 1.1);
+          }
+          if (Math.random() < 0.35) { const an = o.ang + rnd(-half, half), d = o.len * rnd(0.7, 1); this.addP('smoke', o.x + Math.cos(an) * d, o.y + Math.sin(an) * d * 0.8, rnd(-10, 10), -12, 0.5, o.color, 2); }
+          this.checkHits(o, (v) => {
+            const dx = v.x - o.x, dy = this.bodyY(v) - o.y, d = Math.hypot(dx, dy);
+            if (d > o.len + 4 * v.size) return false;
+            let da = Math.atan2(dy, dx) - o.ang; da = Math.atan2(Math.sin(da), Math.cos(da));
+            return d < 8 || Math.abs(da) <= half + 0.15;
+          });
+          break;
+        }
+        case 'wave': {
+          const p = clamp(1 - o.life / o.max, 0, 1);
+          o.prev = o.cur; o.cur = 2 + (o.r - 2) * (1 - (1 - p) * (1 - p));
+          for (let k = 0; k < 3; k++) { const an = Math.random() * 6.283; this.addP('px', o.x + Math.cos(an) * o.cur, o.y + Math.sin(an) * o.cur * 0.8, Math.cos(an) * 30, Math.sin(an) * 20 - 20, 0.35, k ? o.color : '#ffffff', 1); }
+          if (!o.puffed) { o.puffed = true; this.decal(o.x, o.y + 1, Math.min(14, o.r * 0.3), o.dk); this.sfx('boom', o.vfx); }
+          this.checkHits(o, (v) => { const d = Math.hypot(v.x - o.x, (v.y - o.y) / 0.8); return d <= o.cur + 5 * v.size && d >= o.prev - 8 - 4 * v.size; });
+          break;
+        }
+        case 'chain':
+          if (!o.fired) { o.fired = true; this.checkHits(o, (v) => o.path.includes(v.idx)); }
+          break;
         case 'beam': {
           const c = o.follow;
           if (!c.alive) { o.dead = true; break; }
           o.x = c.x; o.y = this.bodyY(c);
+          if (o.sweep) o.ang = o.ang0 + (clamp(o.age / o.dur, 0, 1) - 0.5) * o.sweep;
           const ca = Math.cos(o.ang), sa = Math.sin(o.ang);
           const x0 = o.both ? o.x - ca * o.len : o.x, y0 = o.both ? o.y - sa * o.len : o.y;
           const x1 = o.x + ca * o.len, y1 = o.y + sa * o.len;
@@ -3709,6 +3864,18 @@ class Battle {
     const single = (o.kind === 'shot' && !o.pierce) || o.kind === 'mine';
     if (v.invT > 0 || v.st.invuln) { this.note(v, '무적', '#fff3a0'); if (single) this.sendHit(o, v, 0, 1, 2); return; }
     if (v.spec.passive && v.spec.passive.k === 'dodge' && Math.random() < 0.15) { this.note(v, '회피!', '#eaffff', true); return; }
+    if (v.st.counter && a && a !== v && o.kind !== 'zone' && o.kind !== 'all' && o.kind !== 'orbit') {
+      // 반격 자세: 맞는 순간 막고 그대로 되돌려 준다
+      delete v.st.counter;
+      this.note(v, '반격!', ST_COLOR.counter, true);
+      this.vfxImpact('metal', '#ffffff', v.x, this.bodyY(v), 1.4);
+      this.bursts.push({ x: v.x, y: v.y - 20, text: pick(['반사 신경!', '어림없지!', '역관광!', '카운터!']), color: '#ffffff', t: 0, life: 0.8, rot: rnd(-0.2, 0.2), big: true });
+      const ev = ['r', o.owner, r1(Math.max(10, o.dmg * o.mul * 1.3)), 1];
+      this.emit(ev); this.onEvent(ev);
+      v.invT = Math.max(v.invT, 0.35);
+      this.sendHit(o, v, 0, single ? 1 : 0, 2);
+      return;
+    }
     if (v.st.reflect && o.kind === 'shot') {
       this.note(v, '반사!', ST_COLOR.reflect, true);
       const ev = ['r', o.owner, r1(o.dmg * o.mul * 0.6), 1];
@@ -3732,12 +3899,12 @@ class Battle {
       if (dmg <= 0) this.note(v, '막음', ST_COLOR.shield);
     }
     dmg = Math.round(dmg * 10) / 10;
-    const soft = o.kind === 'zone' || o.kind === 'orbit';
+    const soft = o.kind === 'zone' || o.kind === 'orbit' || o.kind === 'cone';
     if (dmg > 0 || o.kb) {
       let dx, dy;
       if (o.kind === 'shot') { dx = o.vx; dy = o.vy; }
       else if (o.kind === 'beam') { dx = Math.cos(o.ang); dy = Math.sin(o.ang); if (o.both && (v.x - o.x) * dx + (v.y - o.y) * dy < 0) { dx = -dx; dy = -dy; } }
-      else if ((o.kind === 'hb' || o.kind === 'all') && a) { dx = v.x - a.x; dy = v.y - a.y; }
+      else if ((o.kind === 'hb' || o.kind === 'all' || o.kind === 'swing' || o.kind === 'cone' || o.kind === 'chain') && a) { dx = v.x - a.x; dy = v.y - a.y; }
       else { dx = v.x - o.x; dy = this.bodyY(v) - o.y; }
       const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
       if (o.kb) { const s = o.kb * KB / Math.sqrt(v.size); v.vx = dx * s; v.vy = dy * s; }
@@ -3897,7 +4064,7 @@ class Battle {
 
   /* ---------- 입자와 연출 ---------- */
   addP(k, x, y, vx, vy, life, c, s, ex) {
-    if (this.parts.length > 900) return null;
+    if (this.parts.length > 620) return null;
     const p = { k, x, y, z: 0, vx, vy, vz: 0, g: 0, life, max: life, c, s: s || 1, drag: 0 };
     if (ex) Object.assign(p, ex);
     this.parts.push(p);
@@ -4057,6 +4224,21 @@ class Battle {
         g.globalAlpha = 0.2 + 0.3 * p; g.drawImage(discCanvas(r, o.color, Math.floor(T * 16) % 3), ox - r, oy - r); g.globalAlpha = 1;
         dashRing(g, ox, oy, r, (Math.floor(T * 16) & 1) ? '#ffffff' : o.color, T * 30);
         pixRing(g, ox, oy, r * p, o.cl, 2);
+      } else if (o.kind === 'wave') {
+        const p = clamp(1 - o.life / o.max, 0, 1), R = X(o.cur), a = 1 - p * 0.8;
+        const ell = (rr, col, th) => { const n = Math.max(24, Math.round(rr / 2)); g.fillStyle = col; for (let k = 0; k < n; k++) { const an = k / n * 6.283; g.fillRect(Math.round(ox + Math.cos(an) * rr) - (th >> 1), Math.round(oy + Math.sin(an) * rr * 0.8) - (th >> 1), th, th); } };
+        g.globalAlpha = 0.25 * a; g.drawImage(discCanvas(Math.max(2, R), o.color, Math.floor(T * 20) % 3), ox - R, oy - Math.round(R * 0.8), R * 2, Math.round(R * 1.6)); g.globalAlpha = a;
+        ell(R, o.dk, 5); ell(R, o.color, 3); ell(Math.max(1, R - 3), '#ffffff', 1); if (R > 12) ell(R * 0.7, o.cl, 1);
+        g.globalAlpha = 1;
+      } else if (o.kind === 'cone') {
+        const half = o.arc / 2, L = X(o.len), fade = Math.min(1, o.life / 0.12, o.age / 0.06);
+        g.globalAlpha = 0.22 * fade; g.fillStyle = o.color;
+        g.beginPath(); g.moveTo(ox, oy);
+        for (let k = 0; k <= 12; k++) { const an = o.ang - half + (o.arc * k) / 12; g.lineTo(ox + Math.cos(an) * L, oy + Math.sin(an) * L * 0.8); }
+        g.closePath(); g.fill();
+        g.globalAlpha = 0.85 * fade;
+        for (let k = 0; k <= 10; k++) { const an = o.ang - half + (o.arc * k) / 10, wob = Math.sin(T * 30 + k) * 3; g.fillStyle = k & 1 ? o.cl : o.color; g.fillRect(Math.round(ox + Math.cos(an) * (L + wob)) - 1, Math.round(oy + Math.sin(an) * (L + wob) * 0.8) - 1, 3, 3); }
+        g.globalAlpha = 1;
       } else if (o.kind === 'circle') {
         const p = 1 - o.life / o.max, r = X(o.r) * (0.5 + 0.5 * Math.min(1, p * 3));
         this.runeCircle(g, ox, oy, r, o.color, o.cl, T, Math.min(1, o.life / 0.15));
@@ -4114,6 +4296,10 @@ class Battle {
       switch (o.kind) {
         case 'shot': {
           const big = o.r >= 3 ? 2 : 1, rows = moveRows(o.gm, T + o.ph);
+          if (o.hook) {
+            const ow = this.fighters[o.owner];
+            if (ow) { const hx = X(ow.x), hy = X(this.bodyY(ow)), n = Math.max(2, Math.round(Math.hypot(x - hx, y - hy) / 6)); for (let k = 0; k <= n; k++) { g.fillStyle = k & 1 ? o.dk : '#d8d8e8'; g.fillRect(Math.round(hx + (x - hx) * k / n) - 1, Math.round(hy + (y - hy) * k / n) - 1, 3, 3); } }
+          }
           g.globalAlpha = 0.5 + 0.3 * Math.sin(T * 20 + o.ph); pixRing(g, x, y, (big ? 15 : 9) + Math.round(Math.sin(T * 14 + o.ph) * 2), o.cl, 1); g.globalAlpha = 1;
           fillEll(g, x, y + 14, 4 + o.r, 2, 'rgba(0,0,0,0.25)');
           // 잔상
@@ -4129,9 +4315,46 @@ class Battle {
           break;
         }
         case 'drop': if (!o.trig) { const hh = Math.max(0, o.fall) * 180 * RS; drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - 9 - hh, 1, 1); } break;
+        case 'swing': {
+          if (o.cur == null) break;
+          const half = o.arc / 2, a0 = o.ang - o.dirS * half, a1 = o.cur, R = X(o.r), Ri = R * 0.42, fade = Math.min(1, o.life / 0.08 + 0.3);
+          const mid = (R + Ri) / 2, th = R - Ri;
+          const seg = (s0, s1, col, w, rr, al) => {
+            g.globalAlpha = al * fade; g.strokeStyle = col; g.lineWidth = w;
+            g.beginPath(); g.ellipse(x, y, rr, rr * 0.8, 0, Math.min(s0, s1), Math.max(s0, s1)); g.stroke();
+          };
+          const span = a1 - a0;
+          seg(a0, a0 + span * 0.55, o.color, th * 0.6, mid, 0.25);
+          seg(a0 + span * 0.5, a0 + span * 0.85, o.color, th * 0.85, mid, 0.6);
+          seg(a0 + span * 0.8, a1, o.cl, th, mid, 0.95);
+          seg(a0 + span * 0.4, a1, '#ffffff', 2, R, 0.9);
+          g.globalAlpha = 1;
+          const tx = x + Math.cos(a1) * R, ty = y + Math.sin(a1) * R * 0.8;
+          drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, tx, ty, 1, rotOf(Math.cos(a1 + o.dirS * 1.57), Math.sin(a1 + o.dirS * 1.57)));
+          break;
+        }
+        case 'chain': {
+          const ow = this.fighters[o.owner], pts = [[ow ? X(ow.x) : x, ow ? X(this.bodyY(ow)) : y]];
+          for (const k of o.path) { const v = this.fighters[k]; pts.push([X(v.x), X(this.bodyY(v))]); }
+          if (!o.path.length) pts.push([x + Math.cos(o.endA) * X(o.endL), y + Math.sin(o.endA) * X(o.endL)]);
+          const a = Math.min(1, o.life / 0.15);
+          for (let i2 = 1; i2 < pts.length; i2++) {
+            const [ax, ay] = pts[i2 - 1], [bx, by] = pts[i2], n = Math.max(3, Math.round(Math.hypot(bx - ax, by - ay) / 14));
+            let px = ax, py = ay;
+            for (let k = 1; k <= n; k++) {
+              const t = k / n, qx = k === n ? bx : ax + (bx - ax) * t + rnd(-8, 8), qy = k === n ? by : ay + (by - ay) * t + rnd(-8, 8);
+              g.globalAlpha = a; this.line(g, px, py, qx, qy, o.color, 4); this.line(g, px, py, qx, qy, '#ffffff', 2);
+              px = qx; py = qy;
+            }
+            if (i2 < pts.length) { fillDisc(g, bx, by, 6, o.cl); fillDisc(g, bx, by, 3, '#ffffff'); }
+          }
+          g.globalAlpha = 1;
+          break;
+        }
         case 'spike': {
-          const p = clamp(o.age / 0.07, 0, 1), down = o.life < 0.1 ? o.life / 0.1 : 1, hh = Math.round((10 + 18 * p) * down);
-          fillEll(g, x, y, 9, 3, o.dk);
+          const p = clamp(o.age / 0.07, 0, 1), down = o.life < 0.1 ? o.life / 0.1 : 1, hh = Math.round((o.big ? 16 + 30 * p : 10 + 18 * p) * down);
+          fillEll(g, x, y, o.big ? 14 : 9, o.big ? 5 : 3, o.dk);
+          if (o.big && hh > 10) { g.fillStyle = o.color; g.fillRect(x - 5, y - hh + 10, 11, hh - 10); g.fillStyle = o.cl; g.fillRect(x - 5, y - hh + 10, 3, hh - 10); g.fillStyle = '#ffffff'; g.fillRect(x - 5, y - hh + 10, 11, 2); }
           g.fillStyle = 'rgba(0,0,0,0.4)'; g.fillRect(x - 6, y - 1, 4, 1); g.fillRect(x + 3, y, 4, 1);
           drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - hh + 4, 1, 3);
           break;
@@ -4155,6 +4378,13 @@ class Battle {
           break;
         }
         case 'blast':
+          if (!o.trig && o.lob) {
+            const p = clamp(o.age / Math.max(0.05, o.delay0), 0, 1), x0 = X(o.lob.x0), y0 = X(o.lob.y0);
+            const hgt = X(18 + Math.hypot(o.x - o.lob.x0, o.y - o.lob.y0) * 0.35);
+            const lx = x0 + (x - x0) * p, ly = y0 + (y - y0) * p;
+            g.globalAlpha = 0.35; fillEll(g, lx, ly + 4, 6, 2, '#000000'); g.globalAlpha = 1;
+            drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, lx, ly - Math.sin(p * Math.PI) * hgt, o.r >= 24 ? 2 : 1, Math.floor(T * 14) & 3);
+          }
           if (o.trig) {
             const p = clamp((o.age - o.trigAge) / 0.4, 0, 1), r = X(o.r);
             if (p < 0.18) { fillDisc(g, x, y, r * 0.65 * (1 - p * 3), '#ffffff'); fillDisc(g, x, y, r * 0.4 * (1 - p * 3), o.cl); }
@@ -4522,6 +4752,13 @@ class Battle {
       case 'zone': return 28;
       case 'dash': return e.dist * 0.7;
       case 'summon': return 70;
+      case 'swing': return e.r * 0.7;
+      case 'cone': return e.len * 0.6;
+      case 'wave': return e.at === 'self' ? e.r * 0.6 : 80;
+      case 'line': return 50;
+      case 'chain': return e.range * 0.7;
+      case 'hook': return e.range * 0.6;
+      case 'lob': return 100;
     }
     return 60;
   }
@@ -4555,6 +4792,7 @@ class Battle {
     const mv = f.spec.moves;
     const ok = (m) => {
       const e = m.fx.find((q) => q.dmg > 0 || q.t === 'all' || q.t === 'summon') || m.fx[0];
+      if (e.t === 'buff' && e.k === 'counter') return d < 60 && Math.random() < 0.5;
       switch (e.t) {
         case 'shot': return e.from === 'hand' ? d < Math.min(200, e.speed * e.life * 0.9) : e.from === 'around' ? d < 70 : d < 150;
         case 'beam': return d < e.len;
@@ -4570,6 +4808,13 @@ class Battle {
         case 'summon': return d < 170;
         case 'all': return true;
         case 'swap': return Math.random() < 0.3;
+        case 'swing': return d < e.r + 8;
+        case 'cone': return d < e.len;
+        case 'wave': return e.at === 'self' ? d < e.r : d < 170;
+        case 'line': return d < 14 + e.n * e.step;
+        case 'chain': return d < e.range * 1.2;
+        case 'hook': return d < e.range && d > 30;
+        case 'lob': return d < 180;
       }
       return false;
     };

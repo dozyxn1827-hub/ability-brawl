@@ -78,19 +78,19 @@ const light = (c, t = 0.45) => mix(c, '#ffffff', t);
 
 /* ----- 열거형 ----- */
 const DEBUFFS = ['burn', 'poison', 'slow', 'root', 'stun', 'freeze', 'silence', 'confuse', 'weak', 'vuln', 'slip', 'heavy', 'dance', 'sleep', 'morph'];
-const BUFFS = ['haste', 'shield', 'regen', 'power', 'armor', 'invis', 'giant', 'tiny', 'fly', 'reflect', 'invuln'];
+const BUFFS = ['haste', 'shield', 'regen', 'power', 'armor', 'invis', 'giant', 'tiny', 'fly', 'reflect', 'invuln', 'counter'];
 const ST_ALL = DEBUFFS.concat(BUFFS);
 const ST_KO = {
   burn: '화상', poison: '중독', slow: '둔화', root: '속박', stun: '기절', freeze: '빙결', silence: '침묵',
   confuse: '혼란', weak: '약화', vuln: '취약', slip: '미끄러짐', heavy: '무거움', dance: '춤', sleep: '잠', morph: '변신',
   haste: '가속', shield: '보호막', regen: '재생', power: '강화', armor: '단단함', invis: '은신',
-  giant: '거대화', tiny: '축소', fly: '비행', reflect: '반사', invuln: '무적',
+  giant: '거대화', tiny: '축소', fly: '비행', reflect: '반사', invuln: '무적', counter: '반격 자세',
 };
 const ST_COLOR = {
   burn: '#ff7a2f', poison: '#9be04a', slow: '#7fb4ff', root: '#b58a4a', stun: '#ffe14a', freeze: '#9fe8ff',
   silence: '#b9a7ff', confuse: '#ff7ad9', weak: '#9aa0b8', vuln: '#ff5a5a', slip: '#c9f5ff', dance: '#ff8ad0', sleep: '#c8d8ff', morph: '#b6f24a', heavy: '#8d7f6a',
   haste: '#6dffb0', shield: '#7fd0ff', regen: '#7dff8a', power: '#ffb23f', armor: '#c9c9d6', invis: '#d9d9ff',
-  giant: '#ffa64a', tiny: '#ffd9f0', fly: '#bfe9ff', reflect: '#e7f6ff', invuln: '#fff3a0',
+  giant: '#ffa64a', tiny: '#ffd9f0', fly: '#bfe9ff', reflect: '#e7f6ff', invuln: '#fff3a0', counter: '#ffffff',
 };
 const HEADS = ['short', 'spiky', 'long', 'ponytail', 'bald', 'hood', 'hat', 'helmet', 'crown', 'horns', 'halo', 'cap', 'mask', 'ears', 'robot'];
 const WEAPONS = ['none', 'sword', 'staff', 'wand', 'gun', 'bow', 'hammer', 'scythe', 'book', 'orb', 'shield', 'dagger', 'axe', 'spear'];

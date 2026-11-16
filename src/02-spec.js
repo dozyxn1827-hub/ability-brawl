@@ -47,7 +47,21 @@ function sanFx(e, slot) {
         from: oneOf(e.from, ['hand', 'sky', 'ground', 'around'], 'hand'), kb: num(e.kb, 0, 10, 2), st,
       };
     case 'beam':
-      return { t: 'beam', dmg: num(e.dmg, 1, 20, 5), len: num(e.len, 24, 320, 110), w: num(e.w, 2, 14, 4), ticks: Math.round(num(e.ticks, 1, 6, 2)), dur: num(e.dur, 0.1, 1.5, 0.4), both: bool(e.both), kb: num(e.kb, 0, 10, 1), st };
+      return { t: 'beam', dmg: num(e.dmg, 1, 20, 5), len: num(e.len, 24, 320, 110), w: num(e.w, 2, 14, 4), ticks: Math.round(num(e.ticks, 1, 6, 2)), dur: num(e.dur, 0.1, 1.5, 0.4), both: bool(e.both), sweep: num(e.sweep, 0, 220, 0), kb: num(e.kb, 0, 10, 1), st };
+    case 'swing':
+      return { t: 'swing', dmg: num(e.dmg, 1, 30, 9), r: num(e.r, 10, 44, 20), arc: num(e.arc, 40, 360, 120), n: Math.round(num(e.n, 1, 4, 1)), kb: num(e.kb, 0, 10, 4), st };
+    case 'cone':
+      return { t: 'cone', dmg: num(e.dmg, 1, 10, 3), len: num(e.len, 24, 120, 60), arc: num(e.arc, 20, 100, 50), dur: num(e.dur, 0.2, 1.6, 0.6), ticks: Math.round(num(e.ticks, 1, 8, 4)), kb: num(e.kb, 0, 6, 1), st };
+    case 'wave':
+      return { t: 'wave', dmg: num(e.dmg, 1, 40, 10), r: num(e.r, 16, 100, 44), at: oneOf(e.at, ['self', 'front', 'target'], 'self'), off: num(e.off, 0, 140, 40), n: Math.round(num(e.n, 1, 3, 1)), kb: num(e.kb, -10, 10, 6), st };
+    case 'line':
+      return { t: 'line', dmg: num(e.dmg, 1, 30, 10), n: Math.round(num(e.n, 3, 9, 5)), step: num(e.step, 10, 28, 18), r: num(e.r, 5, 16, 9), kb: num(e.kb, 0, 10, 4), st };
+    case 'chain':
+      return { t: 'chain', dmg: num(e.dmg, 1, 25, 9), n: Math.round(num(e.n, 1, 6, 3)), range: num(e.range, 40, 140, 90), kb: num(e.kb, 0, 6, 1), st };
+    case 'hook':
+      return { t: 'hook', dmg: num(e.dmg, 1, 25, 8), speed: num(e.speed, 150, 340, 280), range: num(e.range, 50, 200, 130), st };
+    case 'lob':
+      return { t: 'lob', dmg: num(e.dmg, 1, 45, 14), r: num(e.r, 8, 50, 20), n: Math.round(num(e.n, 1, 5, 1)), kb: num(e.kb, 0, 10, 5), st };
     case 'blast':
       return { t: 'blast', dmg: num(e.dmg, 1, 50, 14), r: num(e.r, 6, 56, 18), at, off: num(e.off, 0, 140, 26), delay: num(e.delay, 0, 1.5, 0.15), kb: num(e.kb, -10, 10, 5), st };
     case 'zone':
@@ -60,7 +74,7 @@ function sanFx(e, slot) {
       if (slot === 'basic') return null;
       const k = oneOf(e.k, BUFFS, null);
       if (!k) return null;
-      const cap = k === 'invuln' ? (slot === 'ult' ? 2.5 : 1.5) : k === 'invis' ? 5 : k === 'fly' ? 6 : 8;
+      const cap = k === 'invuln' ? (slot === 'ult' ? 2.5 : 1.5) : k === 'counter' ? 2 : k === 'invis' ? 5 : k === 'fly' ? 6 : 8;
       const o = { t: 'buff', k, d: r1(num(e.d, 1, cap, Math.min(4, cap))) };
       if (k === 'shield') o.pow = num(e.pow, 10, 60, 25);
       if (k === 'regen') o.pow = num(e.pow, 2, 8, 4);
@@ -91,6 +105,13 @@ function fxExpected(e) {
     case 'beam': return e.dmg * e.ticks;
     case 'zone': return e.dmg * (e.dur / 0.5) * 0.4;
     case 'all': return e.dmg * 1.5;
+    case 'swing': return e.dmg * e.n * (e.arc >= 300 ? 1.2 : 1);
+    case 'cone': return e.dmg * e.ticks * 0.7;
+    case 'wave': return e.dmg * e.n;
+    case 'line': return e.dmg * 1.2;
+    case 'chain': return e.dmg * Math.min(2.2, 1 + e.n * 0.3);
+    case 'hook': return e.dmg;
+    case 'lob': return e.dmg * (1 + (e.n - 1) * 0.5);
     case 'summon':
       if (e.kind === 'turret') return e.dmg * e.rate * e.dur * 0.35 * e.n;
       if (e.kind === 'chaser') return e.dmg * e.n * 1.5;
@@ -594,7 +615,7 @@ ${sideList}
 
 [설계 순서] 아래 순서대로 속으로 깊이 생각한 뒤 결과만 출력한다(생각 과정은 출력하지 않는다).
 1. 해석: 능력 글을 단어 하나하나 글자 그대로 읽는다. 그 능력이 진짜로 있다면 싸움판에서 벌어질 웃긴 장면을 여러 개 떠올리고, 글에 가장 충실하면서 가장 황당한 해석을 고른다. 말장난, 과장, 일상 소재의 엉뚱한 활용, 숫자·조건의 지나치게 성실한 해석을 적극 쓴다. 가장 먼저 떠오르는 뻔한 해석은 한 번 더 비틀어 본다.
-2. 콩트 구성: 네 기술이 한 편의 콩트처럼 이어지게 한다.
+2. 콩트 구성: 네 기술이 한 편의 콩트처럼 이어지게 한다. 네 기술의 공격 방식이 모두 달라야 한다(발사체만 네 개는 금지). 액션 게임처럼 휘두르기(swing), 분사(cone), 충격파(wave), 땅 가르기(line), 연쇄(chain), 갈고리(hook), 포물선 투척(lob), 광선 쓸기(beam sweep), 반격 자세(buff counter), 돌진·순간이동·소환·장판을 섞는다.
    · basic: 그 능력의 대표 개그를 가볍고 빠르게 연타. 쏠 때마다 손맛이 나게.
    · s1: 예상 밖으로 비튼 활용. 상태이상이나 장판으로 판을 깐다.
    · s2: 능력을 엉뚱하게 써서 도망·접근·방어·소환. 위기 탈출이나 기습.
@@ -658,7 +679,14 @@ SOUND: ${SOUND_KINDS.join('|')}
 SHAPE(pix가 없을 때 쓰는 기본 모양): ${SHAPES.join('|')}
 EFFECT (아레나 480x320px, 캐릭터 키 10px, 이동 속도 약 96px/초, 거리 px, 속도 px/초, 모두 가장 가까운 적 방향 기준):
  {"t":"shot","dmg":2~30,"n":1~8,"spread":0~120,"speed":80~340,"size":1~4,"homing":0~1,"pierce":bool,"bounce":0~3,"life":0.3~3,"boom":0~34,"ret":bool,"split":0~6,"from":"hand|sky|ground|around","kb":0~10,"st":ST} 발사체(hand 손에서 날아감, sky 적 주변에 하늘에서 떨어짐, ground 적 쪽으로 땅에서 차례로 솟음, around 사방으로, boom 폭발 반경, bounce 벽에 튕김, ret 부메랑처럼 돌아옴, split 터질 때 작은 조각 개수)
- {"t":"beam","dmg":2~20,"len":24~320,"w":2~14,"ticks":1~6,"dur":0.1~1.5,"both":bool,"kb":0~10,"st":ST} 광선(ticks번 dmg씩, both는 앞뒤로)
+ {"t":"beam","dmg":2~20,"len":24~320,"w":2~14,"ticks":1~6,"dur":0.1~1.5,"both":bool,"sweep":0~220,"kb":0~10,"st":ST} 광선(ticks번 dmg씩, both는 앞뒤로) (sweep: 각도만큼 휙 쓸면서 지나감)
+ {"t":"swing","dmg":2~30,"r":10~44,"arc":40~360,"n":1~4,"kb":0~10,"st":ST} 휘두르기(능력으로 만든 무언가를 앞쪽 부채꼴로 쓸어 벤다. arc 360이면 한 바퀴 회전베기, n은 좌우로 번갈아 몇 번)
+ {"t":"cone","dmg":1~10,"len":24~120,"arc":20~100,"dur":0.2~1.6,"ticks":1~8,"kb":0~6,"st":ST} 부채꼴 분사(숨결·물줄기·가스·소리를 앞으로 쏟아낸다)
+ {"t":"wave","dmg":2~40,"r":16~100,"at":"self|front|target","off":0~140,"n":1~3,"kb":-10~10,"st":ST} 충격파(한 점에서 고리가 퍼져 나간다. 내려찍기·고함·발 구르기. n번 연속)
+ {"t":"line","dmg":2~30,"n":3~9,"step":10~28,"r":5~16,"kb":0~10,"st":ST} 땅 가르기(조준 방향으로 기둥·가시·불기둥이 차례로 솟는다)
+ {"t":"chain","dmg":2~25,"n":1~6,"range":40~140,"st":ST} 연쇄(가장 가까운 적에게 꽂히고 옆 적으로 n번 튄다)
+ {"t":"hook","dmg":2~25,"speed":150~340,"range":50~200,"st":ST} 갈고리(줄 달린 무언가를 던져 맞은 적을 내 쪽으로 끌어온다)
+ {"t":"lob","dmg":2~45,"r":8~50,"n":1~5,"kb":0~10,"st":ST} 포물선 투척(머리 위로 던져 표시된 곳에 떨어져 터진다. 벽을 넘어간다)
  {"t":"blast","dmg":4~50,"r":6~56,"at":"self|front|target","off":0~140,"delay":0~1.5,"kb":-10~10,"st":ST} 폭발(kb 음수는 끌어당김, front는 적 방향 off만큼 앞, target은 적 위치)
  {"t":"zone","dmg":0~8,"r":8~50,"dur":1.5~8,"at":"self|front|target","off":0~140,"follow":bool,"heal":0~6,"st":ST} 장판(0.5초마다 dmg, heal은 안에 선 자신 회복, follow는 자신을 따라다님)
  {"t":"trail","dmg":0~6,"r":6~16,"dur":1~6,"life":1~4,"st":ST} dur초 동안 지나간 자리에 흔적 장판을 남김
@@ -671,7 +699,7 @@ EFFECT (아레나 480x320px, 캐릭터 키 10px, 이동 속도 약 96px/초, 거
  {"t":"swap"} 가장 가까운 적과 자리 바꾸기
  basic에는 buff, heal, all, swap을 쓸 수 없다. "st"는 생략 가능. ST: {"k":DEBUFF,"d":0.5~5}
 DEBUFF: burn(화상 지속피해)|poison(중독 지속피해)|slow|root(이동 불가)|stun(기절)|freeze(빙결)|silence(능력 봉인)|confuse(방향 반전)|weak(공격력 감소)|vuln(받는 피해 증가)|slip(미끄러짐)|heavy(무거움: 느려지고 돌진·순간이동 불가)|dance(강제로 춤춤: 아무것도 못 함)|sleep(잠듦: 맞으면 깸)|morph(변신: 그 기술의 pix 모양 생물로 변해 능력을 못 쓰고 느려짐)
-BUFF: haste|shield|regen|power|armor|invis|giant|tiny|fly|reflect|invuln
+BUFF: haste|shield|regen|power|armor|invis|giant|tiny|fly|reflect|invuln|counter(반격 자세: 그 시간 안에 처음 맞는 공격을 막고 되돌려 줌, 최대 2초)
 PASSIVE: {"k":"regen|thorns|lifesteal|armor|rage|aura|revive|swift|crit|dodge","desc":"설명(30자 이내)"}
 DRAWBACK: {"how":"게임에서 실제로 벌어지는 일(50자 이내)","say":"부작용이 터질 때 하는 말(14자 이내, 없으면 빈 문자열)","fx":DFX,"more":[DFX, ...]}
 ON: basic|s1|s2|ult|skills(네 능력 모두)
