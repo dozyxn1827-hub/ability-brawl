@@ -6,6 +6,9 @@ const path = require('path');
 
 const PORT = +process.env.PORT || 3000;
 const KEY = process.env.ANTHROPIC_API_KEY || '';
+const GKEY = process.env.GEMINI_API_KEY || ''; // 구글 Gemini 무료 키 (Anthropic 키가 없을 때 사용)
+const GMODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
+const AI_ON = !!(KEY || GKEY);
 const MODELS = { complex: process.env.AI_MODEL_COMPLEX || 'claude-opus-5-5', default: process.env.AI_MODEL || 'claude-sonnet-5-5', quick: process.env.AI_MODEL_QUICK || 'claude-haiku-5-5' };
 const PAGE = path.join(__dirname, 'public', 'index.html');
 
@@ -24,7 +27,31 @@ function body(req, limit) {
 const json = (res, code, obj) => { res.writeHead(code, { 'content-type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(obj)); };
 
 let aiBusy = 0;
+// Gemini 무료 사용량은 분당 요청 수가 적어서 한 번에 하나씩, 막히면 잠시 쉬었다 다시
+let gChain = Promise.resolve();
+function callGemini(input) {
+  const run = async () => {
+    const text = typeof input === 'string' ? input : input.map((m) => m.content).join('\n\n');
+    for (let i = 0; i < 4; i++) {
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GMODEL}:generateContent`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-goog-api-key': GKEY },
+        body: JSON.stringify({ contents: [{ role: 'user', parts: [{ text }] }], generationConfig: { responseMimeType: 'application/json', maxOutputTokens: 8192, temperature: 1.1 } }),
+      });
+      const d = await r.json().catch(() => ({}));
+      if (r.status === 429 || r.status === 503) { await new Promise((ok) => setTimeout(ok, 15000)); continue; }
+      if (!r.ok) throw { status: r.status, code: 'error', message: (d.error && d.error.message) || 'Gemini 오류' };
+      const parts = (((d.candidates || [])[0] || {}).content || {}).parts || [];
+      return parts.map((p) => p.text || '').join('');
+    }
+    throw { status: 429, code: 'rate_limited', message: 'Gemini 무료 사용량이 잠시 꽉 찼어요' };
+  };
+  const p = gChain.then(run, run);
+  gChain = p.catch(() => {});
+  return p;
+}
 async function callAI(input, tier) {
+  if (!KEY) return callGemini(input);
   const messages = typeof input === 'string' ? [{ role: 'user', content: input }] : input;
   const r = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -65,9 +92,9 @@ http.createServer(async (req, res) => {
       if (p) { p.presence = b.presence || {}; broadcast(String(b.room || 'main').slice(0, 40), { peer: b.peer, presence: p.presence }); }
       return json(res, 200, { ok: true });
     }
-    if (u.pathname === '/ai-status') return json(res, 200, { ok: !!KEY });
+    if (u.pathname === '/ai-status') return json(res, 200, { ok: AI_ON });
     if (req.method === 'POST' && u.pathname === '/ai') {
-      if (!KEY) return json(res, 403, { code: 'not_granted', message: 'AI 키가 설정되지 않았어요' });
+      if (!AI_ON) return json(res, 403, { code: 'not_granted', message: 'AI 키가 설정되지 않았어요' });
       if (aiBusy >= 8) return json(res, 429, { code: 'rate_limited', message: '잠시 후 다시' });
       const b = await body(req, 200000);
       aiBusy++;
@@ -77,4 +104,4 @@ http.createServer(async (req, res) => {
     }
     json(res, 404, {});
   } catch (e) { json(res, 400, { code: 'error', message: String(e.message || e) }); }
-}).listen(PORT, () => console.log(`능력 난투 서버: http://localhost:${PORT}  (AI ${KEY ? '켜짐' : '꺼짐 - 기본 설계로 진행'})`));
+}).listen(PORT, () => console.log(`능력 난투 서버: http://localhost:${PORT}  (AI ${KEY ? '켜짐 (Claude)' : GKEY ? '켜짐 (Gemini ' + GMODEL + ')' : '꺼짐 - 기본 설계로 진행'})`));

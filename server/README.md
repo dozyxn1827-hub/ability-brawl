@@ -4,7 +4,8 @@ claude.ai 없이 친구들과 각자 컴퓨터로 온라인 대전을 하는 버
 
 ## 1. 준비
 - Node.js 18 이상 설치 (https://nodejs.org)
-- (선택) AI 능력 설계를 쓰려면 Anthropic API 키 (https://console.anthropic.com). 키가 없으면 미리 만든 기본 설계로 진행돼요.
+- (선택, 무료) AI 능력 설계를 무료로 쓰려면 Google AI Studio(https://aistudio.google.com/apikey)의 Gemini API 키를 환경 변수 `GEMINI_API_KEY`로. 모델은 `GEMINI_MODEL`(기본 gemini-2.5-flash)
+- (선택, 유료) 더 똑똑한 설계를 원하면 Anthropic API 키 (https://console.anthropic.com). 키가 없으면 미리 만든 기본 설계로 진행돼요.
 
 ## 2. 서버 켜기 (방장 컴퓨터)
 이 `server` 폴더에서:
