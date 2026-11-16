@@ -643,7 +643,7 @@ function dfxText(f) {
   const on = ON_KO[f.on] || '';
   switch (f.t) {
     case 'lock': return `${on} 봉인 (아예 못 씀)`;
-    case 'replace': return Object.keys(f.moves).map((s) => SLOT_KO[s]).join('·') + ' 이(가) 다른 기술로 바뀜';
+    case 'replace': return Object.keys(f.moves).map((s) => SLOT_KO[s]).join('·') + '이(가) 다른 기술로 바뀜';
     case 'selfdmg': return `${on} 쓸 때마다 체력 -${f.amt}`;
     case 'backfire': return `${on} 위력의 ${f.pct}%만큼 자기도 다침`;
     case 'selfst': return `${on} 쓰고 나면 ${ST_KO[f.st.k]} ${f.st.d}초`;
@@ -667,7 +667,7 @@ function dfxText(f) {
     case 'move': return MOVE_KO[f.mode];
     case 'vision': return VISION_KO[f.mode] + ' (내 화면)';
     case 'shout': return `${on} 쓸 때마다 “${f.text}” 외침`;
-    case 'pest': return `${f.every}초마다 ${f.name}이(가) 쫓아와 괴롭힘`;
+    case 'pest': return `${f.every}초마다 ${josa(f.name, '이', '가')} 쫓아와 괴롭힘`;
     case 'look': return '겉모습이 바뀜';
   }
   return '';
@@ -1171,7 +1171,7 @@ const THEME = {
   dark:   { vfx: 'shadow', shape: 'moon', c: ['#8a5ad0', '#d0a8ff'], sfx: 'warp', st: 'silence', aura: 'shadow', body: '#2a1f3f', hair: '#1a1020', head: 'hood', feel: ['blink', 'invis', 'shot'] },
   space:  { vfx: 'void', shape: 'star', c: ['#7a5aff', '#c8b0ff'], sfx: 'rumble', st: 'heavy', aura: 'star', body: '#1f1a4a', hair: '#c8b0ff', head: 'long', feel: ['pull', 'rain', 'all'] },
   time:   { vfx: 'arcane', shape: 'gear', c: ['#ffd98a', '#fff6d0'], sfx: 'bell', st: 'freeze', aura: 'star', body: '#5b3f8c', hair: '#d8d8e8', head: 'hat', feel: ['all', 'blink', 'shot'] },
-  sound:  { vfx: 'sound', shape: 'note', c: ['#ff8ad8', '#ffd0f0'], sfx: 'kazoo', st: 'confuse', aura: 'none', body: '#8f2f7f', hair: '#ff8ad8', head: 'ponytail', feel: ['beam', 'all', 'shot'] },
+  sound:  { basic: 'beam', vfx: 'sound', shape: 'note', c: ['#ff8ad8', '#ffd0f0'], sfx: 'kazoo', st: 'confuse', aura: 'none', body: '#8f2f7f', hair: '#ff8ad8', head: 'ponytail', feel: ['beam', 'all', 'shot'] },
   love:   { vfx: 'cute', shape: 'heart', c: ['#ff7ab0', '#ffd0e0'], sfx: 'squeak', st: 'dance', aura: 'none', body: '#d84f8a', hair: '#ffb0d0', head: 'ponytail', feel: ['shot', 'heal', 'summon'] },
   sleep:  { vfx: 'sleep', shape: 'moon', c: ['#9aa8ff', '#dfe4ff'], sfx: 'whistle', st: 'sleep', aura: 'none', body: '#4a5aa8', hair: '#c8d0ff', head: 'cap', feel: ['zone', 'all', 'heal'] },
   metal:  { vfx: 'metal', shape: 'blade', c: ['#c8c8d8', '#ffffff'], sfx: 'laser', st: 'weak', aura: 'none', body: '#4a4a5a', hair: '#2a2a2a', head: 'helmet', feel: ['shot', 'dash', 'turret'] },
@@ -1187,7 +1187,7 @@ const THEME = {
   nag:    { vfx: 'sound', shape: 'cube', c: ['#e0e0e0', '#ffffff'], sfx: 'honk', st: 'sleep', aura: 'none', body: '#5a5a6a', hair: '#3a3a3a', head: 'short', feel: ['beam', 'all', 'shot'] },
   gravity:{ vfx: 'void', shape: 'orb', c: ['#8a6aff', '#d0c0ff'], sfx: 'rumble', st: 'heavy', aura: 'star', body: '#2a1f5a', hair: '#8a6aff', head: 'long', feel: ['pull', 'all', 'boom'] },
   speed:  { vfx: 'wind', shape: 'feather', c: ['#9fe8ff', '#ffffff'], sfx: 'whoosh', st: 'slow', aura: 'wind', body: '#1f6faf', hair: '#9fe8ff', head: 'spiky', feel: ['dash', 'haste', 'blink'] },
-  power:  { vfx: 'earth', shape: 'rock', c: ['#ff7a3a', '#ffd0a0'], sfx: 'thud', st: 'stun', aura: 'flame', body: '#a83a1a', hair: '#2a1a1a', head: 'spiky', feel: ['dash', 'boom', 'shield'] },
+  power:  { basic: 'boom', vfx: 'earth', shape: 'rock', c: ['#ff7a3a', '#ffd0a0'], sfx: 'thud', st: 'stun', aura: 'flame', body: '#a83a1a', hair: '#2a1a1a', head: 'spiky', feel: ['dash', 'boom', 'shield'] },
   ball:   { vfx: 'plain', shape: 'orb', c: ['#ff8a3a', '#ffffff'], sfx: 'boing', st: 'stun', aura: 'none', body: '#2f6fd8', hair: '#2a1a1a', head: 'cap', feel: ['shot', 'dash', 'rain'] },
   ki:     { vfx: 'plain', shape: 'orb', c: ['#5fc8ff', '#d0f0ff'], sfx: 'pew', st: 'stun', aura: 'none', body: '#d8782f', hair: '#2a1a1a', head: 'spiky', feel: ['shot', 'boom', 'beam'] },
 };
@@ -1215,7 +1215,7 @@ const LEX = [
   [/침|가래|콧물|코딱지|눈물|땀|토(?=를|가|해|하)|구토/, 'gross'],
   [/똥|응가|변기|화장실|휴지/, 'gross', { shape: 'drop', sfx: 'fart', c: ['#8a5a2a', '#d0a060'] }],
   [/머리카락|털|대머리|가발/, 'gross', { shape: 'feather', c: ['#3a2a1a', '#8a6a4a'], sfx: 'whoosh' }],
-  [/손톱|이빨|이를|깨물|물어/, 'metal', { shape: 'blade', sfx: 'crunch' }],
+  [/손톱|이빨|앞니|송곳니|깨물|물어뜯/, 'metal', { shape: 'blade', sfx: 'crunch' }],
   [/웃음|웃기|개그|농담|드립|간지럼|간지러/, 'sound', { sfx: 'squeak', st: 'dance' }],
   [/울음|울기|우는|징징|떼쓰/, 'water', { sfx: 'meow', st: 'slow' }],
   [/하품|잠|졸음|자장가|꿈|베개|이불|침대|멍때|멍하|넋|게으|귀찮|빈둥|뒹굴/, 'sleep'],
@@ -1257,6 +1257,69 @@ const LEX = [
   [/기(?=를|운|공)|기공|에너지|오라|파동|염력|초능력|텔레파시/, 'ki'],
 ];
 
+/* ----- 단어 사전 확장 (더 많은 일상어·병맛어) ----- */
+LEX.push(
+  // 불·열
+  [/라이터|성냥|촛불|양초|횃불|모닥불|캠프파이어|숯|난로|보일러|핫팩|찜질|사우나|불닭|핫소스|매운|맵다|고추장|와사비|화산|화로|용가리|불사조|피닉스|열기|열정|뜨거운/, 'fire'],
+  // 얼음·추위
+  [/냉동|아이스|빙수|얼음물|에어컨 바람|설탕 눈|눈덩이|눈싸움|썰매|스키|북극|남극|펭귄 떼|빙판|동태|냉동실|추위|한파|시원/, 'ice'],
+  // 전기
+  [/배터리|건전지|콘센트|충전기|전선|전봇대|발전기|피카|전기뱀장어|네온|전구|형광등|번쩍이는/, 'elec'],
+  // 물
+  [/호수|강물|시냇물|폭포|샤워|목욕|욕조|수도꼭지|양동이|물풍선|스프링클러|분무기|소나기|장마|이슬|해일|쓰나미|수족관|어항|오줌|침수/, 'water'],
+  // 바람·공기
+  [/공기|숨|한숨|휘파람|입바람|드라이기|청소기|진공|풍선껌|헬륨|연|낙하산|부메랑|바람개비/, 'wind'],
+  // 땅·돌·건물
+  [/벽돌|시멘트|콘크리트|아스팔트|자갈|조약돌|석상|동상|피라미드|성(?=을|이|\s|$)|건물|빌딩|아파트|집(?=을|이|\s|$)|지붕|기둥|삽|포크레인|굴착기|두더지/, 'earth'],
+  // 식물
+  [/장미|해바라기|민들레|튤립|벚꽃|단풍|낙엽|대나무|소나무|야자수|덩쿨|가시덤불|이끼|새싹|화분|정원|채소|브로콜리|시금치|콩|옥수수|감자칩/, 'plant'],
+  // 독·화학
+  [/농약|살충제|표백제|락스|세균|바이러스|감기|코로나|병균|곰팡이|썩은|상한|유통기한|폐수|쓰레기|음식물 쓰레기|하수구|시궁창/, 'poison'],
+  // 냄새·병맛 몸
+  [/입냄새|겨드랑이|땀냄새|발가락|무좀|정수리|머리냄새|고린내|암내|홀애비|홀아비|청국장|두리안|낫또|홍어|청국|치즈 냄새/, 'stink', { sfx: 'fart' }],
+  [/코딱지|귀지|각질|비듬|여드름|피지|배꼽|때(?=를|가|\s|$)|이태리타올|트림|딸꾹질|재채기|콧바람|하품/, 'gross'],
+  [/엉덩이|궁둥이|똥침|빵꾸|팬티|기저귀|변비|설사|배탈/, 'gross', { sfx: 'fart', shape: 'bubble' }],
+  // 빛·신성
+  [/손전등|플래시|스포트라이트|조명|레이저 포인터|햇빛|햇살|광채|후광|별빛|반딧불|형광|신|부처|성모|기도|축복|천국|날개 달린/, 'holy'],
+  // 어둠
+  [/밤하늘|새벽|정전|블라인드|선글라스|먹물|잉크|검은|까만|흑마법|사신|저승사자|흑화|중2병|흑염룡/, 'dark'],
+  // 우주
+  [/로켓|우주선|인공위성|화성|목성|토성|태양계|은하수|별똥별|유성|혜성|성운|우주인|외계/, 'space'],
+  // 시간
+  [/알람|모래시계|타이머|달력|어제|내일|과거|미래|타임머신|되돌|빨리감기|일시정지|슬로모션|느리게 감/, 'time'],
+  // 소리·음악
+  [/트럼펫|나팔|색소폰|바이올린|리코더|탬버린|캐스터네츠|하모니카|확성기|스피커|이어폰|헤드폰|노래방|트로트|아이돌|케이팝|K팝|뮤지컬|오페라|합창|박수|발구르기|휘파람|코골이|코 골/, 'sound'],
+  // 사랑·귀여움
+  [/첫사랑|짝사랑|커플|데이트|키스|하이파이브|포옹|안아|꽃다발|선물|발렌타인|러브레터|팬레터|아기|애기|베이비|곰인형|인형|말랑|뽀송|깜찍/, 'love'],
+  // 잠
+  [/낮잠|늦잠|숙면|코골|불면|수면제|양 세기|자장자장|꿀잠|이불킥|잠옷|파자마|안대/, 'sleep'],
+  // 쇠·무기
+  [/쇠사슬|철퇴|너클|쌍절곤|부채|채찍|작살|창살|못(?=을|이|\s|$)|나사|볼트|드라이버|렌치|스패너|철판|깡통|캔|병따개|포크|나이프|이쑤시개|바늘|압정|클립|스테이플러/, 'metal', { shape: 'blade', sfx: 'crunch' }],
+  // 기계·디지털
+  [/키보드|마우스|모니터|노트북|태블릿|프린터|복사기|계산기|리모컨|티비|TV|텔레비전|라디오|카메라|셀카|사진|영상|틱톡|인스타|SNS|이모티콘|카톡|문자|알림|업데이트|버그|해킹|바이러스|코딩|프로그래밍|메타버스|VR|홀로그램|자판기|엘리베이터|에스컬레이터|청소 로봇/, 'tech'],
+  // 음식
+  [/삼겹살|족발|보쌈|곱창|순대|어묵|오뎅|튀김|돈까스|스테이크|햄|베이컨|핫도그|샌드위치|토스트|팬케이크|와플|파스타|스파게티|우동|라멘|짬뽕|탕수육|마라탕|쌀국수|초밥|스시|회|김|된장|청국장|비빔밥|볶음밥|주먹밥|도시락|컵라면|과일|멜론|복숭아|자두|체리|키위|망고|코코넛|오이|토마토|양배추|버터|치즈|마요네즈|케첩|소스|식빵|크루아상|베이글|팝콘|콜라|사이다|커피|녹차|주스|요구르트|요거트|두유|탄산/, 'food'],
+  [/캔디|롤리팝|막대사탕|츄파춥스|마시멜로|쿠키|브라우니|푸딩|타르트|크레페|빙과|슬러시|버블티|흑당|설탕|시럽|잼|누텔라|생크림|휘핑/, 'sweet'],
+  // 동물 더
+  [/판다|코알라|캥거루|기린|얼룩말|하이에나|치타|표범|퓨마|사슴|순록|양(?=을|이|\s|$)|염소|알파카|라마|낙타|당나귀|원숭이|침팬지|오랑우탄|나무늘보|수달|비버|미어캣|라쿤|너구리|스컹크|두더지|박쥐|부엉이|올빼미|플라밍고|공작|칠면조|백조|갈매기|타조|키위새/, 'animal', { sfx: 'roar' }],
+  [/돌고래|범고래|바다표범|물개|해마|불가사리|성게|조개|굴|소라|문어발|오징어 다리|복어|뱀장어|장어|연어|참치|고등어|멸치|붕어|잉어|금붕어|올챙이/, 'water', { shape: 'paw', sfx: 'splash' }],
+  [/스컹크/, 'stink', { sfx: 'fart' }],
+  [/무당벌레|사마귀|잠자리|반딧불이|지렁이|달팽이|굼벵이|애벌레|진드기|벼룩|이(?=가 |를 )|빈대|말벌|꿀벌|땅벌|장수풍뎅이|사슴벌레|소금쟁이|하루살이/, 'bug'],
+  // 돈·소유
+  [/월급|용돈|세뱃돈|복권|로또|주식|비트코인|코인|통장|지갑|카드|쿠폰|포인트|할인|세일|명품|금괴|금고|은행|부동산|빌딩주/, 'money'],
+  // 귀신·공포
+  [/처녀귀신|달걀귀신|도깨비|구미호|강시|늑대인간|프랑켄|미라|해골 병사|저승|지옥|공포|무서운|소름|으스스|호러|빙의|퇴마/, 'ghost'],
+  // 마법·초능력
+  [/요정|정령|소환사|연금술|물약|포션|마나|룬|마법진|빗자루를 타|요술|순간이동술|투시|예지|염동력|사이코|최면술|저주 인형|타로|점술|운세/, 'magic'],
+  // 잔소리·일상 스트레스
+  [/숙제 검사|수행평가|중간고사|기말고사|수능|모의고사|성적표|학교|교실|급식|교장|담임|학원 숙제|과제|발표|조별과제|팀플|상사|부장|사장님|회식|월급날|출퇴근|지옥철|만원 지하철|민원|고객센터|대기 번호|줄서기|광고 전화|스팸|알바/, 'nag'],
+  // 운동·힘
+  [/태권도|유도|복싱|권투|가라테|합기도|씨름|팔씨름|레슬링|프로레슬링|보디빌딩|역도|스쿼트|푸시업|팔굽혀|윗몸|줄넘기|훌라후프|마라톤|박치기|헤드락|백드롭|드롭킥|날아차기|돌려차기|어퍼컷|훅|잽/, 'power'],
+  [/스케이트|롤러|킥보드|자전거|오토바이|스포츠카|레이싱|F1|경주|달리기 선수|육상|단거리|번개처럼|총알처럼|로켓처럼/, 'speed'],
+  [/골프|하키|배드민턴|탁구|핸드볼|당구|구슬|공기놀이|딱지|팽이|요요|원반|프리스비|럭비|미식축구|수박 깨기|눈덩이/, 'ball'],
+  // 무게·중력
+  [/코끼리 무게|돌덩이|쇳덩이|역기|아령|덤벨|무거운|짓누르|납덩이|볼링공|모래주머니/, 'gravity'],
+);
 /** 한 글자짜리 소재 단어는 앞에 다른 한글이 붙어 있으면 무시 (양말 → 말 X) */
 function guardShort(re) {
   const src = re.source, parts = [];
@@ -1297,6 +1360,20 @@ const MECH = [
   [/모두|전부|모든 적|전체|온 세상|세상을|모든 사람/, 'all'],
   [/던지|던져|던진|투척|날리|날린|쏘|쏜|쏴|발사|뱉|튕기/, 'shot'],
 ];
+MECH.push(
+  [/쏟아붓|퍼붓|폭격|공습|빗발|떨어트/, 'rain'],
+  [/쏘아|발사해|뿜어|내뿜|분사|뿌직|브레스|숨결/, 'beam'],
+  [/날려 버|빵 터|평 터|터트|폭죽처럼|자폭/, 'boom'],
+  [/퍼트|흩뿌|뒤덮|물들|오염시|도배|칠해/, 'zone'],
+  [/데려오|불러내|나타나게|만들어 내|키워서|복제|분신/, 'summon'],
+  [/몸통 박치기|밀어붙|들이박|돌격|달려가|덮쳐|덮친/, 'dash'],
+  [/사라져|사라지는|숨바꼭질|변장|숨겨/, 'invis'],
+  [/먹어|마셔|삼켜|섭취|충전|힐링|쉬면/, 'heal'],
+  [/막아내|버티|튕겨내|피해 없|철통/, 'shield'],
+  [/빨아당|흡입|빨대|진공|청소기처럼/, 'pull'],
+  [/커다래|부풀|뻥튀기|거대화/, 'big'],
+  [/뛰어오르|날아올라|공중부양|점프/, 'fly'],
+);
 const STATUS_WORDS = [
   [/얼리|얼린|얼어|얼음으로|동상|굳게|굳어|정지|멈추|멈춘|멈춰/, 'freeze'],
   [/기절|마비|감전|어지럽|실신|넋/, 'stun'],
@@ -1311,6 +1388,11 @@ const STATUS_WORDS = [
   [/미끄|미끌|넘어지/, 'slip'],
   [/변신|개구리로|돼지로|바꿔 버/, 'morph'],
   [/약하게|힘을 빼|힘이 빠지게|기운/, 'weak'],
+  [/웃기게|웃게|간지럽|빵 터지게/, 'dance'],
+  [/울게|울려|슬프게|우울/, 'slow'],
+  [/졸게|하품하게|나른/, 'sleep'],
+  [/멍하게|멍때리게|바보로|정신 못/, 'confuse'],
+  [/끈적|달라붙|붙여|접착|껌/, 'root'],
   [/무겁게|무거워|짓눌/, 'heavy'],
 ];
 
@@ -1410,7 +1492,7 @@ const MOBI = ['dash', 'blink', 'invis', 'shield', 'heal', 'haste', 'fly', 'big',
 const ULT_OK = ['all', 'rain', 'boom', 'beam', 'pull', 'summon', 'big', 'zone', 'dash', 'shot'];
 
 /** 글 하나로 설계서 원본(검증 전)을 조립한다 */
-function composeRaw(ability, sides) {
+function composeRaw(ability, sides, noDraw) {
   const text = String(ability || '').trim();
   const R = mulberry(hashText(text) || 7);
   const pk = (a) => a[Math.floor(R() * a.length)];
@@ -1453,7 +1535,7 @@ function composeRaw(ability, sides) {
   };
   const pref = said.concat(T(t1).feel, T(t2).feel, ['shot', 'boom', 'dash', 'zone', 'all']);
   const firstSaid = said.find((k) => BASIC_OK.has(k));
-  const basicM = choose([...BASIC_OK], [firstSaid && firstSaid !== 'boom' ? firstSaid : 'shot']);
+  const basicM = choose([...BASIC_OK], [firstSaid && firstSaid !== 'boom' ? firstSaid : T(t1).basic || 'shot']);
   const s1M = choose(CTRL, pref);
   const s2M = choose(MOBI, pref);
   const ultM = choose(ULT_OK, said.includes('all') ? ['all'] : said.concat(['rain', 'boom', 'all', 'beam', 'pull']));
@@ -1478,7 +1560,7 @@ function composeRaw(ability, sides) {
       cd: { basic: 0.55, s1: 1.9, s2: 2.7, ult: 7.5 }[s] * (mech === 'heal' || mech === 'big' ? 1.25 : 1),
       color: s === 'ult' ? tt.c[1] : s === 's2' ? tt.c[1] : tt.c[0], vfx: tt.vfx, shape: tt.shape,
       sfx: { kind: tt.sfx, pitch: { basic: 1.25, s1: 1, s2: 1.1, ult: 0.75 }[s], len: { basic: 0.7, s1: 1, s2: 0.9, ult: 1.5 }[s] },
-      fx,
+      fx, _k: th.key, _m: mech, _w: th.word,
     };
   }
   // 6) 겉모습·능력치·특성
@@ -1500,10 +1582,15 @@ function composeRaw(ability, sides) {
     win: cut(pk([`${josa(n1, '은', '는')} 최강이야!`, `역시 ${n1}밖에 없어`, `${n1} 앞에 무릎 꿇어라`]), 22),
   };
   const raw = { title, concept: cut(text, 50) || '정체불명의 능력', look, stats, moves, passive, lines };
-  raw.drawbacks = (sides || []).map((s) => smartDrawback(s.text, { text, moves, n1, themes }));
+  if (!noDraw) raw.drawbacks = (sides || []).map((s) => smartDrawback(s.text, { text, moves, n1, themes, aura: look.aura }));
   return raw;
 }
 
+function themesInText(t) {
+  const out = [];
+  for (const [re, key] of LEX) { const m = String(t || '').match(re); if (m) out.push({ key, word: m[0], at: m.index }); }
+  return out.sort((a, b) => a.at - b.at);
+}
 /* ----- 부작용 읽기: 맞는 말을 전부 찾아 겹친다 (최대 3개) ----- */
 function smartDrawback(side, ctx) {
   const t = String(side || '');
@@ -1511,18 +1598,64 @@ function smartDrawback(side, ctx) {
   const q = t.match(/["'“‘「]([^"'”’」]{1,16})["'”’」]/);
   const say = q ? q[1] : '';
   const out = [];
+  let customHow = '', newAura = null;
   const add = (fx) => { if (fx && out.length < 3 && !out.some((x) => x.t === fx.t && (x.t !== 'lock' || x.on === fx.on))) out.push(fx); };
   const SL = [[/궁극기|궁|필살기/, 'ult'], [/능력\s?1|첫\s?번째|기본/, 'basic'], [/능력\s?2|두\s?번째/, 's1'], [/능력\s?3|세\s?번째/, 's2']];
-  // "~을 못 쓴다": 능력 글의 소재를 콕 집으면 그 소재 기술만, 아니면 전부 엉망이 된다
-  if (has(/못\s?[가-힣]|안\s?나(온|와)|사용\s?(불가|금지)|봉인|쓸 수 없|금지|안 된다|안돼|안 돼|할 수 없/) && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못/)) {
+  // "~을 못 쓴다": 글자 그대로. 그 소재·행동이 들어간 기술은 정말로 그 소재가 안 나오는 기술로 바뀐다
+  const NEG = /못\s?[가-힣]|안\s?(나(온|와|옴)|된|돼|써|쓰|생|통|먹)|사용\s?(불가|금지)|봉인|쓸 수 없|금지|할 수 없|사라(진|져|짐)|잃(는|어|었|음)|없어(진|져|짐)|빼앗|뺏|막힌|막혀/;
+  if (ctx && has(NEG) && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못|못 자|못 걷|못 뛰|못 피|못 먹(?!.*(능력|기술))/)) {
     const slot = SL.find(([re]) => re.test(t));
-    const hitTheme = ctx && ctx.themes.find((f) => f.word && t.includes(f.word));
-    if (slot) add({ t: 'lock', on: slot[1] });
-    else if (hitTheme && ctx.themes.length > 1) {
-      const slots = SLOTS.filter((s) => ctx.moves[s].name.includes(cut(hitTheme.word, 5)));
-      if (slots.length && slots.length < 4) slots.forEach((s) => add({ t: 'lock', on: s }));
-      else add({ t: 'replace', moves: lameMoves(ctx.n1) });
-    } else add({ t: 'replace', moves: lameMoves(ctx ? ctx.n1 : '') });
+    // 부작용 글에 나온 소재(사전으로 같은 주제까지) + 행동
+    const keys = new Set(), words = [];
+    for (const f of ctx.themes) if (f.word && t.includes(f.word)) { keys.add(f.key); words.push(f.word); }
+    for (const [re, key] of LEX) { const m = t.match(re); if (m && ctx.themes.some((f) => f.key === key)) { keys.add(key); words.push(m[0]); } }
+    const mechHit = MECH.filter(([re]) => re.test(t.replace(/못\s?쓴|안\s?쓴/g, ''))).map(([, k]) => k);
+    let slots = [];
+    if (slot) slots = [slot[1]];
+    else {
+      slots = SLOTS.filter((s) => keys.has(ctx.moves[s]._k) || words.some((w) => w && ctx.moves[s].name.includes(cut(w, 5))));
+      if (!slots.length) slots = SLOTS.filter((s) => mechHit.includes(ctx.moves[s]._m));
+      if (has(/능력|기술|스킬|모든|전부|아무것도|다 못|하나도|모두/) && !slot) slots = SLOTS.slice();
+      // 능력 글의 핵심 단어를 짚었는데 주제가 하나뿐이면 전부 해당
+      if (!slots.length && keys.size && new Set(ctx.themes.map((f) => f.key)).size === 1) slots = SLOTS.slice();
+    }
+    if (slots.length) {
+      // "불 대신 물이 나온다", "불이 물로 바뀐다": 바뀐 소재로 다시 만든다
+      const subM = t.match(/(?:대신|아니라|말고)\s*([가-힣]{1,6}?)(?:이|가|을|를|만|만이)?\s*(?:나온|나와|나감|쏟|뿜|발사|튀어|써|쓴|된)/) || t.match(/([가-힣]{1,6}?)(?:으로|로)\s*(?:바뀐|바뀜|변한|변함|대체)/);
+      const sub = subM && subM[1] && !STOP.has(subM[1]) ? subM[1] : '';
+      let rep;
+      if (sub) {
+        const old = words[0] || (ctx.themes[0] && ctx.themes[0].word) || '';
+        const altRaw = composeRaw(old ? ctx.text.split(old).join(sub) : `${sub} ${ctx.text}`, [], true), alt = altRaw.moves;
+        if (slots.length === 4) newAura = altRaw.look;
+        rep = {}; for (const s of slots) rep[s] = alt[s];
+      } else {
+        const lame = lameMoves(words[0] || ctx.n1); rep = {}; for (const s of slots) rep[s] = lame[s];
+      }
+      if (slot && !sub) add({ t: 'lock', on: slot[1] });
+      else add({ t: 'replace', moves: rep });
+      if (newAura) add({ t: 'look', aura: newAura.aura, body: newAura.body, hair: newAura.hair });
+      const what = cut(words[0] || '능력', 6);
+      customHow = sub ? `${what} 대신 ${sub}: ${slots.map((s) => SLOT_KO[s]).join('·')}이(가) ${sub} 기술로 바뀜`
+        : slot ? `${SLOT_KO[slot[1]]} 아예 못 씀`
+        : slots.length === 4 ? `${josa(what, '을', '를')} 진짜 못 씀 — 네 기술 모두 버둥대기로`
+        : `${what} 기술(${slots.map((s) => SLOT_KO[s]).join('·')})은 진짜 못 씀`;
+      // 능력 전부가 사라지면 몸에 두르던 기운(불꽃 오라 등)도 꺼진다
+      if (slots.length === 4 && ctx.aura && ctx.aura !== 'none' && !sub) add({ t: 'look', aura: 'none' });
+    }
+  }
+  if (ctx && !out.length) {
+    const sw = t.match(/([가-힣]{1,6}?)(?:이|가|을|를|은|는)?\s*대신(?:에)?\s*([가-힣]{1,6}?)(?:이|가|을|를|만)?\s*(?:나온|나와|나감|쏟|뿜|발사|튀어|써|쓴|된|생|만들|$)/)
+      || t.match(/([가-힣]{1,6}?)(?:이|가|은|는|을|를)\s*([가-힣]{1,6}?)(?:으로|로)\s*(?:바뀐|바뀜|바뀌|변한|변함|변해|대체|둔갑)/);
+    if (sw && !STOP.has(sw[2])) {
+      const from = sw[1], to = sw[2], ft = themesInText(from)[0];
+      let slots = SLOTS.filter((s) => (ft && ctx.moves[s]._k === ft.key) || (ctx.moves[s]._w && (from.includes(ctx.moves[s]._w) || ctx.moves[s]._w.includes(from))));
+      if (!slots.length) slots = SLOTS.slice();
+      const altRaw = composeRaw(ctx.text.includes(from) ? ctx.text.split(from).join(to) : `${to} ${ctx.text}`, [], true), alt = altRaw.moves;
+      add({ t: 'replace', moves: Object.fromEntries(slots.map((s) => [s, alt[s]])) });
+      if (slots.length === 4) add({ t: 'look', aura: altRaw.look.aura, body: altRaw.look.body, hair: altRaw.look.hair });
+      customHow = `${from} 대신 ${to}: ${slots.length === 4 ? '네 기술 모두' : slots.map((s) => SLOT_KO[s]).join('·')} ${to} 기술로 바뀜`;
+    }
   }
   if (has(/외친|외쳐|소리친|말한|말해야|소리 질/) && say) add({ t: 'shout', on: 'skills', text: say });
   if (has(/횟수|번만|번밖|번 밖|한정/)) add({ t: 'uses', on: 'skills', n: +(t.match(/[0-6]/) || [3])[0] });
@@ -1534,7 +1667,8 @@ function smartDrawback(side, ctx) {
   else if (has(/화면이 뒤집|세상이 뒤집|거꾸로 보|뒤집혀 보/)) add({ t: 'vision', mode: 'flip' });
   else if (has(/멀미|어지|흔들|술에 취/)) add({ t: 'vision', mode: 'shake' });
   const PEST = t.match(/(벌|모기|파리|비둘기|강아지|고양이|닭|오리|거위|엄마|선생님|경찰|좀비|귀신|바퀴벌레|까마귀|팬|기자|빚쟁이)/);
-  if (PEST || has(/쫓아|따라다|따라온|달려든/)) add({ t: 'pest', every: 6, dmg: 3, name: PEST ? PEST[1] : '무언가', color: '#ffe14a' });
+  const chaser = t.match(/([가-힣]{1,6}?)(?:이|가|들이|들)?\s*(?:계속\s*|자꾸\s*|하루 종일\s*)?(?:쫓아|따라다|따라온|따라와|달려들|달려든)/);
+  if (PEST || chaser) add({ t: 'pest', every: 6, dmg: 3, name: chaser && !STOP.has(chaser[1]) ? chaser[1] : PEST ? PEST[1] : '무언가', color: '#ffe14a' });
   if (has(/춤/)) add({ t: 'tick', every: 7, st: { k: 'dance', d: 1.5 } });
   if (has(/잠|졸|하품/)) add({ t: 'tick', every: 8, st: { k: 'sleep', d: 2 } });
   if (has(/재채기|딸꾹|기침|방귀|트림/)) add({ t: 'tick', every: 6, st: { k: 'stun', d: 1 } });
@@ -1562,7 +1696,11 @@ function smartDrawback(side, ctx) {
   if (has(/모아|충전|준비|기다려야|주문을|외워야|뜸/)) add({ t: 'windup', on: 'skills', time: 1.2 });
   if (has(/약해|힘이 빠|위력|약하다|약함/)) add({ t: 'mul', on: 'skills', pct: 60 });
   if (has(/방어|맞으면|받는 피해|종이|유리|약골|맷집/)) add({ t: 'stat', stat: 'taken', pct: 60 });
-  if (has(/불|화상|뜨거|타 버/) && !out.length) add({ t: 'selfst', on: 'skills', st: { k: 'burn', d: 3 } });
+  if (has(/(내가|나도|자기|본인|손이|몸이|나를).*(탄다|타 버|불붙|화상|뜨거)/) || (has(/불|화상|뜨거|타 버/) && !out.length)) add({ t: 'selfst', on: 'skills', st: { k: 'burn', d: 3 } });
+  if (has(/(내가|나도|자기|본인|손이|몸이|나를).*(얼어|얼린|꽁꽁)/)) add({ t: 'selfst', on: 'skills', st: { k: 'freeze', d: 1.2 } });
+  if (has(/(내가|나도|자기|본인|나를).*(감전|찌릿)/)) add({ t: 'selfst', on: 'skills', st: { k: 'stun', d: 1 } });
+  if (has(/(내가|나도|자기|본인|나를).*(중독|배탈)/)) add({ t: 'selfst', on: 'skills', st: { k: 'poison', d: 3 } });
+  if (has(/(내가|나도|자기|본인|나를).*(젖|미끄)/)) add({ t: 'selfst', on: 'skills', st: { k: 'slip', d: 2 } });
   if (has(/(?<![가-힣])말을 못|입이 막|벙어리|침묵/)) add({ t: 'selfst', on: 'skills', st: { k: 'silence', d: 2 } });
   if (has(/가만히 있으면|멈춰 있으면/)) add({ t: 'when', if: 'still', st: has(/잠/) ? 'sleep' : 'weak' });
   if (has(/움직이면|걸으면|뛰면/)) add({ t: 'when', if: 'moving', st: has(/아프|체력/) ? 'burn' : 'slow' });
@@ -1571,17 +1709,20 @@ function smartDrawback(side, ctx) {
     const h = hashText(t);
     add([{ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } }, { t: 'move', mode: 'drunk' }, { t: 'reverse', on: 'skills', chance: 40 }, { t: 'tick', every: 8, st: { k: 'sleep', d: 1.5 } }, { t: 'fail', on: 'skills', chance: 35, back: 'fizzle' }][h % 5]);
   }
-  const [fx, ...more] = out.map(sanDfx).filter(Boolean);
-  const f = fx || sanDfx({ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } });
-  return { how: [f].concat(more).map(dfxText).join(' + ').slice(0, 50), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: f, more };
+  const clean = out.map((x) => [x, sanDfx(x)]).filter(([, c]) => c);
+  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } });
+  const f = fx, more = clean.slice(1).map(([, c]) => c), rawMore = clean.slice(1).map(([x]) => x);
+  return { how: (customHow ? [customHow].concat(more.filter((x) => !['look', 'replace', 'lock'].includes(x.t)).map(dfxText)) : [f].concat(more).map(dfxText)).join(' + ').slice(0, 60), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: clean.length ? clean[0][0] : f, more: rawMore };
 }
 /** 능력을 못 쓰게 됐을 때 대신 나오는 버둥대는 기술 (능력 이름을 살려서) */
 function lameMoves(n) {
   n = cut(n || '능력', 4);
   const M = JSON.parse(JSON.stringify(PATHETIC));
-  M.basic.name = cut(`${n} 흉내`, 12); M.basic.desc = `${josa(n, '은', '는')} 안 나오고 흉내만 낸다`;
-  M.s1.name = cut(`${n} 그리워하기`, 12); M.s1.desc = `${josa(n, '이', '가')} 그리워 눈물을 흩뿌린다`;
-  M.ult.name = cut(`${n} 없이 떼쓰기`, 12);
+  const R = mulberry(hashText(n) || 3), pk = (a) => a[Math.floor(R() * a.length)];
+  M.basic.name = cut(pk([`${n} 흉내`, `에어 ${n}`, `${n} 시늉`]), 12); M.basic.desc = `${josa(n, '은', '는')} 안 나오고 입으로 소리만 낸다`; M.basic.say = cut(pk([`${n}…?`, '어 안 나와', '딸깍딸깍']), 10);
+  M.s1.name = cut(pk([`${n} 그리워하기`, `${n} 찾아 울기`]), 12); M.s1.desc = `${josa(n, '이', '가')} 그리워 눈물을 흩뿌린다`;
+  M.s2.name = cut(pk([`${n} 없이 도망`, '줄행랑']), 12);
+  M.ult.name = cut(pk([`${n} 없이 떼쓰기`, `${n} 돌려줘!`, `${n} 장례식`]), 12); M.ult.say = cut(`${n} 돌려줘!!`, 10);
   return M;
 }
 

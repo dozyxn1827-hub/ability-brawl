@@ -219,7 +219,7 @@ function dfxText(f) {
   const on = ON_KO[f.on] || '';
   switch (f.t) {
     case 'lock': return `${on} 봉인 (아예 못 씀)`;
-    case 'replace': return Object.keys(f.moves).map((s) => SLOT_KO[s]).join('·') + ' 이(가) 다른 기술로 바뀜';
+    case 'replace': return Object.keys(f.moves).map((s) => SLOT_KO[s]).join('·') + '이(가) 다른 기술로 바뀜';
     case 'selfdmg': return `${on} 쓸 때마다 체력 -${f.amt}`;
     case 'backfire': return `${on} 위력의 ${f.pct}%만큼 자기도 다침`;
     case 'selfst': return `${on} 쓰고 나면 ${ST_KO[f.st.k]} ${f.st.d}초`;
@@ -243,7 +243,7 @@ function dfxText(f) {
     case 'move': return MOVE_KO[f.mode];
     case 'vision': return VISION_KO[f.mode] + ' (내 화면)';
     case 'shout': return `${on} 쓸 때마다 “${f.text}” 외침`;
-    case 'pest': return `${f.every}초마다 ${f.name}이(가) 쫓아와 괴롭힘`;
+    case 'pest': return `${f.every}초마다 ${josa(f.name, '이', '가')} 쫓아와 괴롭힘`;
     case 'look': return '겉모습이 바뀜';
   }
   return '';
