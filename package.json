@@ -1,0 +1,7 @@
+{
+  "name": "ability-brawl",
+  "version": "1.0.0",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": { "start": "node server/server.js", "build": "node build.js" }
+}
