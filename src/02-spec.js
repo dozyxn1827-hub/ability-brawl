@@ -562,25 +562,8 @@ const ARCH_DEFAULT = {
   },
 };
 function fallbackSpec(ability, sides) {
-  const hit = ARCH.find(([re]) => re.test(ability || ''));
-  const raw = JSON.parse(JSON.stringify(hit ? hit[1] : ARCH_DEFAULT));
-  if (!hit && ability) { raw.title = '능력자'; raw.concept = str(ability, 50, raw.concept); }
-  for (const s of SLOTS) {
-    const m = raw.moves[s];
-    m.cd = m.cd * 0.42;
-    for (const e of m.fx) {
-      if (e.t === 'shot') e.speed = (e.speed || 140) * 1.45;
-      if (e.t === 'dash' || e.t === 'blink') e.dist = (e.dist || 50) * 1.25;
-      if (e.t === 'beam') e.len = Math.min(320, (e.len || 100) * 1.2);
-    }
-  }
-  const AV = { flame: 'fire', frost: 'ice', spark: 'electric', shadow: 'shadow', leaf: 'nature', star: 'arcane', bubble: 'water', wind: 'wind', holy: 'holy', toxic: 'poison' };
-  if (raw.look && AV[raw.look.aura]) for (const s of SLOTS) if (!raw.moves[s].vfx && !SHAPE_VFX[raw.moves[s].shape]) raw.moves[s].vfx = AV[raw.look.aura];
-  if (!raw.lines) raw.lines = {};
-  if (!raw.lines.intro) raw.lines.intro = pick(['한 판 붙자!', '오늘 컨디션 최고', '살살 해 줘…', '각오해라!', '나 엄청 세다?', '밥은 먹고 왔냐']);
-  if (!raw.lines.ko) raw.lines.ko = pick(['이건 무효야!', '다음엔 진짜…', '살려 줘…', '엄마…']);
-  if (!raw.lines.win) raw.lines.win = pick(['역시 내가 최고야', '연습은 좀 했냐?', '박수 쳐 줘']);
-  return sanSpec(raw, sides, false);
+  // AI 없이: 글 속 단어를 읽어 조립한다 (025-compose.js)
+  return sanSpec(composeRaw(ability, sides), sides, false);
 }
 
 const BOT_NAMES = ['깡통 1호', '깡통 2호', '깡통 3호'];
