@@ -429,6 +429,115 @@ const STYLES = {
     ult: { m: 'rain', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 5 }, { t: 'lob', dmg: 10 * P, r: 22, n: 5, kb: 6, st: SX(S, 1.4) }], name: ['{n} 대공습', '{n} 하늘 지배'], desc: ['하늘을 지배하며 {n} 폭탄을 사방에 떨군다'] },
   },
 };
+/* ----- 유형별 다른 버전 기술: 같은 유형이라도 글마다 다른 공격이 나오게 ----- */
+const ALT = {
+  gunner: {
+    basic: [{ m: 'shot', fx: (P, S) => [{ t: 'gatling', dmg: 3 * P, n: 10, spread: 18, st: SX(S, 0.5) }], name: ['{n} 개틀링', '{n} 드르륵'], desc: ['{n을} 개틀링처럼 드르륵 갈긴다. 손목 나감'] }],
+    s1: [{ m: 'net', fx: (P) => [{ t: 'net', dmg: 6 * P, speed: 240, range: 150, r: 16, d: 2 }], name: ['{n} 그물탄', '{n} 포획'], desc: ['{n} 그물을 쏴서 맞은 자리에 꽁꽁 묶어 둔다'] }],
+    ult: [{ m: 'snipe', fx: (P, S) => [{ t: 'snipe', dmg: 40 * P, delay: 0.6, kb: 9, st: SX(S || 'stun', 1.4) }], name: ['{n} 헤드샷', '{n} 저격 한 방'], desc: ['빨간 조준선이 번쩍… 탕! 맵 끝까지 꿰뚫는 {n} 한 발'] },
+      { m: 'missiles', fx: (P, S) => [{ t: 'missiles', dmg: 8 * P, n: 8, speed: 230, st: SX(S, 1) }], name: ['{n} 유도 미사일', '{n} 미사일 파티'], desc: ['{n} 미사일 여덟 발이 연기를 뿜으며 쫓아간다'] }],
+  },
+  bomber: {
+    s1: [{ m: 'mark', fx: (P, S) => [{ t: 'mark', dmg: 22 * P, r: 20, delay: 1.2, range: 170, kb: 7, st: SX(S, 1) }], name: ['{n} 찰싹 폭탄', '{n} 시한폭탄'], desc: ['적 등에 {n} 폭탄을 찰싹 붙인다. 1초 뒤 펑'] },
+      { m: 'cross', fx: (P, S) => [{ t: 'cross', dmg: 14 * P, n: 4, at: 'target', kb: 5, st: SX(S, 1) }], name: ['{n} 십자 폭발', '{n} 봄버맨'], desc: ['{n} 폭탄이 십자 모양으로 쭉 터진다'] }],
+    s2: [{ m: 'clone', fx: (P) => [{ t: 'clone', dmg: 16 * P, n: 1, r: 22, dur: 5 }], name: ['자폭 {n} 분신', '{n} 가미카제'], desc: ['내 분신이 적에게 달려가서 껴안고 터진다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'meteor', dmg: 40 * P, r: 48, kb: 10, st: SX(S || 'stun', 1.5) }, { t: 'storm', dmg: 6 * P, n: 6, r: 50 }], name: ['{n} 운석 낙하', '하늘에서 거대 {n}'], desc: ['하늘에서 집채만 한 {n이} 떨어진다. 대피 안내 없음'] }],
+  },
+  summoner: {
+    s1: [{ m: 'top', fx: (P, S) => [{ t: 'top', dmg: 6 * P, n: 3, speed: 120, dur: 6, st: SX(S, 0.8) }], name: ['{n} 굴리기', '{n} 놀이터'], desc: ['{n} 세 마리가 미친 듯이 굴러다니며 들이받는다'] }],
+    s2: [{ m: 'beacon', fx: (P, S) => [{ t: 'beacon', dmg: 5 * P, r: 36, rate: 0.9, dur: 6, kb: 5, st: SX(S, 0.8) }], name: ['{n} 집', '{n} 둥지'], desc: ['{n} 둥지를 지으면 주기적으로 {n이} 우르르 튀어나온다'] }],
+    ult: [{ m: 'clone', fx: (P, S) => [{ t: 'clone', dmg: 14 * P, n: 3, r: 20, dur: 6 }, { t: 'summon', kind: 'chaser', n: 3, dmg: 8 * P, dur: 8, st: SX(S, 1.2) }], name: ['{n} 대가족 출동', '{n}과 나의 분신'], desc: ['내 분신과 {n} 무리가 한꺼번에 달려든다'] }],
+  },
+  brawler: {
+    basic: [{ m: 'thrust', fx: (P, S) => [{ t: 'thrust', dmg: 5 * P, len: 34, w: 6, n: 2, kb: 3, st: SX(S, 0.5) }], name: ['{n} 원투', '{n} 잽잽'], desc: ['{n} 주먹을 원투로 쭉쭉 내지른다'] }],
+    s1: [{ m: 'launch', fx: (P) => [{ t: 'launch', dmg: 13 * P, r: 15, off: 14, d: 1.1 }], name: ['{n} 어퍼컷', '승룡 {n}'], desc: ['아래에서 위로 {n} 어퍼컷! 적이 하늘로 붕 뜬다'] }],
+    s2: [{ m: 'counter', fx: () => [{ t: 'buff', k: 'counter', d: 1.5 }, { t: 'buff', k: 'armor', d: 3 }], name: ['{n} 받아치기', '덤벼라 {n}'], desc: ['자세를 잡고 버틴다. 때리는 순간 그대로 되받아친다'] },
+      { m: 'surge', fx: (P, S) => [{ t: 'surge', dmg: 12 * P, w: 50, len: 140, speed: 190, kb: 9, st: SX(S, 0.8) }], name: ['{n} 어깨빵', '{n} 밀어붙이기'], desc: ['땅을 박차며 {n} 기운의 벽을 앞으로 밀어 보낸다'] }],
+    ult: [{ m: 'leap', fx: (P, S) => [{ t: 'leap', dmg: 28 * P, r: 32, dist: 140, kb: 10, st: SX(S || 'stun', 1.3) }, { t: 'spikering', dmg: 12 * P, r: 40, n: 10, at: 'self' }], name: ['{n} 하늘 내려찍기', '{n} 슈퍼 점프'], desc: ['하늘 높이 뛰어올라 쿵! 착지하면 땅이 솟는다'] }],
+  },
+  assassin: {
+    basic: [{ m: 'thrust', fx: (P, S) => [{ t: 'thrust', dmg: 4 * P, len: 40, w: 4, n: 3, kb: 1, st: SX(S, 0.5) }], name: ['{n} 삼연 찌르기', '{n} 쿡쿡쿡'], desc: ['{n으로} 빛의 속도로 세 번 쿡쿡쿡'] }],
+    s1: [{ m: 'phantom', fx: (P, S) => [{ t: 'phantom', dmg: 18 * P, dist: 110, st: SX(S, 1.2) }], name: ['{n} 환영 베기', '{n} 이미 베었다'], desc: ['스쳐 지나간 뒤… 0.3초 후에 {n} 칼자국이 터진다'] }],
+    s2: [{ m: 'clone', fx: (P) => [{ t: 'buff', k: 'invis', d: 2.5 }, { t: 'clone', dmg: 10 * P, n: 2, r: 16, dur: 4 }], name: ['{n} 분신술', '진짜 나를 찾아봐'], desc: ['숨으면서 {n} 분신 둘을 내보낸다. 분신은 터진다'] }],
+    ult: [{ m: 'flurry', fx: (P, S) => [{ t: 'phantom', dmg: 14 * P, dist: 120 }, { t: 'flurry', dmg: 4 * P, r: 26, off: 0, dur: 0.8, ticks: 8, st: SX(S, 1) }], name: ['{n} 천 번 베기', '{n} 난무'], desc: ['순식간에 파고들어 {n으로} 천 번 벤다(실제로는 여덟 번)'] }],
+  },
+  tank: {
+    s1: [{ m: 'surge', fx: (P, S) => [{ t: 'surge', dmg: 12 * P, w: 60, len: 130, speed: 160, kb: 10, st: SX(S || 'heavy', 1) }], name: ['{n} 불도저', '{n} 밀어내기'], desc: ['{n} 벽을 세워 앞으로 쭉 밀고 나간다'] }],
+    s2: [{ m: 'firewall', fx: (P, S) => [{ t: 'firewall', dmg: 3 * P, len: 80, off: 30, dur: 4, st: SX(S, 1) }, { t: 'buff', k: 'shield', d: 3, pow: 25 }], name: ['{n} 바리케이드', '{n} 방어선'], desc: ['눈앞에 {n} 벽을 가로로 세운다. 넘어오면 아프다'] }],
+    ult: [{ m: 'leap', fx: (P, S) => [{ t: 'buff', k: 'giant', d: 4 }, { t: 'leap', dmg: 34 * P, r: 44, dist: 130, kb: 10, st: SX(S || 'stun', 1.5) }], name: ['{n} 바디 프레스', '거대 {n} 낙하'], desc: ['커다래진 몸으로 점프해서 그대로 깔아뭉갠다'] }],
+  },
+  healer: {
+    basic: [{ m: 'whip', fx: (P, S) => [{ t: 'whip', dmg: 8 * P, len: 50, kb: 4, st: SX(S || 'weak', 0.6) }], name: ['{n} 붕대 채찍', '{n} 찰싹'], desc: ['{n} 붕대를 채찍처럼 찰싹 휘두른다'] }],
+    s1: [{ m: 'drain', fx: (P, S) => [{ t: 'drain', dmg: 3 * P, range: 120, dur: 1.8, ticks: 6, heal: 2, st: SX(S, 0.6) }], name: ['{n} 수혈', '{n} 기운 빨기'], desc: ['적과 {n} 줄로 연결해서 생명력을 쭉쭉 빨아온다'] }],
+    ult: [{ m: 'beacon', fx: (P, S) => [{ t: 'heal', amt: 30 }, { t: 'beacon', dmg: 7 * P, r: 50, rate: 0.8, dur: 6, kb: 6, st: SX(S || 'weak', 1) }], name: ['{n} 치유의 탑', '{n} 성지'], desc: ['{n} 탑을 세우면 치유의 파동이 계속 퍼진다(적은 아프다)'] }],
+  },
+  beamer: {
+    basic: [{ m: 'prism', fx: (P, S) => [{ t: 'prism', dmg: 3 * P, len: 100, w: 3, spread: 18, ticks: 1, dur: 0.25, st: SX(S, 0.5) }], name: ['{n} 세 갈래 빔', '{n} 삼지창'], desc: ['{n} 광선이 세 갈래로 퍼진다'] }],
+    s1: [{ m: 'prism', fx: (P, S) => [{ t: 'prism', dmg: 5 * P, len: 190, w: 5, spread: 25, ticks: 2, dur: 0.5, st: SX(S || 'slow', 1) }], name: ['{n} 분광', '{n} 무지개빔'], desc: ['{n이} 프리즘에 갈라져 세 줄기로 뿜어진다'] }],
+    ult: [{ m: 'charge', fx: (P, S) => [{ t: 'charge', dmg: 34 * P, delay: 0.5, speed: 300, boom: 30, kb: 10, st: SX(S || 'stun', 1.4) }, { t: 'storm', dmg: 7 * P, n: 6, r: 44 }], name: ['{n} 원기옥', '{n} 차지샷'], desc: ['{n} 기운을 모으고 모아… 거대한 관통탄 발사!'] }],
+  },
+  polluter: {
+    s1: [{ m: 'vortex', fx: (P, S) => [{ t: 'vortex', dmg: 3 * P, r: 34, dur: 3.5, pull: 9, at: 'target', st: SX(S || 'poison', 1.2) }], name: ['{n} 하수구', '{n} 블랙홀'], desc: ['{n} 소용돌이가 주변을 빨아들이며 괴롭힌다'] }],
+    ult: [{ m: 'tornado', fx: (P, S) => [{ t: 'tornado', dmg: 5 * P, r: 20, speed: 70, life: 4, st: SX(S || 'poison', 1.2) }, { t: 'ring', dmg: 6 * P, r: 40, dur: 4, at: 'target', st: SX(S || 'confuse', 1) }], name: ['{n} 태풍 경보', '{n} 회오리'], desc: ['거대한 {n} 회오리가 굴러다니며 모두를 빨아들인다'] }],
+  },
+  artillery: {
+    basic: [{ m: 'skyline', fx: (P, S) => [{ t: 'skyline', dmg: 6 * P, n: 3, step: 18, r: 8, st: SX(S, 0.5) }], name: ['{n} 일렬 낙하', '{n} 줄줄이'], desc: ['앞으로 쭉 {n이} 줄줄이 떨어진다'] }],
+    s1: [{ m: 'skyline', fx: (P, S) => [{ t: 'skyline', dmg: 10 * P, n: 7, step: 20, r: 11, st: SX(S || 'slow', 1) }], name: ['{n}의 비', '{n} 폭격선'], desc: ['적을 향해 일직선으로 {n이} 꽂힌다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'meteor', dmg: 36 * P, r: 46, kb: 10, st: SX(S || 'stun', 1.4) }, { t: 'storm', dmg: 7 * P, n: 8, r: 60 }], name: ['초거대 {n} 낙하', '{n} 종말'], desc: ['하늘에서 초거대 {n이} 떨어지고 번개까지 친다'] }],
+  },
+  trickster: {
+    basic: [{ m: 'spiral', fx: (P, S) => [{ t: 'spiral', dmg: 3 * P, n: 8, speed: 200, st: SX(S || 'confuse', 0.5) }], name: ['{n} 빙글빙글', '{n} 회전 마술'], desc: ['{n이} 빙글빙글 돌며 사방으로 흩어진다'] }],
+    s1: [{ m: 'ring', fx: (P, S) => [{ t: 'ring', dmg: 5 * P, r: 30, dur: 3.5, at: 'target', st: SX(S || 'confuse', 1.2) }], name: ['{n} 마법진', '{n} 감옥'], desc: ['적 주위에 {n} 고리를 쳐서 가둔다. 나오면 아프다'] }],
+    s2: [{ m: 'clone', fx: (P) => [{ t: 'blink', to: 'random', dist: 80 }, { t: 'clone', dmg: 12 * P, n: 2, r: 18, dur: 5 }], name: ['{n} 눈속임', '어느 게 진짜게'], desc: ['순간이동하고 그 자리에 {n} 분신을 남긴다'] }],
+    ult: [{ m: 'vortex', fx: (P, S) => [{ t: 'vortex', dmg: 3 * P, r: 50, dur: 4, pull: 11, at: 'target', st: { k: 'morph', d: 1.5 } }, { t: 'all', dmg: 4 * P, st: SX(S || 'dance', 1.4) }], name: ['{n} 블랙홀 마술', '{n} 대환장 쇼'], desc: ['{n} 소용돌이에 빨려 들어가면 개구리가 된다'] }],
+  },
+  speedster: {
+    basic: [{ m: 'thrust', fx: (P, S) => [{ t: 'thrust', dmg: 3 * P, len: 34, w: 4, n: 4, kb: 1, st: SX(S, 0.4) }], name: ['{n} 백열권', '{n} 다다다다'], desc: ['{n으로} 다다다다 네 번 찌른다'] }],
+    s1: [{ m: 'phantom', fx: (P, S) => [{ t: 'phantom', dmg: 16 * P, dist: 125, st: SX(S, 1) }], name: ['{n} 소닉붐', '{n} 지나갔다'], desc: ['순식간에 지나간 뒤 그 길에 {n} 충격이 터진다'] }],
+    ult: [{ m: 'flurry', fx: (P, S) => [{ t: 'phantom', dmg: 14 * P, dist: 130 }, { t: 'flurry', dmg: 4 * P, r: 28, off: 0, dur: 0.9, ticks: 9, st: SX(S, 1) }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 무한 연타', '{n} 광속 난무'], desc: ['빛의 속도로 파고들어 {n으로} 아홉 번 연타'] }],
+  },
+  gravity: {
+    s1: [{ m: 'vortex', fx: (P, S) => [{ t: 'vortex', dmg: 3 * P, r: 36, dur: 3, pull: 12, at: 'target', st: SX(S || 'heavy', 1.2) }], name: ['{n} 중력장', '{n} 빨대'], desc: ['{n} 중력장이 계속 끌어당긴다. 발버둥 쳐도 소용없다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'vortex', dmg: 3 * P, r: 50, dur: 2, pull: 13, at: 'target', st: { k: 'heavy', d: 1.5 } }, { t: 'meteor', dmg: 34 * P, r: 44, kb: 8, st: SX(S || 'stun', 1.3) }], name: ['{n} 낙하 중력', '{n} 행성 충돌'], desc: ['모두를 한곳에 끌어모은 뒤 {n} 행성을 떨어뜨린다'] }],
+  },
+  engineer: {
+    basic: [{ m: 'gatling', fx: (P, S) => [{ t: 'gatling', dmg: 3 * P, n: 8, spread: 14, st: SX(S, 0.4) }], name: ['{n} 머신건', '{n} 연사 장치'], desc: ['손목에 단 {n} 머신건이 드르륵'] }],
+    s1: [{ m: 'top', fx: (P, S) => [{ t: 'top', dmg: 6 * P, n: 2, speed: 130, dur: 6, kb: 5, st: SX(S, 0.8) }], name: ['{n} 로봇청소기', '{n} 자율주행'], desc: ['{n} 로봇 둘이 맵을 누비며 들이받는다'] }],
+    s2: [{ m: 'beacon', fx: (P, S) => [{ t: 'beacon', dmg: 5 * P, r: 34, rate: 1, dur: 6, kb: 6, st: SX(S || 'slow', 0.8) }], name: ['{n} 진동기', '{n} 발전기'], desc: ['{n} 장치를 설치하면 주기적으로 충격파가 나온다'] }],
+    ult: [{ m: 'missiles', fx: (P, S) => [{ t: 'missiles', dmg: 8 * P, n: 8, speed: 240, st: SX(S, 1) }, { t: 'summon', kind: 'turret', n: 2, dmg: 5 * P, rate: 1.3, dur: 8 }], name: ['{n} 미사일 공장', '{n} 무기고 개방'], desc: ['{n} 미사일 여덟 발 발사 + 포탑 두 대 설치'] }],
+  },
+  glutton: {
+    basic: [{ m: 'whip', fx: (P, S) => [{ t: 'whip', dmg: 8 * P, len: 52, kb: 5, st: SX(S || 'slow', 0.6) }], name: ['{n} 면발 채찍', '{n} 휘두르기'], desc: ['긴 {n} 가닥을 채찍처럼 휘두른다'] }],
+    s1: [{ m: 'drain', fx: (P, S) => [{ t: 'drain', dmg: 3 * P, range: 110, dur: 1.8, ticks: 6, heal: 3, st: SX(S, 0.6) }], name: ['{n} 빨대 꽂기', '{n} 흡입'], desc: ['적에게 {n} 빨대를 꽂고 쭉쭉 빨아 먹는다'] }],
+    ult: [{ m: 'roll', fx: (P, S) => [{ t: 'roll', dmg: 22 * P, size: 13, speed: 120, life: 3, bounce: 3, kb: 10, st: SX(S || 'heavy', 1.4) }, { t: 'heal', amt: 20 }], name: ['거대 {n} 굴리기', '{n} 미트볼'], desc: ['집채만 한 {n} 덩어리가 맵을 굴러다니며 다 깔아뭉갠다'] }],
+  },
+  lazy: {
+    basic: [{ m: 'roll', fx: (P, S) => [{ t: 'roll', dmg: 7 * P, size: 6, speed: 90, life: 1.5, bounce: 1, kb: 4, st: SX(S || 'slow', 0.6) }], name: ['{n} 데굴데굴', '굴러가라 {n}'], desc: ['누운 채로 {n을} 대충 굴려 보낸다'] }],
+    s1: [{ m: 'ring', fx: (P, S) => [{ t: 'ring', dmg: 3 * P, r: 30, dur: 4, at: 'target', st: SX(S || 'sleep', 1.2) }], name: ['{n} 이불 감옥', '{n} 울타리'], desc: ['적 주위에 {n} 울타리를 친다. 넘으면 잠든다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'meteor', dmg: 30 * P, r: 44, kb: 8, st: SX(S || 'sleep', 2) }, { t: 'all', dmg: 3 * P, st: { k: 'sleep', d: 1.5 } }], name: ['하늘에서 {n} 침대', '{n} 낙하 낮잠'], desc: ['하늘에서 거대한 {n} 침대가 떨어진다. 다 같이 잔다'] }],
+  },
+  idol: {
+    basic: [{ m: 'prism', fx: (P, S) => [{ t: 'prism', dmg: 3 * P, len: 90, w: 3, spread: 22, ticks: 1, dur: 0.25, st: SX(S, 0.4) }], name: ['{n} 조명', '{n} 스포트라이트'], desc: ['무대 조명이 세 갈래로 쏟아진다'] }],
+    s1: [{ m: 'beacon', fx: (P, S) => [{ t: 'beacon', dmg: 4 * P, r: 40, rate: 0.8, dur: 5, kb: 4, st: SX(S || 'dance', 0.8) }], name: ['{n} 스피커', '{n} 앰프'], desc: ['{n} 스피커를 설치하면 쿵쿵 울릴 때마다 춤추게 된다'] }],
+    s2: [{ m: 'clone', fx: (P) => [{ t: 'clone', dmg: 10 * P, n: 2, r: 18, dur: 5 }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 백댄서 출동', '{n} 멤버 소환'], desc: ['나랑 똑같이 생긴 멤버들이 달려가서 터진다'] }],
+  },
+  nagger: {
+    basic: [{ m: 'whip', fx: (P, S) => [{ t: 'whip', dmg: 8 * P, len: 54, kb: 4, st: SX(S || 'slow', 0.6) }], name: ['{n} 회초리', '사랑의 {n}'], desc: ['{n} 회초리를 찰싹. 사랑해서 그런 거다'] }],
+    s1: [{ m: 'mark', fx: (P, S) => [{ t: 'mark', dmg: 18 * P, r: 18, delay: 1.1, range: 170, kb: 6, st: SX(S || 'weak', 1.2) }], name: ['{n} 벌점', '{n} 마감 표시'], desc: ['적에게 {n} 벌점 딱지를 붙인다. 잠시 후 폭발'] }],
+    ult: [{ m: 'skyline', fx: (P, S) => [{ t: 'skyline', dmg: 12 * P, n: 9, step: 20, r: 12, st: SX(S || 'weak', 1.2) }, { t: 'all', dmg: 4 * P, st: SX(S || 'sleep', 1.5) }], name: ['{n} 산더미', '{n} 폭탄 줄투하'], desc: ['적 쪽으로 {n이} 일렬로 쾅쾅쾅 쌓인다'] }],
+  },
+  spinner: {
+    basic: [{ m: 'top', fx: (P, S) => [{ t: 'top', dmg: 6 * P, n: 1, speed: 140, dur: 2.5, kb: 4, st: SX(S, 0.5) }], name: ['{n} 팽이치기', '팽이 {n}'], desc: ['{n} 팽이를 던지면 혼자 돌아다니며 부딪힌다'] }],
+    s1: [{ m: 'tornado', fx: (P, S) => [{ t: 'tornado', dmg: 4 * P, r: 14, speed: 90, life: 2.5, st: SX(S, 0.8) }], name: ['{n} 회오리', '{n} 토네이도'], desc: ['{n} 회오리를 만들어 앞으로 굴려 보낸다'] }],
+    ult: [{ m: 'spiral', fx: (P, S) => [{ t: 'spiral', dmg: 6 * P, n: 22, speed: 210, st: SX(S, 0.8) }, { t: 'tornado', dmg: 5 * P, r: 18, speed: 70, life: 3.5 }], name: ['{n} 대회전 탄막', '{n} 블레이드 스톰'], desc: ['{n이} 나선을 그리며 사방으로 쏟아진다'] }],
+  },
+  flyer: {
+    basic: [{ m: 'gust', fx: (P, S) => [{ t: 'gust', dmg: 4 * P, len: 70, arc: 70, kb: 10, st: SX(S, 0.4) }], name: ['{n} 날갯바람', '{n} 부채질'], desc: ['{n} 날갯짓으로 앞을 휙 날려 버린다'] }],
+    s2: [{ m: 'leap', fx: (P, S) => [{ t: 'leap', dmg: 14 * P, r: 24, dist: 130, kb: 8, st: SX(S, 1) }], name: ['{n} 급강하', '{n} 다이브'], desc: ['하늘로 솟구쳤다가 적 머리 위로 내리꽂힌다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 4 }, { t: 'meteor', dmg: 32 * P, r: 42, kb: 9, st: SX(S || 'stun', 1.3) }, { t: 'skyline', dmg: 9 * P, n: 6, step: 20, r: 10 }], name: ['{n} 융단 폭격기', '{n} 하늘 지배'], desc: ['하늘을 날며 {n을} 줄줄이 떨구고 마지막에 거대 {n} 투하'] }],
+  },
+};
+for (const k in ALT) for (const sl in ALT[k]) STYLES[k][sl] = [].concat(STYLES[k][sl], ALT[k][sl]);
 const THEME_STYLE = { fire: 'bomber', ice: 'trickster', elec: 'beamer', water: 'artillery', wind: 'speedster', earth: 'tank', plant: 'healer', stink: 'polluter', poison: 'polluter', holy: 'beamer', dark: 'assassin', space: 'gravity', time: 'trickster', sound: 'idol', love: 'healer', sleep: 'lazy', metal: 'gunner', tech: 'engineer', food: 'glutton', sweet: 'artillery', animal: 'summoner', bug: 'summoner', money: 'artillery', gross: 'polluter', ghost: 'assassin', magic: 'trickster', nag: 'nagger', gravity: 'gravity', speed: 'speedster', power: 'brawler', ball: 'gunner', ki: 'beamer' };
 /** 글의 의도를 보고 전투 유형 점수를 매긴다 (높은 순) */
 function rankStyles(text, keys, said) {
@@ -513,7 +622,7 @@ function composeRaw(ability, sides, noDraw) {
   const quote = (text.match(/["'“‘「]([^"'”’」]{1,10})["'”’」]/) || [])[1];
   const short = (pool, n, max) => { for (let i = 0; i < 6; i++) { const v = fmtN(pk(pool), n); if (Array.from(v).length <= max) return v; } return cut(`${n}!`, max); };
   for (const s of SLOTS) {
-    const K = kitOf[s][s], [th, n] = plan[s], tt = T(th);
+    const K0 = kitOf[s][s], K = Array.isArray(K0) ? pk(K0) : K0, [th, n] = plan[s], tt = T(th);
     const S = st || tt.st;
     let fx = K.fx(o.pow, S, o).filter(Boolean);
     for (const e of fx) if (e.t === 'shot') {
@@ -525,6 +634,8 @@ function composeRaw(ability, sides, noDraw) {
       if (o.n > 1 && s !== 'basic' && e.from !== 'sky') e.n = clamp(Math.max(e.n || 1, o.n), 1, 8);
     }
     let name = fmtN(pk(K.name), n);
+    for (let k = 0; k < 6 && name.split(n).length > 2; k++) name = fmtN(pk(K.name), n);
+    if (name.split(n).length > 2) name = name.replace(n + ' ', '');
     if (s === 'ult' && Array.from(name).length <= 8 && R() < 0.7) name = `${pk(FUN.ultPre)} ${name}`;
     const pic = pixFor(n) || pixFor(th.word) || (s !== 'basic' ? null : pixFor(text));
     moves[s] = {

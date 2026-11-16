@@ -446,18 +446,18 @@ const dark = (c, t = 0.35) => mix(c, '#0b0820', t);
 const light = (c, t = 0.45) => mix(c, '#ffffff', t);
 
 /* ----- 열거형 ----- */
-const DEBUFFS = ['burn', 'poison', 'slow', 'root', 'stun', 'freeze', 'silence', 'confuse', 'weak', 'vuln', 'slip', 'heavy', 'dance', 'sleep', 'morph'];
+const DEBUFFS = ['burn', 'poison', 'slow', 'root', 'stun', 'freeze', 'silence', 'confuse', 'weak', 'vuln', 'slip', 'heavy', 'dance', 'sleep', 'morph', 'air'];
 const BUFFS = ['haste', 'shield', 'regen', 'power', 'armor', 'invis', 'giant', 'tiny', 'fly', 'reflect', 'invuln', 'counter'];
 const ST_ALL = DEBUFFS.concat(BUFFS);
 const ST_KO = {
   burn: '화상', poison: '중독', slow: '둔화', root: '속박', stun: '기절', freeze: '빙결', silence: '침묵',
-  confuse: '혼란', weak: '약화', vuln: '취약', slip: '미끄러짐', heavy: '무거움', dance: '춤', sleep: '잠', morph: '변신',
+  confuse: '혼란', weak: '약화', vuln: '취약', slip: '미끄러짐', heavy: '무거움', dance: '춤', sleep: '잠', morph: '변신', air: '공중에 뜸',
   haste: '가속', shield: '보호막', regen: '재생', power: '강화', armor: '단단함', invis: '은신',
   giant: '거대화', tiny: '축소', fly: '비행', reflect: '반사', invuln: '무적', counter: '반격 자세',
 };
 const ST_COLOR = {
   burn: '#ff7a2f', poison: '#9be04a', slow: '#7fb4ff', root: '#b58a4a', stun: '#ffe14a', freeze: '#9fe8ff',
-  silence: '#b9a7ff', confuse: '#ff7ad9', weak: '#9aa0b8', vuln: '#ff5a5a', slip: '#c9f5ff', dance: '#ff8ad0', sleep: '#c8d8ff', morph: '#b6f24a', heavy: '#8d7f6a',
+  silence: '#b9a7ff', confuse: '#ff7ad9', weak: '#9aa0b8', vuln: '#ff5a5a', slip: '#c9f5ff', dance: '#ff8ad0', sleep: '#c8d8ff', morph: '#b6f24a', heavy: '#8d7f6a', air: '#e0f0ff',
   haste: '#6dffb0', shield: '#7fd0ff', regen: '#7dff8a', power: '#ffb23f', armor: '#c9c9d6', invis: '#d9d9ff',
   giant: '#ffa64a', tiny: '#ffd9f0', fly: '#bfe9ff', reflect: '#e7f6ff', invuln: '#fff3a0', counter: '#ffffff',
 };
@@ -481,7 +481,7 @@ const onMatch = (on, slot) => on === 'skills' || on === 'any' || on === slot;
 
 const FIGHTER_COLORS = ['#ff4d6d', '#3fb8ff', '#ffcf3a', '#5be37a'];
 
-const HARD_ST = ['stun', 'freeze', 'dance', 'sleep'];
+const HARD_ST = ['stun', 'freeze', 'dance', 'sleep', 'air'];
 const MOVE_MODES = ['reverse', 'slide', 'drunk', 'nostop', 'backward', 'hop', 'spin'];
 const MOVE_KO = { reverse: '방향키가 반대로', slide: '빙판처럼 미끄러짐', drunk: '비틀비틀 걸음', nostop: '멈출 수 없음', backward: '뒷걸음질로만 걸음', hop: '깡총깡총 뛰어다님', spin: '뱅글뱅글 돌며 걸음' };
 const VISION_KO = { dark: '앞이 거의 안 보임', flip: '화면이 뒤집힘', mirror: '화면 좌우가 바뀜', shake: '화면이 계속 흔들림', tiny: '화면이 엄청 멀어짐', zoom: '화면이 코앞만 보임' };
@@ -550,6 +550,37 @@ function sanFx(e, slot) {
       return { t: 'hook', dmg: num(e.dmg, 1, 25, 8), speed: num(e.speed, 150, 340, 280), range: num(e.range, 50, 200, 130), st };
     case 'lob':
       return { t: 'lob', dmg: num(e.dmg, 1, 45, 14), r: num(e.r, 8, 50, 20), n: Math.round(num(e.n, 1, 5, 1)), kb: num(e.kb, 0, 10, 5), st };
+    /* ----- 추가 공격 30종 ----- */
+    case 'meteor': return { t: 'meteor', dmg: num(e.dmg, 5, 50, 24), r: num(e.r, 14, 56, 30), kb: num(e.kb, 0, 10, 8), st };
+    case 'thrust': return { t: 'thrust', dmg: num(e.dmg, 2, 30, 11), len: num(e.len, 20, 80, 44), w: num(e.w, 3, 12, 6), n: Math.round(num(e.n, 1, 4, 1)), kb: num(e.kb, 0, 10, 5), st };
+    case 'launch': return { t: 'launch', dmg: num(e.dmg, 2, 30, 10), r: num(e.r, 8, 30, 14), off: num(e.off, 6, 40, 14), kb: 1, st: { k: 'air', d: num(e.d, 0.4, slot === 'basic' ? 0.5 : 1.4, 0.8) } };
+    case 'leap': return { t: 'leap', dmg: num(e.dmg, 3, 40, 16), r: num(e.r, 12, 50, 26), dist: num(e.dist, 40, 150, 100), kb: num(e.kb, 0, 10, 8), st };
+    case 'flurry': return { t: 'flurry', dmg: num(e.dmg, 1, 8, 3), r: num(e.r, 10, 34, 18), off: num(e.off, 0, 50, 18), dur: num(e.dur, 0.2, 1.2, 0.5), ticks: Math.round(num(e.ticks, 2, 10, 5)), kb: num(e.kb, 0, 4, 0), st };
+    case 'spikering': return { t: 'spikering', dmg: num(e.dmg, 2, 30, 10), r: num(e.r, 14, 60, 26), n: Math.round(num(e.n, 4, 14, 8)), at: oneOf(e.at, ['self', 'target'], 'self'), kb: num(e.kb, 0, 10, 4), st };
+    case 'cross': return { t: 'cross', dmg: num(e.dmg, 2, 30, 12), n: Math.round(num(e.n, 1, 5, 3)), at: oneOf(e.at, ['self', 'target'], 'target'), kb: num(e.kb, 0, 10, 4), st };
+    case 'tornado': return { t: 'tornado', dmg: num(e.dmg, 1, 10, 4), r: num(e.r, 8, 26, 14), speed: num(e.speed, 30, 160, 80), life: num(e.life, 1, 5, 2.5), kb: num(e.kb, 0, 6, 2), st };
+    case 'roll': return { t: 'roll', dmg: num(e.dmg, 3, 30, 12), size: num(e.size, 5, 14, 8), speed: num(e.speed, 60, 220, 130), life: num(e.life, 0.8, 4, 2.2), bounce: Math.round(num(e.bounce, 0, 4, 2)), kb: num(e.kb, 0, 10, 7), st };
+    case 'firewall': return { t: 'firewall', dmg: num(e.dmg, 1, 8, 3), len: num(e.len, 30, 140, 70), off: num(e.off, 10, 90, 40), dur: num(e.dur, 1, 6, 3.5), st };
+    case 'net': return { t: 'net', dmg: num(e.dmg, 0, 20, 4), speed: num(e.speed, 120, 300, 220), range: num(e.range, 50, 200, 130), r: num(e.r, 10, 30, 16), d: num(e.d, 1, 4, 2) };
+    case 'surge': return { t: 'surge', dmg: num(e.dmg, 2, 30, 12), w: num(e.w, 20, 120, 50), len: num(e.len, 40, 260, 150), speed: num(e.speed, 80, 280, 170), kb: num(e.kb, 0, 10, 7), st };
+    case 'clone': return { t: 'clone', dmg: num(e.dmg, 3, 30, 12), n: Math.round(num(e.n, 1, 3, 1)), r: num(e.r, 10, 34, 18), dur: num(e.dur, 2, 8, 5), st };
+    case 'mark': return { t: 'mark', dmg: num(e.dmg, 4, 45, 18), r: num(e.r, 10, 40, 18), delay: num(e.delay, 0.6, 2.5, 1.2), range: num(e.range, 40, 220, 160), kb: num(e.kb, 0, 10, 6), st };
+    case 'charge': return { t: 'charge', dmg: num(e.dmg, 5, 40, 18), delay: num(e.delay, 0.2, 0.9, 0.4), speed: num(e.speed, 150, 340, 300), boom: num(e.boom, 0, 34, 0), kb: num(e.kb, 0, 10, 8), st };
+    case 'missiles': return { t: 'missiles', dmg: num(e.dmg, 2, 20, 6), n: Math.round(num(e.n, 2, 8, 4)), speed: num(e.speed, 120, 300, 220), kb: num(e.kb, 0, 6, 2), st };
+    case 'vortex': return { t: 'vortex', dmg: num(e.dmg, 0, 8, 3), r: num(e.r, 16, 60, 34), dur: num(e.dur, 1, 6, 3), pull: num(e.pull, 4, 14, 9), at: oneOf(e.at, ['self', 'target'], 'target'), st };
+    case 'storm': return { t: 'storm', dmg: num(e.dmg, 2, 20, 7), n: Math.round(num(e.n, 3, 12, 6)), r: num(e.r, 16, 70, 36), kb: num(e.kb, 0, 6, 2), st };
+    case 'ring': return { t: 'ring', dmg: num(e.dmg, 1, 10, 5), r: num(e.r, 18, 60, 32), dur: num(e.dur, 1, 6, 3.5), at: oneOf(e.at, ['self', 'target'], 'target'), st };
+    case 'phantom': return { t: 'phantom', dmg: num(e.dmg, 3, 40, 16), dist: num(e.dist, 40, 140, 100), st };
+    case 'spiral': return { t: 'spiral', dmg: num(e.dmg, 1, 12, 4), n: Math.round(num(e.n, 6, 24, 14)), speed: num(e.speed, 120, 300, 200), dir: e.dir === -1 ? -1 : 1, st };
+    case 'prism': return { t: 'prism', dmg: num(e.dmg, 1, 14, 4), len: num(e.len, 40, 260, 150), w: num(e.w, 2, 8, 4), spread: num(e.spread, 8, 45, 22), ticks: Math.round(num(e.ticks, 1, 5, 2)), dur: num(e.dur, 0.2, 1, 0.45), st };
+    case 'whip': return { t: 'whip', dmg: num(e.dmg, 2, 30, 10), len: num(e.len, 24, 90, 56), kb: num(e.kb, 0, 10, 5), st };
+    case 'skyline': return { t: 'skyline', dmg: num(e.dmg, 2, 30, 10), n: Math.round(num(e.n, 3, 10, 6)), step: num(e.step, 10, 30, 18), r: num(e.r, 6, 18, 10), st };
+    case 'gatling': return { t: 'gatling', dmg: num(e.dmg, 1, 8, 3), n: Math.round(num(e.n, 4, 20, 12)), spread: num(e.spread, 0, 50, 20), st };
+    case 'top': return { t: 'top', dmg: num(e.dmg, 1, 14, 5), n: Math.round(num(e.n, 1, 4, 2)), speed: num(e.speed, 60, 200, 120), dur: num(e.dur, 2, 8, 5), kb: num(e.kb, 0, 8, 4), st };
+    case 'beacon': return { t: 'beacon', dmg: num(e.dmg, 1, 14, 5), r: num(e.r, 16, 60, 34), rate: num(e.rate, 0.5, 2, 0.9), dur: num(e.dur, 2, 9, 5), kb: num(e.kb, 0, 8, 4), st };
+    case 'snipe': return { t: 'snipe', dmg: num(e.dmg, 5, 50, 24), delay: num(e.delay, 0.3, 1, 0.55), kb: num(e.kb, 0, 10, 8), st };
+    case 'gust': return { t: 'gust', dmg: num(e.dmg, 0, 10, 3), len: num(e.len, 30, 110, 70), arc: num(e.arc, 30, 120, 70), kb: num(e.kb, 4, 10, 10), st };
+    case 'drain': return slot === 'basic' ? null : { t: 'drain', dmg: num(e.dmg, 1, 8, 3), range: num(e.range, 40, 160, 110), dur: num(e.dur, 0.6, 3, 1.6), ticks: Math.round(num(e.ticks, 2, 10, 6)), heal: num(e.heal, 0, 5, 2), st };
     case 'blast':
       return { t: 'blast', dmg: num(e.dmg, 1, 50, 14), r: num(e.r, 6, 56, 18), at, off: num(e.off, 0, 140, 26), delay: num(e.delay, 0, 1.5, 0.15), kb: num(e.kb, -10, 10, 5), st };
     case 'zone':
@@ -600,6 +631,25 @@ function fxExpected(e) {
     case 'chain': return e.dmg * Math.min(2.2, 1 + e.n * 0.3);
     case 'hook': return e.dmg;
     case 'lob': return e.dmg * (1 + (e.n - 1) * 0.5);
+    case 'meteor': case 'leap': case 'launch': case 'mark': case 'snipe': case 'phantom': case 'charge': case 'whip': case 'cross': case 'spikering': case 'surge': return e.dmg * (e.t === 'thrust' ? e.n : 1);
+    case 'thrust': return e.dmg * e.n;
+    case 'flurry': return e.dmg * e.ticks * 0.8;
+    case 'tornado': return e.dmg * (e.life / 0.35) * 0.35;
+    case 'roll': return e.dmg * (1 + e.bounce * 0.3);
+    case 'firewall': case 'ring': return e.dmg * (e.dur / 0.5) * 0.35;
+    case 'vortex': return e.dmg * (e.dur / 0.5) * 0.4;
+    case 'net': return e.dmg + 6;
+    case 'clone': return e.dmg * e.n;
+    case 'missiles': return e.dmg * Math.min(e.n, 3) * 0.9;
+    case 'storm': return e.dmg * Math.min(3, e.n * 0.4);
+    case 'spiral': return e.dmg * Math.min(4, e.n * 0.25);
+    case 'prism': return e.dmg * e.ticks * 1.5;
+    case 'skyline': return e.dmg * 1.3;
+    case 'gatling': return e.dmg * Math.min(6, e.n * 0.5);
+    case 'top': return e.dmg * e.n * 1.5;
+    case 'beacon': return e.dmg * (e.dur / e.rate) * 0.4;
+    case 'gust': return e.dmg + 3;
+    case 'drain': return e.dmg * e.ticks + e.heal * e.ticks * 0.5;
     case 'summon':
       if (e.kind === 'turret') return e.dmg * e.rate * e.dur * 0.35 * e.n;
       if (e.kind === 'chaser') return e.dmg * e.n * 1.5;
@@ -1103,7 +1153,7 @@ ${sideList}
 
 [설계 순서] 아래 순서대로 속으로 깊이 생각한 뒤 결과만 출력한다(생각 과정은 출력하지 않는다).
 1. 해석: 능력 글을 단어 하나하나 글자 그대로 읽는다. 그 능력이 진짜로 있다면 싸움판에서 벌어질 웃긴 장면을 여러 개 떠올리고, 글에 가장 충실하면서 가장 황당한 해석을 고른다. 말장난, 과장, 일상 소재의 엉뚱한 활용, 숫자·조건의 지나치게 성실한 해석을 적극 쓴다. 가장 먼저 떠오르는 뻔한 해석은 한 번 더 비틀어 본다.
-2. 콩트 구성: 네 기술이 한 편의 콩트처럼 이어지게 한다. 네 기술의 공격 방식이 모두 달라야 한다(발사체만 네 개는 금지). 액션 게임처럼 휘두르기(swing), 분사(cone), 충격파(wave), 땅 가르기(line), 연쇄(chain), 갈고리(hook), 포물선 투척(lob), 광선 쓸기(beam sweep), 반격 자세(buff counter), 돌진·순간이동·소환·장판을 섞는다.
+2. 콩트 구성: 네 기술이 한 편의 콩트처럼 이어지게 한다. 네 기술의 공격 방식이 모두 달라야 한다(발사체만 네 개는 금지). 액션 게임처럼 휘두르기(swing), 분사(cone), 충격파(wave), 땅 가르기(line), 연쇄(chain), 갈고리(hook), 포물선 투척(lob), 광선 쓸기(beam sweep), 반격 자세(buff counter)와 추가 공격 30종(운석, 찌르기, 띄우기, 도약, 난무, 회오리, 굴러가는 구체, 불벽, 그물, 지면파, 분신, 표식, 모아 쏘기, 미사일, 소용돌이, 낙뢰, 고리, 환영 베기, 나선 탄막, 세 갈래 광선, 채찍, 검의 비, 개틀링, 팽이, 신호탑, 저격, 돌풍, 흡혈 줄 등) 가운데 능력 글에 가장 어울리는 것을 골라 섞는다.
    · basic: 그 능력의 대표 개그를 가볍고 빠르게 연타. 쏠 때마다 손맛이 나게.
    · s1: 예상 밖으로 비튼 활용. 상태이상이나 장판으로 판을 깐다.
    · s2: 능력을 엉뚱하게 써서 도망·접근·방어·소환. 위기 탈출이나 기습.
@@ -1175,6 +1225,15 @@ EFFECT (아레나 480x320px, 캐릭터 키 10px, 이동 속도 약 96px/초, 거
  {"t":"chain","dmg":2~25,"n":1~6,"range":40~140,"st":ST} 연쇄(가장 가까운 적에게 꽂히고 옆 적으로 n번 튄다)
  {"t":"hook","dmg":2~25,"speed":150~340,"range":50~200,"st":ST} 갈고리(줄 달린 무언가를 던져 맞은 적을 내 쪽으로 끌어온다)
  {"t":"lob","dmg":2~45,"r":8~50,"n":1~5,"kb":0~10,"st":ST} 포물선 투척(머리 위로 던져 표시된 곳에 떨어져 터진다. 벽을 넘어간다)
+ 추가 공격(이름: 형태 — 쓸 수 있는 값):
+ meteor 거대 낙하물(표시 후 큰 것이 떨어짐) dmg r · thrust 찌르기(좁고 긴 일격) dmg len w n · launch 띄우기(앞의 적을 공중에 띄워 잠시 못 움직이게) dmg r off d · leap 도약 내려찍기(적 쪽으로 뛰어올라 착지 충격) dmg r dist
+ flurry 난무(앞 구역을 마구 베기) dmg r off dur ticks · spikering 가시 고리(원형으로 솟음) dmg r n at:self|target · cross 십자 폭발(+모양) dmg n at · tornado 움직이는 회오리(끌어당기며 전진) dmg r speed life
+ roll 굴러가는 거대 구체(관통·벽에 튕김) dmg size speed life bounce · firewall 가로 불벽(앞에 세워 지나가면 피해) dmg len off dur · net 그물(맞은 자리 속박) dmg speed range r d · surge 전진하는 지면파(넓은 벽이 밀고 나감) dmg w len speed
+ clone 분신(내 모습이 달려가 터짐) dmg n r dur · mark 표식(적에게 붙어 잠시 후 폭발) dmg r delay range · charge 모아 쏘기(기를 모아 거대 관통탄) dmg delay speed boom · missiles 유도 미사일 연발 dmg n speed
+ vortex 소용돌이 장판(계속 빨아들임) dmg r dur pull at · storm 낙뢰(적 주변에 번개 연타) dmg n r · ring 가두는 고리(테두리를 넘으면 피해) dmg r dur at · phantom 환영 베기(돌진한 길이 뒤늦게 베어짐) dmg dist
+ spiral 나선 탄막 dmg n speed dir · prism 세 갈래 광선 dmg len w spread ticks dur · whip 채찍(휘는 긴 일격) dmg len · skyline 일직선 하늘 낙하(검의 비) dmg n step r · gatling 개틀링 연사 dmg n spread
+ top 팽이(돌아다니며 부딪힘) dmg n speed dur · beacon 신호탑(설치하면 주기적으로 충격파) dmg r rate dur · snipe 저격(조준선 후 한 방) dmg delay · gust 돌풍(넓게 강하게 밀침) dmg len arc kb · drain 흡혈 줄(연결해 피해를 주며 회복) dmg range dur ticks heal
+ 모든 추가 공격은 {"t":"이름", 값들..., "st":ST} 형태로 쓴다.
  {"t":"blast","dmg":4~50,"r":6~56,"at":"self|front|target","off":0~140,"delay":0~1.5,"kb":-10~10,"st":ST} 폭발(kb 음수는 끌어당김, front는 적 방향 off만큼 앞, target은 적 위치)
  {"t":"zone","dmg":0~8,"r":8~50,"dur":1.5~8,"at":"self|front|target","off":0~140,"follow":bool,"heal":0~6,"st":ST} 장판(0.5초마다 dmg, heal은 안에 선 자신 회복, follow는 자신을 따라다님)
  {"t":"trail","dmg":0~6,"r":6~16,"dur":1~6,"life":1~4,"st":ST} dur초 동안 지나간 자리에 흔적 장판을 남김
@@ -1677,6 +1736,115 @@ const STYLES = {
     ult: { m: 'rain', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 5 }, { t: 'lob', dmg: 10 * P, r: 22, n: 5, kb: 6, st: SX(S, 1.4) }], name: ['{n} 대공습', '{n} 하늘 지배'], desc: ['하늘을 지배하며 {n} 폭탄을 사방에 떨군다'] },
   },
 };
+/* ----- 유형별 다른 버전 기술: 같은 유형이라도 글마다 다른 공격이 나오게 ----- */
+const ALT = {
+  gunner: {
+    basic: [{ m: 'shot', fx: (P, S) => [{ t: 'gatling', dmg: 3 * P, n: 10, spread: 18, st: SX(S, 0.5) }], name: ['{n} 개틀링', '{n} 드르륵'], desc: ['{n을} 개틀링처럼 드르륵 갈긴다. 손목 나감'] }],
+    s1: [{ m: 'net', fx: (P) => [{ t: 'net', dmg: 6 * P, speed: 240, range: 150, r: 16, d: 2 }], name: ['{n} 그물탄', '{n} 포획'], desc: ['{n} 그물을 쏴서 맞은 자리에 꽁꽁 묶어 둔다'] }],
+    ult: [{ m: 'snipe', fx: (P, S) => [{ t: 'snipe', dmg: 40 * P, delay: 0.6, kb: 9, st: SX(S || 'stun', 1.4) }], name: ['{n} 헤드샷', '{n} 저격 한 방'], desc: ['빨간 조준선이 번쩍… 탕! 맵 끝까지 꿰뚫는 {n} 한 발'] },
+      { m: 'missiles', fx: (P, S) => [{ t: 'missiles', dmg: 8 * P, n: 8, speed: 230, st: SX(S, 1) }], name: ['{n} 유도 미사일', '{n} 미사일 파티'], desc: ['{n} 미사일 여덟 발이 연기를 뿜으며 쫓아간다'] }],
+  },
+  bomber: {
+    s1: [{ m: 'mark', fx: (P, S) => [{ t: 'mark', dmg: 22 * P, r: 20, delay: 1.2, range: 170, kb: 7, st: SX(S, 1) }], name: ['{n} 찰싹 폭탄', '{n} 시한폭탄'], desc: ['적 등에 {n} 폭탄을 찰싹 붙인다. 1초 뒤 펑'] },
+      { m: 'cross', fx: (P, S) => [{ t: 'cross', dmg: 14 * P, n: 4, at: 'target', kb: 5, st: SX(S, 1) }], name: ['{n} 십자 폭발', '{n} 봄버맨'], desc: ['{n} 폭탄이 십자 모양으로 쭉 터진다'] }],
+    s2: [{ m: 'clone', fx: (P) => [{ t: 'clone', dmg: 16 * P, n: 1, r: 22, dur: 5 }], name: ['자폭 {n} 분신', '{n} 가미카제'], desc: ['내 분신이 적에게 달려가서 껴안고 터진다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'meteor', dmg: 40 * P, r: 48, kb: 10, st: SX(S || 'stun', 1.5) }, { t: 'storm', dmg: 6 * P, n: 6, r: 50 }], name: ['{n} 운석 낙하', '하늘에서 거대 {n}'], desc: ['하늘에서 집채만 한 {n이} 떨어진다. 대피 안내 없음'] }],
+  },
+  summoner: {
+    s1: [{ m: 'top', fx: (P, S) => [{ t: 'top', dmg: 6 * P, n: 3, speed: 120, dur: 6, st: SX(S, 0.8) }], name: ['{n} 굴리기', '{n} 놀이터'], desc: ['{n} 세 마리가 미친 듯이 굴러다니며 들이받는다'] }],
+    s2: [{ m: 'beacon', fx: (P, S) => [{ t: 'beacon', dmg: 5 * P, r: 36, rate: 0.9, dur: 6, kb: 5, st: SX(S, 0.8) }], name: ['{n} 집', '{n} 둥지'], desc: ['{n} 둥지를 지으면 주기적으로 {n이} 우르르 튀어나온다'] }],
+    ult: [{ m: 'clone', fx: (P, S) => [{ t: 'clone', dmg: 14 * P, n: 3, r: 20, dur: 6 }, { t: 'summon', kind: 'chaser', n: 3, dmg: 8 * P, dur: 8, st: SX(S, 1.2) }], name: ['{n} 대가족 출동', '{n}과 나의 분신'], desc: ['내 분신과 {n} 무리가 한꺼번에 달려든다'] }],
+  },
+  brawler: {
+    basic: [{ m: 'thrust', fx: (P, S) => [{ t: 'thrust', dmg: 5 * P, len: 34, w: 6, n: 2, kb: 3, st: SX(S, 0.5) }], name: ['{n} 원투', '{n} 잽잽'], desc: ['{n} 주먹을 원투로 쭉쭉 내지른다'] }],
+    s1: [{ m: 'launch', fx: (P) => [{ t: 'launch', dmg: 13 * P, r: 15, off: 14, d: 1.1 }], name: ['{n} 어퍼컷', '승룡 {n}'], desc: ['아래에서 위로 {n} 어퍼컷! 적이 하늘로 붕 뜬다'] }],
+    s2: [{ m: 'counter', fx: () => [{ t: 'buff', k: 'counter', d: 1.5 }, { t: 'buff', k: 'armor', d: 3 }], name: ['{n} 받아치기', '덤벼라 {n}'], desc: ['자세를 잡고 버틴다. 때리는 순간 그대로 되받아친다'] },
+      { m: 'surge', fx: (P, S) => [{ t: 'surge', dmg: 12 * P, w: 50, len: 140, speed: 190, kb: 9, st: SX(S, 0.8) }], name: ['{n} 어깨빵', '{n} 밀어붙이기'], desc: ['땅을 박차며 {n} 기운의 벽을 앞으로 밀어 보낸다'] }],
+    ult: [{ m: 'leap', fx: (P, S) => [{ t: 'leap', dmg: 28 * P, r: 32, dist: 140, kb: 10, st: SX(S || 'stun', 1.3) }, { t: 'spikering', dmg: 12 * P, r: 40, n: 10, at: 'self' }], name: ['{n} 하늘 내려찍기', '{n} 슈퍼 점프'], desc: ['하늘 높이 뛰어올라 쿵! 착지하면 땅이 솟는다'] }],
+  },
+  assassin: {
+    basic: [{ m: 'thrust', fx: (P, S) => [{ t: 'thrust', dmg: 4 * P, len: 40, w: 4, n: 3, kb: 1, st: SX(S, 0.5) }], name: ['{n} 삼연 찌르기', '{n} 쿡쿡쿡'], desc: ['{n으로} 빛의 속도로 세 번 쿡쿡쿡'] }],
+    s1: [{ m: 'phantom', fx: (P, S) => [{ t: 'phantom', dmg: 18 * P, dist: 110, st: SX(S, 1.2) }], name: ['{n} 환영 베기', '{n} 이미 베었다'], desc: ['스쳐 지나간 뒤… 0.3초 후에 {n} 칼자국이 터진다'] }],
+    s2: [{ m: 'clone', fx: (P) => [{ t: 'buff', k: 'invis', d: 2.5 }, { t: 'clone', dmg: 10 * P, n: 2, r: 16, dur: 4 }], name: ['{n} 분신술', '진짜 나를 찾아봐'], desc: ['숨으면서 {n} 분신 둘을 내보낸다. 분신은 터진다'] }],
+    ult: [{ m: 'flurry', fx: (P, S) => [{ t: 'phantom', dmg: 14 * P, dist: 120 }, { t: 'flurry', dmg: 4 * P, r: 26, off: 0, dur: 0.8, ticks: 8, st: SX(S, 1) }], name: ['{n} 천 번 베기', '{n} 난무'], desc: ['순식간에 파고들어 {n으로} 천 번 벤다(실제로는 여덟 번)'] }],
+  },
+  tank: {
+    s1: [{ m: 'surge', fx: (P, S) => [{ t: 'surge', dmg: 12 * P, w: 60, len: 130, speed: 160, kb: 10, st: SX(S || 'heavy', 1) }], name: ['{n} 불도저', '{n} 밀어내기'], desc: ['{n} 벽을 세워 앞으로 쭉 밀고 나간다'] }],
+    s2: [{ m: 'firewall', fx: (P, S) => [{ t: 'firewall', dmg: 3 * P, len: 80, off: 30, dur: 4, st: SX(S, 1) }, { t: 'buff', k: 'shield', d: 3, pow: 25 }], name: ['{n} 바리케이드', '{n} 방어선'], desc: ['눈앞에 {n} 벽을 가로로 세운다. 넘어오면 아프다'] }],
+    ult: [{ m: 'leap', fx: (P, S) => [{ t: 'buff', k: 'giant', d: 4 }, { t: 'leap', dmg: 34 * P, r: 44, dist: 130, kb: 10, st: SX(S || 'stun', 1.5) }], name: ['{n} 바디 프레스', '거대 {n} 낙하'], desc: ['커다래진 몸으로 점프해서 그대로 깔아뭉갠다'] }],
+  },
+  healer: {
+    basic: [{ m: 'whip', fx: (P, S) => [{ t: 'whip', dmg: 8 * P, len: 50, kb: 4, st: SX(S || 'weak', 0.6) }], name: ['{n} 붕대 채찍', '{n} 찰싹'], desc: ['{n} 붕대를 채찍처럼 찰싹 휘두른다'] }],
+    s1: [{ m: 'drain', fx: (P, S) => [{ t: 'drain', dmg: 3 * P, range: 120, dur: 1.8, ticks: 6, heal: 2, st: SX(S, 0.6) }], name: ['{n} 수혈', '{n} 기운 빨기'], desc: ['적과 {n} 줄로 연결해서 생명력을 쭉쭉 빨아온다'] }],
+    ult: [{ m: 'beacon', fx: (P, S) => [{ t: 'heal', amt: 30 }, { t: 'beacon', dmg: 7 * P, r: 50, rate: 0.8, dur: 6, kb: 6, st: SX(S || 'weak', 1) }], name: ['{n} 치유의 탑', '{n} 성지'], desc: ['{n} 탑을 세우면 치유의 파동이 계속 퍼진다(적은 아프다)'] }],
+  },
+  beamer: {
+    basic: [{ m: 'prism', fx: (P, S) => [{ t: 'prism', dmg: 3 * P, len: 100, w: 3, spread: 18, ticks: 1, dur: 0.25, st: SX(S, 0.5) }], name: ['{n} 세 갈래 빔', '{n} 삼지창'], desc: ['{n} 광선이 세 갈래로 퍼진다'] }],
+    s1: [{ m: 'prism', fx: (P, S) => [{ t: 'prism', dmg: 5 * P, len: 190, w: 5, spread: 25, ticks: 2, dur: 0.5, st: SX(S || 'slow', 1) }], name: ['{n} 분광', '{n} 무지개빔'], desc: ['{n이} 프리즘에 갈라져 세 줄기로 뿜어진다'] }],
+    ult: [{ m: 'charge', fx: (P, S) => [{ t: 'charge', dmg: 34 * P, delay: 0.5, speed: 300, boom: 30, kb: 10, st: SX(S || 'stun', 1.4) }, { t: 'storm', dmg: 7 * P, n: 6, r: 44 }], name: ['{n} 원기옥', '{n} 차지샷'], desc: ['{n} 기운을 모으고 모아… 거대한 관통탄 발사!'] }],
+  },
+  polluter: {
+    s1: [{ m: 'vortex', fx: (P, S) => [{ t: 'vortex', dmg: 3 * P, r: 34, dur: 3.5, pull: 9, at: 'target', st: SX(S || 'poison', 1.2) }], name: ['{n} 하수구', '{n} 블랙홀'], desc: ['{n} 소용돌이가 주변을 빨아들이며 괴롭힌다'] }],
+    ult: [{ m: 'tornado', fx: (P, S) => [{ t: 'tornado', dmg: 5 * P, r: 20, speed: 70, life: 4, st: SX(S || 'poison', 1.2) }, { t: 'ring', dmg: 6 * P, r: 40, dur: 4, at: 'target', st: SX(S || 'confuse', 1) }], name: ['{n} 태풍 경보', '{n} 회오리'], desc: ['거대한 {n} 회오리가 굴러다니며 모두를 빨아들인다'] }],
+  },
+  artillery: {
+    basic: [{ m: 'skyline', fx: (P, S) => [{ t: 'skyline', dmg: 6 * P, n: 3, step: 18, r: 8, st: SX(S, 0.5) }], name: ['{n} 일렬 낙하', '{n} 줄줄이'], desc: ['앞으로 쭉 {n이} 줄줄이 떨어진다'] }],
+    s1: [{ m: 'skyline', fx: (P, S) => [{ t: 'skyline', dmg: 10 * P, n: 7, step: 20, r: 11, st: SX(S || 'slow', 1) }], name: ['{n}의 비', '{n} 폭격선'], desc: ['적을 향해 일직선으로 {n이} 꽂힌다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'meteor', dmg: 36 * P, r: 46, kb: 10, st: SX(S || 'stun', 1.4) }, { t: 'storm', dmg: 7 * P, n: 8, r: 60 }], name: ['초거대 {n} 낙하', '{n} 종말'], desc: ['하늘에서 초거대 {n이} 떨어지고 번개까지 친다'] }],
+  },
+  trickster: {
+    basic: [{ m: 'spiral', fx: (P, S) => [{ t: 'spiral', dmg: 3 * P, n: 8, speed: 200, st: SX(S || 'confuse', 0.5) }], name: ['{n} 빙글빙글', '{n} 회전 마술'], desc: ['{n이} 빙글빙글 돌며 사방으로 흩어진다'] }],
+    s1: [{ m: 'ring', fx: (P, S) => [{ t: 'ring', dmg: 5 * P, r: 30, dur: 3.5, at: 'target', st: SX(S || 'confuse', 1.2) }], name: ['{n} 마법진', '{n} 감옥'], desc: ['적 주위에 {n} 고리를 쳐서 가둔다. 나오면 아프다'] }],
+    s2: [{ m: 'clone', fx: (P) => [{ t: 'blink', to: 'random', dist: 80 }, { t: 'clone', dmg: 12 * P, n: 2, r: 18, dur: 5 }], name: ['{n} 눈속임', '어느 게 진짜게'], desc: ['순간이동하고 그 자리에 {n} 분신을 남긴다'] }],
+    ult: [{ m: 'vortex', fx: (P, S) => [{ t: 'vortex', dmg: 3 * P, r: 50, dur: 4, pull: 11, at: 'target', st: { k: 'morph', d: 1.5 } }, { t: 'all', dmg: 4 * P, st: SX(S || 'dance', 1.4) }], name: ['{n} 블랙홀 마술', '{n} 대환장 쇼'], desc: ['{n} 소용돌이에 빨려 들어가면 개구리가 된다'] }],
+  },
+  speedster: {
+    basic: [{ m: 'thrust', fx: (P, S) => [{ t: 'thrust', dmg: 3 * P, len: 34, w: 4, n: 4, kb: 1, st: SX(S, 0.4) }], name: ['{n} 백열권', '{n} 다다다다'], desc: ['{n으로} 다다다다 네 번 찌른다'] }],
+    s1: [{ m: 'phantom', fx: (P, S) => [{ t: 'phantom', dmg: 16 * P, dist: 125, st: SX(S, 1) }], name: ['{n} 소닉붐', '{n} 지나갔다'], desc: ['순식간에 지나간 뒤 그 길에 {n} 충격이 터진다'] }],
+    ult: [{ m: 'flurry', fx: (P, S) => [{ t: 'phantom', dmg: 14 * P, dist: 130 }, { t: 'flurry', dmg: 4 * P, r: 28, off: 0, dur: 0.9, ticks: 9, st: SX(S, 1) }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 무한 연타', '{n} 광속 난무'], desc: ['빛의 속도로 파고들어 {n으로} 아홉 번 연타'] }],
+  },
+  gravity: {
+    s1: [{ m: 'vortex', fx: (P, S) => [{ t: 'vortex', dmg: 3 * P, r: 36, dur: 3, pull: 12, at: 'target', st: SX(S || 'heavy', 1.2) }], name: ['{n} 중력장', '{n} 빨대'], desc: ['{n} 중력장이 계속 끌어당긴다. 발버둥 쳐도 소용없다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'vortex', dmg: 3 * P, r: 50, dur: 2, pull: 13, at: 'target', st: { k: 'heavy', d: 1.5 } }, { t: 'meteor', dmg: 34 * P, r: 44, kb: 8, st: SX(S || 'stun', 1.3) }], name: ['{n} 낙하 중력', '{n} 행성 충돌'], desc: ['모두를 한곳에 끌어모은 뒤 {n} 행성을 떨어뜨린다'] }],
+  },
+  engineer: {
+    basic: [{ m: 'gatling', fx: (P, S) => [{ t: 'gatling', dmg: 3 * P, n: 8, spread: 14, st: SX(S, 0.4) }], name: ['{n} 머신건', '{n} 연사 장치'], desc: ['손목에 단 {n} 머신건이 드르륵'] }],
+    s1: [{ m: 'top', fx: (P, S) => [{ t: 'top', dmg: 6 * P, n: 2, speed: 130, dur: 6, kb: 5, st: SX(S, 0.8) }], name: ['{n} 로봇청소기', '{n} 자율주행'], desc: ['{n} 로봇 둘이 맵을 누비며 들이받는다'] }],
+    s2: [{ m: 'beacon', fx: (P, S) => [{ t: 'beacon', dmg: 5 * P, r: 34, rate: 1, dur: 6, kb: 6, st: SX(S || 'slow', 0.8) }], name: ['{n} 진동기', '{n} 발전기'], desc: ['{n} 장치를 설치하면 주기적으로 충격파가 나온다'] }],
+    ult: [{ m: 'missiles', fx: (P, S) => [{ t: 'missiles', dmg: 8 * P, n: 8, speed: 240, st: SX(S, 1) }, { t: 'summon', kind: 'turret', n: 2, dmg: 5 * P, rate: 1.3, dur: 8 }], name: ['{n} 미사일 공장', '{n} 무기고 개방'], desc: ['{n} 미사일 여덟 발 발사 + 포탑 두 대 설치'] }],
+  },
+  glutton: {
+    basic: [{ m: 'whip', fx: (P, S) => [{ t: 'whip', dmg: 8 * P, len: 52, kb: 5, st: SX(S || 'slow', 0.6) }], name: ['{n} 면발 채찍', '{n} 휘두르기'], desc: ['긴 {n} 가닥을 채찍처럼 휘두른다'] }],
+    s1: [{ m: 'drain', fx: (P, S) => [{ t: 'drain', dmg: 3 * P, range: 110, dur: 1.8, ticks: 6, heal: 3, st: SX(S, 0.6) }], name: ['{n} 빨대 꽂기', '{n} 흡입'], desc: ['적에게 {n} 빨대를 꽂고 쭉쭉 빨아 먹는다'] }],
+    ult: [{ m: 'roll', fx: (P, S) => [{ t: 'roll', dmg: 22 * P, size: 13, speed: 120, life: 3, bounce: 3, kb: 10, st: SX(S || 'heavy', 1.4) }, { t: 'heal', amt: 20 }], name: ['거대 {n} 굴리기', '{n} 미트볼'], desc: ['집채만 한 {n} 덩어리가 맵을 굴러다니며 다 깔아뭉갠다'] }],
+  },
+  lazy: {
+    basic: [{ m: 'roll', fx: (P, S) => [{ t: 'roll', dmg: 7 * P, size: 6, speed: 90, life: 1.5, bounce: 1, kb: 4, st: SX(S || 'slow', 0.6) }], name: ['{n} 데굴데굴', '굴러가라 {n}'], desc: ['누운 채로 {n을} 대충 굴려 보낸다'] }],
+    s1: [{ m: 'ring', fx: (P, S) => [{ t: 'ring', dmg: 3 * P, r: 30, dur: 4, at: 'target', st: SX(S || 'sleep', 1.2) }], name: ['{n} 이불 감옥', '{n} 울타리'], desc: ['적 주위에 {n} 울타리를 친다. 넘으면 잠든다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'meteor', dmg: 30 * P, r: 44, kb: 8, st: SX(S || 'sleep', 2) }, { t: 'all', dmg: 3 * P, st: { k: 'sleep', d: 1.5 } }], name: ['하늘에서 {n} 침대', '{n} 낙하 낮잠'], desc: ['하늘에서 거대한 {n} 침대가 떨어진다. 다 같이 잔다'] }],
+  },
+  idol: {
+    basic: [{ m: 'prism', fx: (P, S) => [{ t: 'prism', dmg: 3 * P, len: 90, w: 3, spread: 22, ticks: 1, dur: 0.25, st: SX(S, 0.4) }], name: ['{n} 조명', '{n} 스포트라이트'], desc: ['무대 조명이 세 갈래로 쏟아진다'] }],
+    s1: [{ m: 'beacon', fx: (P, S) => [{ t: 'beacon', dmg: 4 * P, r: 40, rate: 0.8, dur: 5, kb: 4, st: SX(S || 'dance', 0.8) }], name: ['{n} 스피커', '{n} 앰프'], desc: ['{n} 스피커를 설치하면 쿵쿵 울릴 때마다 춤추게 된다'] }],
+    s2: [{ m: 'clone', fx: (P) => [{ t: 'clone', dmg: 10 * P, n: 2, r: 18, dur: 5 }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 백댄서 출동', '{n} 멤버 소환'], desc: ['나랑 똑같이 생긴 멤버들이 달려가서 터진다'] }],
+  },
+  nagger: {
+    basic: [{ m: 'whip', fx: (P, S) => [{ t: 'whip', dmg: 8 * P, len: 54, kb: 4, st: SX(S || 'slow', 0.6) }], name: ['{n} 회초리', '사랑의 {n}'], desc: ['{n} 회초리를 찰싹. 사랑해서 그런 거다'] }],
+    s1: [{ m: 'mark', fx: (P, S) => [{ t: 'mark', dmg: 18 * P, r: 18, delay: 1.1, range: 170, kb: 6, st: SX(S || 'weak', 1.2) }], name: ['{n} 벌점', '{n} 마감 표시'], desc: ['적에게 {n} 벌점 딱지를 붙인다. 잠시 후 폭발'] }],
+    ult: [{ m: 'skyline', fx: (P, S) => [{ t: 'skyline', dmg: 12 * P, n: 9, step: 20, r: 12, st: SX(S || 'weak', 1.2) }, { t: 'all', dmg: 4 * P, st: SX(S || 'sleep', 1.5) }], name: ['{n} 산더미', '{n} 폭탄 줄투하'], desc: ['적 쪽으로 {n이} 일렬로 쾅쾅쾅 쌓인다'] }],
+  },
+  spinner: {
+    basic: [{ m: 'top', fx: (P, S) => [{ t: 'top', dmg: 6 * P, n: 1, speed: 140, dur: 2.5, kb: 4, st: SX(S, 0.5) }], name: ['{n} 팽이치기', '팽이 {n}'], desc: ['{n} 팽이를 던지면 혼자 돌아다니며 부딪힌다'] }],
+    s1: [{ m: 'tornado', fx: (P, S) => [{ t: 'tornado', dmg: 4 * P, r: 14, speed: 90, life: 2.5, st: SX(S, 0.8) }], name: ['{n} 회오리', '{n} 토네이도'], desc: ['{n} 회오리를 만들어 앞으로 굴려 보낸다'] }],
+    ult: [{ m: 'spiral', fx: (P, S) => [{ t: 'spiral', dmg: 6 * P, n: 22, speed: 210, st: SX(S, 0.8) }, { t: 'tornado', dmg: 5 * P, r: 18, speed: 70, life: 3.5 }], name: ['{n} 대회전 탄막', '{n} 블레이드 스톰'], desc: ['{n이} 나선을 그리며 사방으로 쏟아진다'] }],
+  },
+  flyer: {
+    basic: [{ m: 'gust', fx: (P, S) => [{ t: 'gust', dmg: 4 * P, len: 70, arc: 70, kb: 10, st: SX(S, 0.4) }], name: ['{n} 날갯바람', '{n} 부채질'], desc: ['{n} 날갯짓으로 앞을 휙 날려 버린다'] }],
+    s2: [{ m: 'leap', fx: (P, S) => [{ t: 'leap', dmg: 14 * P, r: 24, dist: 130, kb: 8, st: SX(S, 1) }], name: ['{n} 급강하', '{n} 다이브'], desc: ['하늘로 솟구쳤다가 적 머리 위로 내리꽂힌다'] }],
+    ult: [{ m: 'meteor', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 4 }, { t: 'meteor', dmg: 32 * P, r: 42, kb: 9, st: SX(S || 'stun', 1.3) }, { t: 'skyline', dmg: 9 * P, n: 6, step: 20, r: 10 }], name: ['{n} 융단 폭격기', '{n} 하늘 지배'], desc: ['하늘을 날며 {n을} 줄줄이 떨구고 마지막에 거대 {n} 투하'] }],
+  },
+};
+for (const k in ALT) for (const sl in ALT[k]) STYLES[k][sl] = [].concat(STYLES[k][sl], ALT[k][sl]);
 const THEME_STYLE = { fire: 'bomber', ice: 'trickster', elec: 'beamer', water: 'artillery', wind: 'speedster', earth: 'tank', plant: 'healer', stink: 'polluter', poison: 'polluter', holy: 'beamer', dark: 'assassin', space: 'gravity', time: 'trickster', sound: 'idol', love: 'healer', sleep: 'lazy', metal: 'gunner', tech: 'engineer', food: 'glutton', sweet: 'artillery', animal: 'summoner', bug: 'summoner', money: 'artillery', gross: 'polluter', ghost: 'assassin', magic: 'trickster', nag: 'nagger', gravity: 'gravity', speed: 'speedster', power: 'brawler', ball: 'gunner', ki: 'beamer' };
 /** 글의 의도를 보고 전투 유형 점수를 매긴다 (높은 순) */
 function rankStyles(text, keys, said) {
@@ -1761,7 +1929,7 @@ function composeRaw(ability, sides, noDraw) {
   const quote = (text.match(/["'“‘「]([^"'”’」]{1,10})["'”’」]/) || [])[1];
   const short = (pool, n, max) => { for (let i = 0; i < 6; i++) { const v = fmtN(pk(pool), n); if (Array.from(v).length <= max) return v; } return cut(`${n}!`, max); };
   for (const s of SLOTS) {
-    const K = kitOf[s][s], [th, n] = plan[s], tt = T(th);
+    const K0 = kitOf[s][s], K = Array.isArray(K0) ? pk(K0) : K0, [th, n] = plan[s], tt = T(th);
     const S = st || tt.st;
     let fx = K.fx(o.pow, S, o).filter(Boolean);
     for (const e of fx) if (e.t === 'shot') {
@@ -1773,6 +1941,8 @@ function composeRaw(ability, sides, noDraw) {
       if (o.n > 1 && s !== 'basic' && e.from !== 'sky') e.n = clamp(Math.max(e.n || 1, o.n), 1, 8);
     }
     let name = fmtN(pk(K.name), n);
+    for (let k = 0; k < 6 && name.split(n).length > 2; k++) name = fmtN(pk(K.name), n);
+    if (name.split(n).length > 2) name = name.replace(n + ' ', '');
     if (s === 'ult' && Array.from(name).length <= 8 && R() < 0.7) name = `${pk(FUN.ultPre)} ${name}`;
     const pic = pixFor(n) || pixFor(th.word) || (s !== 'basic' ? null : pixFor(text));
     moves[s] = {
@@ -3147,7 +3317,7 @@ class Battle {
       if (hl && f.hp < f.maxHp && f.alive) f.hp = Math.min(f.maxHp, f.hp + hl);
     }
     if (!f.alive) return;
-    const stunned = !!(st.stun || st.freeze || st.dance || st.sleep);
+    const stunned = !!(st.stun || st.freeze || st.dance || st.sleep || st.air);
     f.size = sp.stats.size * f.base.size * (1 + f.stack.size) * (st.giant ? 1.5 : 1) * (st.tiny ? 0.65 : 1);
     const spd = sp.stats.speed * f.base.speed * (st.haste ? 1.45 : 1) * (st.slow ? 0.55 : 1) * (1 - f.stack.slow) * (st.giant ? 0.85 : 1) * (st.tiny ? 1.15 : 1)
       * (st.heavy ? 0.75 : 1) * (st.fly ? 1.15 : 1) * (sp.passive && sp.passive.k === 'swift' ? 1.15 : 1) * (st.morph ? 0.75 : 1)
@@ -3165,7 +3335,13 @@ class Battle {
     const ml = Math.hypot(mx, my);
     if (ml > 1) { mx /= ml; my /= ml; }
     if (ml > 0.15) f.mdir = Math.atan2(my, mx);
-    if (f.dash) {
+    if (f.leap) {
+      const L = f.leap; L.t += dt;
+      const p = Math.min(1, L.t / L.dur);
+      f.x = lerp(L.x0, L.x1, p); f.y = lerp(L.y0, L.y1, p); f.vx = 0; f.vy = 0;
+      if (Math.random() < 0.5) this.addP('after', f.x, f.y - Math.sin(p * Math.PI) * L.h, 0, 0, 0.15, f.color, 1, { dir: f.dir, f });
+      if (p >= 1) f.leap = null;
+    } else if (f.dash) {
       f.dash.t -= dt; f.vx = f.dash.vx; f.vy = f.dash.vy;
       if (f.dash.t <= 0) { f.vx = f.dash.vx * 0.2; f.vy = f.dash.vy * 0.2; f.dash = null; }
     } else {
@@ -3287,7 +3463,7 @@ class Battle {
 
   /* ---------- 능력 쓰기 ---------- */
   tryMove(f, slot) {
-    if (!f.alive || f.wind || f.dash || f.st.stun || f.st.freeze || f.hurtT > 0) return false;
+    if (!f.alive || f.wind || f.dash || f.leap || f.st.stun || f.st.freeze || f.st.air || f.hurtT > 0) return false;
     if (f.cd[slot] > 0) return false;
     f.tried[slot] = 1;
     if (f.lock[slot]) {
@@ -3360,7 +3536,18 @@ class Battle {
     const act = ['a', f.idx, SLOT_IDX[as], Math.round(f.x), Math.round(f.y), Math.round(f.aim * 180 / Math.PI), ++f.actN, Math.round(mul * 100), crit ? 1 : 0,
       tgt ? Math.round(tgt.x) : -1, tgt ? Math.round(tgt.y) : -1, tgt ? tgt.idx : -1, (Math.random() * 1e9) | 0, sw ? sw[0] : -1, sw ? sw[1] : -1];
     for (const e of mv.fx) {
-      if (e.t === 'dash') {
+      if (e.t === 'leap') {
+        if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
+        const [lx, ly] = this.leapTarget(f.x, f.y, tgt ? tgt.x : f.x + ca * 70, tgt ? tgt.y : f.y + sa * 70, f.aim, e.dist);
+        const dur = 0.32 + Math.hypot(lx - f.x, ly - f.y) / 500;
+        f.leap = { x0: f.x, y0: f.y, x1: lx, y1: ly, t: 0, dur, h: 22 + Math.hypot(lx - f.x, ly - f.y) * 0.2 };
+        f.dash = null; f.invT = Math.max(f.invT, dur + 0.05);
+      } else if (e.t === 'phantom') {
+        if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
+        const t = e.dist / DASH_V;
+        f.dash = { vx: ca * DASH_V, vy: sa * DASH_V, t };
+        f.invT = Math.max(f.invT, t + 0.08);
+      } else if (e.t === 'dash') {
         if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
         const t = e.dist / DASH_V;
         f.dash = { vx: ca * DASH_V, vy: sa * DASH_V, t };
@@ -3394,6 +3581,40 @@ class Battle {
     }
   }
 
+  /** 도약 착지점: 목표 쪽으로 최대 dist, 벽·구덩이·바깥이면 앞으로 당긴다 (모든 기기에서 같은 결과) */
+  leapTarget(x, y, tx, ty, ang, dist) {
+    const B = this.map.B;
+    let dx = tx - x, dy = ty - y, d = Math.hypot(dx, dy);
+    if (d < 1) { dx = Math.cos(ang); dy = Math.sin(ang); d = 1; }
+    const L = Math.min(dist, Math.max(20, d));
+    for (let k = 0; k < 8; k++) {
+      const s2 = L * (1 - k * 0.12), px = clamp(x + dx / d * s2, B + 8, W - B - 8), py = clamp(y + dy / d * s2, B + 10, H - B - 6);
+      if (!this.map.obs.some((ob) => px > ob.x - 4 && px < ob.x + ob.w + 4 && py > ob.y - 4 && py < ob.y + ob.h + 4)) return [Math.round(px), Math.round(py)];
+    }
+    return [x, y];
+  }
+  /** 조준 방향 가까이에서 가장 가까운 적 (front: 앞쪽만) */
+  pickTarget(c, x, y, ang, range, front) {
+    let best = null, bd = range;
+    for (const v of this.fighters) {
+      if (!v.alive || v.gone || v.idx === c.idx) continue;
+      const dx = v.x - x, dy = this.bodyY(v) - y, d = Math.hypot(dx, dy);
+      if (front) { let da = Math.atan2(dy, dx) - ang; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > 1.3) continue; }
+      if (d < bd) { bd = d; best = v; }
+    }
+    return best;
+  }
+  /** 채찍 곡선 위의 점들 */
+  whipPts(o) {
+    const p = clamp(1 - o.life / o.max, 0, 1), ca = Math.cos(o.ang), sa = Math.sin(o.ang);
+    const L = o.len * Math.min(1, 0.35 + p * 1.6), bend = o.len * 0.45 * o.dirS * (1 - p) * (1 - p);
+    const pts = [];
+    for (let k = 0; k <= 8; k++) {
+      const t = k / 8, along = L * t, side = bend * Math.sin(t * Math.PI) * (0.5 + t);
+      pts.push([o.x + ca * along - sa * side, o.y + sa * along + ca * side * 0.8]);
+    }
+    return pts;
+  }
   doBlink(f, e, tgt, mv) {
     this.vfxImpact(mv.vfx, mv.color, f.x, this.bodyY(f), 0.7);
     for (let i = 0; i < 3; i++) this.addP('after', f.x, f.y, 0, 0, 0.25 + i * 0.05, mv.color, 1, { dir: f.dir, f });
@@ -3570,6 +3791,191 @@ class Battle {
           }
           this.sfx('dash', style);
           break;
+        /* ===== 추가 공격 30종 ===== */
+        case 'meteor': {
+          const o = base(i, 0, 'drop', e);
+          Object.assign(o, { x: cx(tx), y: cyy(ty), fall: 0.85, fall0: 0.85, r: e.r, life: 1.4, big: true });
+          this.objs.push(o); break;
+        }
+        case 'thrust':
+          for (let j = 0; j < e.n; j++) { const o = base(i, j, 'thrust', e); Object.assign(o, { follow: c, ang, len: e.len, w: e.w, life: 0.16, max: 0.16, delay: j * 0.13 }); this.objs.push(o); }
+          this.sfx('dash', style); break;
+        case 'launch': {
+          const o = base(i, 0, 'blast', e);
+          Object.assign(o, { x: cx(x + ca * e.off), y: cyy(cy + sa * e.off), r: e.r, delay0: 0.05, life: 0.45, trig: false });
+          this.objs.push(o);
+          for (let k = 0; k < 8; k++) this.addP('streak', o.x + rnd(-e.r, e.r) * 0.6, o.y, 0, -rnd(120, 220), 0.35, k & 1 ? '#ffffff' : mv.color, 1);
+          break;
+        }
+        case 'leap': {
+          const [lx, ly] = this.leapTarget(x, y, tx, ty, ang, e.dist), dur = 0.32 + Math.hypot(lx - x, ly - y) / 500;
+          const o = base(i, 0, 'blast', e);
+          Object.assign(o, { x: lx, y: ly - 4, r: e.r, delay0: dur, life: dur + 0.4, trig: false, land: true });
+          this.objs.push(o);
+          if (!c.owned) c.leapVis = { t0: this.t, dur, h: 22 + Math.hypot(lx - x, ly - y) * 0.2 };
+          break;
+        }
+        case 'flurry': {
+          const o = base(i, 0, 'flurry', e);
+          Object.assign(o, { x: cx(x + ca * e.off), y: cyy(y + sa * e.off), r: e.r, life: e.dur, max: e.dur, rehit: e.dur / e.ticks - 0.001 });
+          this.objs.push(o); this.sfx('dash', style); break;
+        }
+        case 'spikering': case 'cross': {
+          const hm = new Map(), pts = [];
+          const ox = e.at === 'target' ? tx : x, oy = e.at === 'target' ? ty : y;
+          if (e.t === 'spikering') for (let j = 0; j < e.n; j++) { const an = (j / e.n) * Math.PI * 2 + ang; pts.push([ox + Math.cos(an) * e.r, oy + Math.sin(an) * e.r * 0.8, j * 0.025]); }
+          else { pts.push([ox, oy, 0]); for (let k = 1; k <= e.n; k++) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) pts.push([ox + dx * k * 15, oy + dy * k * 12, k * 0.06]); }
+          pts.forEach(([px, py, dl], j) => {
+            if (px < B || px > W - B || py < B || py > H - B || this.wallAt(px, py - 2)) return;
+            const o = base(i, j, 'spike', e);
+            Object.assign(o, { x: px, y: py, delay: dl, life: 0.34, r: e.t === 'cross' ? 8 : 7, hit: hm, big: e.t === 'cross' });
+            this.objs.push(o);
+          });
+          break;
+        }
+        case 'tornado': {
+          const o = base(i, 0, 'tornado', e);
+          Object.assign(o, { x: x + ca * 8, y: y + sa * 8, vx: ca * e.speed, vy: sa * e.speed, r: e.r, life: e.life, max: e.life, rehit: 0.35 });
+          this.objs.push(o); this.sfx('dash', 'wind'); break;
+        }
+        case 'roll': {
+          const o = base(i, 0, 'shot', e);
+          Object.assign(o, { x: x + ca * 6, y: cy + sa * 6, vx: ca * e.speed, vy: sa * e.speed, r: e.size, life: e.life, pierce: true, bounce: e.bounce, homing: 0, boom: 0, roll: true, rehit: 0.5 });
+          this.objs.push(o); break;
+        }
+        case 'firewall': {
+          const o = base(i, 0, 'fwall', e), mx2 = cx(x + ca * e.off), my2 = cyy(y + sa * e.off), hl = e.len / 2;
+          Object.assign(o, { x: mx2, y: my2, ax: mx2 - sa * hl, ay: my2 + ca * hl * 0.8, bx: mx2 + sa * hl, by: my2 - ca * hl * 0.8, life: e.dur, max: e.dur, rehit: 0.5 });
+          this.objs.push(o); break;
+        }
+        case 'net': {
+          const o = base(i, 0, 'shot', e);
+          Object.assign(o, { x: x + ca * 5, y: cy + sa * 5, vx: ca * e.speed, vy: sa * e.speed, r: 3, life: e.range / e.speed, net: { r: e.r, d: e.d }, homing: 0, bounce: 0, boom: 0 });
+          this.objs.push(o); break;
+        }
+        case 'surge': {
+          const o = base(i, 0, 'surge', e);
+          Object.assign(o, { x: x + ca * 10, y: y + sa * 10, ca, sa, hw: e.w / 2, vx: ca * e.speed, vy: sa * e.speed, life: e.len / e.speed, max: e.len / e.speed });
+          this.objs.push(o); this.shake = Math.max(this.shake, 2); break;
+        }
+        case 'clone':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'chaser', e), off = (j - (e.n - 1) / 2);
+            Object.assign(o, { x: x - sa * off * 14 + ca * 6, y: y + ca * off * 14 + sa * 6, vx: 0, vy: 0, r: 4, life: e.dur, max: e.dur, clone: c.idx, boom: e.r, d: 1, hop: 0 });
+            this.solid(o, 3, false); this.objs.push(o);
+          }
+          this.sfx('summon'); break;
+        case 'mark': {
+          const o = base(i, 0, 'mark', e);
+          const t = this.pickTarget(c, x, cy, ang, e.range, true);
+          Object.assign(o, { target: t ? t.idx : -1, x: t ? t.x : cx(x + ca * 50), y: t ? t.y : cyy(y + sa * 50), r: e.r, fuse: e.delay, life: e.delay + 0.35, max: e.delay + 0.35 });
+          this.objs.push(o); break;
+        }
+        case 'charge': {
+          const v = base(i, 0, 'chargev', e);
+          Object.assign(v, { follow: c, ang, life: e.delay, max: e.delay, dmg: 0 });
+          this.objs.push(v);
+          const o = base(i, 1, 'shot', e);
+          Object.assign(o, { x: x + ca * 6, y: cy + sa * 6, vx: ca * e.speed, vy: sa * e.speed, r: 4, life: 1.6, pierce: true, homing: 0, bounce: 0, boom: e.boom, delay: e.delay, charged: true });
+          this.objs.push(o); break;
+        }
+        case 'missiles':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'shot', e), side = j % 2 ? 1 : -1, an = ang + side * (1.3 + R() * 0.5);
+            Object.assign(o, { x: x + ca * 4, y: cy - 4, vx: Math.cos(an) * e.speed * 0.7, vy: Math.sin(an) * e.speed * 0.7 - 40, r: 2, life: 2, homing: 1, delay: j * 0.09, missile: true, bounce: 0, boom: 8 });
+            this.objs.push(o);
+          }
+          break;
+        case 'vortex': {
+          const o = base(i, 0, 'zone', e);
+          const at = e.at === 'self' ? [x, y] : [tx, ty];
+          Object.assign(o, { x: cx(at[0]), y: cyy(at[1] - 1), r: e.r, life: e.dur, max: e.dur, rehit: 0.5, heal: 0, pull: e.pull, swirl: true });
+          this.objs.push(o); break;
+        }
+        case 'storm': {
+          const o = base(i, 0, 'storm', e), pts = [];
+          for (let k = 0; k < e.n; k++) { const an = R() * 6.283, d = Math.sqrt(R()) * e.r; pts.push([cx(tx + Math.cos(an) * d), cyy(ty + Math.sin(an) * d * 0.8)]); }
+          Object.assign(o, { x: tx, y: ty, pts, k: 0, acc: 0.1, every: 0.12, sr: 11, life: e.n * 0.12 + 0.35, max: e.n * 0.12 + 0.35, rehit: 0.08, cloudR: e.r });
+          this.objs.push(o); break;
+        }
+        case 'ring': {
+          const o = base(i, 0, 'zone', e);
+          const at = e.at === 'self' ? [x, y] : [tx, ty];
+          Object.assign(o, { x: cx(at[0]), y: cyy(at[1] - 1), r: e.r, life: e.dur, max: e.dur, rehit: 0.4, heal: 0, ring: 6 });
+          this.objs.push(o); break;
+        }
+        case 'phantom': {
+          const o = base(i, 0, 'slash', e);
+          Object.assign(o, { x0: x, y0: cy, x1: cx(x + ca * e.dist), y1: cyy(cy + sa * e.dist), x: x, y: cy, fuse: 0.32, life: 0.58, max: 0.58 });
+          this.objs.push(o); break;
+        }
+        case 'spiral':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'shot', e), an = ang + j * 0.62 * (e.dir || 1);
+            Object.assign(o, { x: x, y: cy, vx: Math.cos(an) * e.speed, vy: Math.sin(an) * e.speed, r: 2, life: 1.1, delay: j * 0.045, homing: 0, bounce: 0, boom: 0 });
+            this.objs.push(o);
+          }
+          break;
+        case 'prism':
+          for (let j = -1; j <= 1; j++) {
+            const o = base(i, j + 1, 'beam', e), an = ang + j * e.spread * Math.PI / 180;
+            Object.assign(o, { follow: c, ang: an, ang0: an, sweep: 0, len: e.len, w: e.w, life: e.dur, dur: e.dur, rehit: e.dur / e.ticks - 0.001, both: false, hit: new Map() });
+            this.objs.push(o);
+          }
+          this.sfx('beam', style); break;
+        case 'whip': {
+          const o = base(i, 0, 'whip', e);
+          Object.assign(o, { follow: c, ang, len: e.len, life: 0.24, max: 0.24, dirS: R() < 0.5 ? 1 : -1 });
+          this.objs.push(o); this.sfx('dash', style); break;
+        }
+        case 'skyline': {
+          const hm = new Map();
+          for (let j = 0; j < e.n; j++) {
+            const dd = 22 + j * e.step, px = x + ca * dd, py = y + sa * dd;
+            if (px < B || px > W - B || py < B || py > H - B) break;
+            const o = base(i, j, 'drop', e);
+            Object.assign(o, { x: px, y: py, delay: j * 0.07, fall: 0.36, fall0: 0.36, r: e.r, life: 0.75, hit: hm });
+            this.objs.push(o);
+          }
+          break;
+        }
+        case 'gatling':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'shot', e), an = ang + (R() - 0.5) * e.spread * Math.PI / 180;
+            Object.assign(o, { x: x + ca * 6, y: cy + sa * 6, vx: Math.cos(an) * 330, vy: Math.sin(an) * 330, r: 1, life: 0.7, delay: j * 0.055, homing: 0, bounce: 0, boom: 0 });
+            this.objs.push(o);
+          }
+          break;
+        case 'top':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'top', e), an = ang + (j - (e.n - 1) / 2) * 0.5;
+            Object.assign(o, { x: x + ca * 8, y: y + sa * 8, vx: Math.cos(an) * e.speed, vy: Math.sin(an) * e.speed, r: 5, life: e.dur, max: e.dur, rehit: 0.4 });
+            this.objs.push(o);
+          }
+          this.sfx('summon'); break;
+        case 'beacon': {
+          const o = base(i, 0, 'beacon', e);
+          Object.assign(o, { x: cx(x + ca * 16), y: cyy(y + sa * 16), r: e.r, rate: e.rate, pulse: 0.25, pn: 0, life: e.dur, max: e.dur, dmg: e.dmg });
+          this.solid(o, 3, true); this.objs.push(o); this.sfx('summon'); break;
+        }
+        case 'snipe': {
+          const o = base(i, 0, 'snipe', e);
+          Object.assign(o, { x: x + ca * 5, y: cy + sa * 5, ang, len: 330, fuse: e.delay, life: e.delay + 0.25, max: e.delay + 0.25, w: 6 });
+          this.objs.push(o); break;
+        }
+        case 'gust': {
+          const o = base(i, 0, 'cone', e);
+          Object.assign(o, { follow: c, ang, len: e.len, arc: e.arc * Math.PI / 180, life: 0.18, max: 0.18, rehit: 0, gust: true });
+          this.objs.push(o);
+          for (let k = 0; k < 14; k++) { const an = ang + rnd(-0.5, 0.5) * e.arc * Math.PI / 180; this.addP('streak', x + Math.cos(an) * 6, cy + Math.sin(an) * 6, Math.cos(an) * 260, Math.sin(an) * 200, 0.3, k & 1 ? '#ffffff' : mv.color, 1); }
+          this.sfx('dash', 'wind'); break;
+        }
+        case 'drain': {
+          const o = base(i, 0, 'drain', e), t = this.pickTarget(c, x, cy, ang, e.range, false);
+          Object.assign(o, { follow: c, target: t ? t.idx : -1, range: e.range, life: t ? e.dur : 0.2, max: e.dur, rehit: e.dur / e.ticks - 0.001, healAmt: e.heal, hacc: 0, every: e.dur / e.ticks });
+          this.objs.push(o); break;
+        }
+
         case 'blast': case 'zone': {
           const o = base(i, 0, e.t, e);
           let ox = x, oy = e.t === 'zone' ? y - 1 : cy;
@@ -3674,6 +4080,10 @@ class Battle {
   killObj(o, victim) {
     if (o.dead) return;
     o.dead = true;
+    if (o.net) {
+      this.objs.push({ uid: o.uid + 'n', owner: o.owner, kind: 'zone', dmg: 0, mul: o.mul, st: { k: 'root', d: 0.9 }, kb: 0, color: '#e8e8f0', cl: '#ffffff', dk: '#8a8aa0', rows: o.rows, gm: o.gm, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0.5, delay: 0, x: o.x, y: o.y + 3, r: o.net.r, life: o.net.d, max: o.net.d, heal: 0, netz: true });
+      this.vfxImpact(o.vfx, '#e8e8f0', o.x, o.y, 0.8);
+    }
     if (o.boom > 0) {
       const b = { uid: o.uid + 'b', owner: o.owner, kind: 'blast', dmg: o.kind === 'mine' ? o.dmg : o.dmg * 0.6, mul: o.mul, st: o.kind === 'mine' ? o.st : null, kb: 4, color: o.color, cl: o.cl, dk: o.dk, rows: o.rows, gm: o.gm, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0, delay: 0, x: o.x, y: o.kind === 'mine' ? o.y - 3 : o.y, r: o.boom, delay0: 0, life: 0.4, trig: false };
       if (victim != null) b.hit.set(victim, this.t);
@@ -3730,6 +4140,9 @@ class Battle {
           o.x += o.vx * dt; o.y += o.vy * dt;
           if (o.tr) { o.tr.push(o.x, o.y); if (o.tr.length > 10) o.tr.splice(0, 2); }
           if (Math.random() < (o.child ? 0.4 : 0.9)) this.vfxTrail(o.vfx, o.color, o.x, o.y, -o.vx * 0.15, -o.vy * 0.15, o.r >= 3 ? 1.3 : 0.8);
+          if (o.missile && Math.random() < 0.8) this.addP('smoke', o.x, o.y, rnd(-6, 6), rnd(-10, 0), 0.5, '#d8d8e8', 1.5);
+          if (o.roll && Math.random() < 0.6) this.addP('smoke', o.x + rnd(-o.r, o.r), o.y + o.r, -o.vx * 0.1, -10, 0.5, o.dk, 2);
+          if (o.charged && Math.random() < 0.9) this.addP('ring', o.x, o.y, 0, 0, 0.2, o.cl, 1, { r0: 2, r1: 9 });
           let wall = false;
           if (o.x < B || o.x > W - B) { if (o.bounce > 0) { o.bounce--; o.vx = -o.vx; o.x = clamp(o.x, B, W - B); this.vfxImpact(o.vfx, o.color, o.x, o.y, 0.3); } else wall = true; }
           if (!wall && (o.y < B || o.y > H - B)) { if (o.bounce > 0) { o.bounce--; o.vy = -o.vy; o.y = clamp(o.y, B, H - B); this.vfxImpact(o.vfx, o.color, o.x, o.y, 0.3); } else wall = true; }
@@ -3750,10 +4163,11 @@ class Battle {
           if (o.fall > 0 && Math.random() < 0.7) this.vfxTrail(o.vfx, o.color, o.x, o.y - 3 - o.fall * 180, 0, -40, 0.8);
           if (o.fall <= 0 && !o.trig) {
             o.trig = true;
-            this.vfxImpact(o.vfx, o.color, o.x, o.y - 2, 1);
+            this.vfxImpact(o.vfx, o.color, o.x, o.y - 2, o.big ? 3 : 1);
             this.decal(o.x, o.y, o.r * 0.7, o.dk);
-            this.sfx(o.boom > 0 ? 'boom' : 'hit', o.vfx);
-            this.shake = Math.max(this.shake, 1.5);
+            this.sfx(o.boom > 0 || o.big ? 'boom' : 'hit', o.vfx);
+            this.shake = Math.max(this.shake, o.big ? 6 : 1.5);
+            if (o.big) { this.addP('ring', o.x, o.y, 0, 0, 0.45, o.cl, 1, { r0: 4, r1: o.r * 1.6 }); this.punch = Math.max(this.punch, 0.5); for (let k = 0; k < 12; k++) this.addP('smoke', o.x + rnd(-o.r, o.r) * 0.7, o.y + rnd(-o.r, o.r) * 0.5, rnd(-30, 30), rnd(-40, 0), 0.9, '#3a3450', 3); }
             this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y - 2, o.r));
             if (o.boom > 0) { o.dead = true; this.killObj(Object.assign({}, o, { dead: false, kind: 'drop', y: o.y - 2, split: 0 })); }
           }
@@ -3809,6 +4223,132 @@ class Battle {
         case 'chain':
           if (!o.fired) { o.fired = true; this.checkHits(o, (v) => o.path.includes(v.idx)); }
           break;
+        /* ===== 추가 공격 30종: 매 프레임 ===== */
+        case 'thrust': {
+          const c = o.follow;
+          if (!c.alive) { o.dead = true; break; }
+          o.x = c.x; o.y = this.bodyY(c);
+          const p = clamp(1 - o.life / o.max, 0, 1), reach = o.len * Math.min(1, p * 2.6);
+          o.reach = reach;
+          const x1 = o.x + Math.cos(o.ang) * reach, y1 = o.y + Math.sin(o.ang) * reach;
+          if (Math.random() < 0.7) this.vfxTrail(o.vfx, o.color, x1, y1, Math.cos(o.ang) * 60, Math.sin(o.ang) * 60, 0.8);
+          this.checkHits(o, (v) => segDist(v.x, this.bodyY(v), o.x, o.y, x1, y1) <= o.w / 2 + 4 * v.size);
+          break;
+        }
+        case 'flurry':
+          if (Math.random() < 0.8) this.vfxTrail(o.vfx, o.color, o.x + rnd(-o.r, o.r), o.y + rnd(-o.r, o.r) * 0.8 - 4, rnd(-40, 40), rnd(-40, 40), 1);
+          this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
+          break;
+        case 'tornado': {
+          o.x += o.vx * dt; o.y += o.vy * dt;
+          if (o.x < B + 6 || o.x > W - B - 6) { o.vx = -o.vx; o.x = clamp(o.x, B + 6, W - B - 6); }
+          if (o.y < B + 6 || o.y > H - B - 6) { o.vy = -o.vy; o.y = clamp(o.y, B + 6, H - B - 6); }
+          for (let k = 0; k < 2; k++) { const an = this.t * 14 + k * 3.14, rr = rnd(2, o.r); this.addP('px', o.x + Math.cos(an) * rr, o.y - rnd(0, 26), -Math.sin(an) * 50, -30, 0.35, k ? o.color : '#ffffff', 1); }
+          for (const v of this.fighters) if (v.owned && v.alive && v.idx !== o.owner && !v.st.invuln) { const d = Math.hypot(o.x - v.x, o.y - v.y); if (d < o.r * 2 && d > 2) { v.vx += (o.x - v.x) / d * 220 * dt; v.vy += (o.y - v.y) / d * 220 * dt; } }
+          this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
+          break;
+        }
+        case 'fwall':
+          if (Math.random() < 0.9) { const t = Math.random(); this.vfxTrail(o.vfx, o.color, lerp(o.ax, o.bx, t), lerp(o.ay, o.by, t) - 4, 0, -50, 1); }
+          this.checkHits(o, (v) => segDist(v.x, v.y, o.ax, o.ay, o.bx, o.by) <= 5 + 3 * v.size);
+          break;
+        case 'surge': {
+          o.x += o.vx * dt; o.y += o.vy * dt;
+          const ax = o.x - o.sa * o.hw, ay = o.y + o.ca * o.hw * 0.8, bx = o.x + o.sa * o.hw, by = o.y - o.ca * o.hw * 0.8;
+          o.ax = ax; o.ay = ay; o.bx = bx; o.by = by;
+          for (let k = 0; k < 3; k++) { const t = Math.random(); this.addP('smoke', lerp(ax, bx, t), lerp(ay, by, t), o.vx * 0.2, -20, 0.4, k ? o.dk : o.color, 2); }
+          if (this.wallAt(o.x, o.y - 2)) { o.life = Math.min(o.life, 0.05); }
+          this.checkHits(o, (v) => segDist(v.x, v.y, ax, ay, bx, by) <= 6 + 3 * v.size);
+          break;
+        }
+        case 'mark': {
+          const t = this.fighters[o.target];
+          if (t && t.alive) { o.x = t.x; o.y = t.y; }
+          if (!o.trig && o.age >= o.fuse) {
+            o.trig = true;
+            this.vfxImpact(o.vfx, o.color, o.x, o.y - 6, 1.6);
+            this.decal(o.x, o.y + 2, o.r * 0.6, o.dk);
+            this.shake = Math.max(this.shake, 3); this.sfx('boom', o.vfx);
+            this.checkHits(o, (v) => dist2(v.x, this.bodyY(v), o.x, o.y - 6) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
+          }
+          break;
+        }
+        case 'chargev': {
+          const c = o.follow;
+          if (!c.alive) { o.dead = true; break; }
+          o.x = c.x + Math.cos(o.ang) * 6; o.y = this.bodyY(c) + Math.sin(o.ang) * 6;
+          const an = Math.random() * 6.283; this.addP('px', o.x + Math.cos(an) * 18, o.y + Math.sin(an) * 14, -Math.cos(an) * 90, -Math.sin(an) * 70, 0.2, o.cl, 1);
+          break;
+        }
+        case 'storm':
+          o.acc -= dt;
+          while (o.acc <= 0 && o.k < o.pts.length) {
+            o.acc += o.every;
+            const [px, py] = o.pts[o.k++], pts = [[px + rnd(-4, 4), py - 90]];
+            for (let s2 = 1; s2 < 6; s2++) pts.push([px + rnd(-5, 5), py - 90 + s2 * 18]);
+            pts.push([px, py - 3]);
+            this.addP('bolt', px, py, 0, 0, 0.12, o.color, 1, { pts });
+            this.vfxImpact(o.vfx, o.color, px, py - 3, 0.6); this.decal(px, py + 1, 4, o.dk); this.lightFlash(px, py - 6, 26, o.color);
+            this.sfx('hit', 'electric');
+            this.checkHits(o, (v) => dist2(v.x, this.bodyY(v), px, py - 3) <= (o.sr + 4 * v.size) * (o.sr + 4 * v.size));
+          }
+          break;
+        case 'slash':
+          if (!o.trig && o.age >= o.fuse) {
+            o.trig = true;
+            this.sfx('hit', 'metal'); this.shake = Math.max(this.shake, 2);
+            for (let k = 0; k < 10; k++) { const t = k / 9; this.vfxTrail(o.vfx, o.color, lerp(o.x0, o.x1, t), lerp(o.y0, o.y1, t), rnd(-30, 30), rnd(-30, 30), 1); }
+            this.checkHits(o, (v) => segDist(v.x, this.bodyY(v), o.x0, o.y0, o.x1, o.y1) <= 7 + 4 * v.size);
+          }
+          break;
+        case 'whip': {
+          const c = o.follow;
+          if (!c.alive) { o.dead = true; break; }
+          o.x = c.x; o.y = this.bodyY(c);
+          const pts = this.whipPts(o);
+          o.pts = pts;
+          const tip = pts[pts.length - 1];
+          if (Math.random() < 0.8) this.vfxTrail(o.vfx, o.color, tip[0], tip[1], 0, 0, 1);
+          this.checkHits(o, (v) => { const bx = v.x, by = this.bodyY(v); for (let k = 1; k < pts.length; k++) if (segDist(bx, by, pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1]) <= 4 + 4 * v.size) return true; return false; });
+          break;
+        }
+        case 'top': {
+          const px = o.x, py = o.y;
+          o.x += o.vx * dt; o.y += o.vy * dt;
+          if (o.x < B + 4 || o.x > W - B - 4) { o.vx = -o.vx; o.x = px; }
+          if (o.y < B + 4 || o.y > H - B - 4) { o.vy = -o.vy; o.y = py; }
+          const w = this.wallAt(o.x, o.y - 2);
+          if (w) { if (px < w.x || px > w.x + w.w) o.vx = -o.vx; else o.vy = -o.vy; o.x = px; o.y = py; this.vfxImpact(o.vfx, o.color, o.x, o.y - 3, 0.3); }
+          if (Math.random() < 0.6) this.addP('px', o.x + rnd(-3, 3), o.y, rnd(-30, 30), rnd(-10, 0), 0.25, o.cl, 1);
+          this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y - 3, o.r));
+          break;
+        }
+        case 'beacon':
+          o.pulse -= dt;
+          if (o.pulse <= 0) {
+            o.pulse = o.rate;
+            this.objs.push({ uid: o.uid + 'w' + (o.pn++), owner: o.owner, kind: 'wave', dmg: o.dmg, mul: o.mul, st: o.st, kb: o.kb, color: o.color, cl: o.cl, dk: o.dk, rows: o.rows, gm: o.gm, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0, delay: 0, x: o.x, y: o.y, r: o.r, cur: 2, prev: 0, life: 0.42, max: 0.42 });
+          }
+          break;
+        case 'snipe':
+          if (!o.trig && o.age >= o.fuse) {
+            o.trig = true;
+            const x1 = o.x + Math.cos(o.ang) * o.len, y1 = o.y + Math.sin(o.ang) * o.len;
+            this.shake = Math.max(this.shake, 3); this.sfx('bighit'); this.lightFlash(o.x, o.y, 40, o.color);
+            for (let k = 0; k < 12; k++) { const t = Math.random(); this.addP('streak', lerp(o.x, x1, t), lerp(o.y, y1, t), Math.cos(o.ang) * 200, Math.sin(o.ang) * 200, 0.25, '#ffffff', 1); }
+            this.checkHits(o, (v) => segDist(v.x, this.bodyY(v), o.x, o.y, x1, y1) <= o.w / 2 + 4 * v.size);
+          }
+          break;
+        case 'drain': {
+          const c = o.follow, t = this.fighters[o.target];
+          if (!c.alive || !t || !t.alive || Math.hypot(t.x - c.x, t.y - c.y) > o.range * 1.35) { o.dead = true; break; }
+          o.x = c.x; o.y = this.bodyY(c);
+          if (Math.random() < 0.6) { const k = Math.random(); this.addP('px', lerp(t.x, c.x, k), lerp(this.bodyY(t), o.y, k), (c.x - t.x) * 1.5, (o.y - this.bodyY(t)) * 1.5, 0.2, o.cl, 1); }
+          this.checkHits(o, (v) => v.idx === o.target);
+          if (c.owned && o.healAmt > 0) { o.hacc += dt; if (o.hacc >= o.every) { o.hacc -= o.every; this.heal(c, o.healAmt, true); } }
+          break;
+        }
+
         case 'beam': {
           const c = o.follow;
           if (!c.alive) { o.dead = true; break; }
@@ -3832,13 +4372,16 @@ class Battle {
               this.decal(o.x, o.y + 3, o.r * 0.6, o.dk);
               this.shake = Math.max(this.shake, Math.min(5, o.r / 9));
               this.sfx('boom', o.vfx);
+              if (o.land) { this.addP('ring', o.x, o.y + 4, 0, 0, 0.45, o.cl, 1, { r0: 4, r1: o.r * 1.5 }); this.shake = Math.max(this.shake, 4); }
               this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y, o.r));
             }
           }
           break;
         case 'zone': {
           if (o.follow) { if (!o.follow.alive) { o.dead = true; break; } o.x = o.follow.x; o.y = o.follow.y - 1; }
-          if (o.dmg > 0 || o.st) this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 3 * v.size) * (o.r + 3 * v.size));
+          if (o.pull) for (const v of this.fighters) if (v.owned && v.alive && v.idx !== o.owner && !v.st.invuln) { const d = Math.hypot(o.x - v.x, o.y - v.y); if (d < o.r * 1.5 && d > 3) { v.vx += (o.x - v.x) / d * o.pull * 9 * dt; v.vy += (o.y - v.y) / d * o.pull * 9 * dt; } }
+          if (o.ring) { if (o.dmg > 0 || o.st) this.checkHits(o, (v) => Math.abs(Math.hypot(v.x - o.x, (v.y - o.y) / 0.8) - o.r) <= o.ring + 3 * v.size); }
+          else if (o.dmg > 0 || o.st) this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 3 * v.size) * (o.r + 3 * v.size));
           if (o.heal > 0 && ow && ow.owned && ow.alive && dist2(ow.x, ow.y, o.x, o.y) <= o.r * o.r) {
             o.healT = (o.healT || 0) + dt;
             if (o.healT >= 0.5) { o.healT -= 0.5; this.heal(ow, o.heal, true); }
@@ -3881,6 +4424,10 @@ class Battle {
           o.x += o.vx * dt; o.y += o.vy * dt;
           this.solid(o, 3, false);
           if (Math.random() < 0.3) this.vfxTrail(o.vfx, o.color, o.x, o.y - 3, 0, 0, 0.6);
+          if (o.clone != null) {
+            if (t && dist2(t.x, t.y, o.x, o.y) < 100) { this.killObj(o); this.shake = Math.max(this.shake, 2); }
+            break;
+          }
           this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y - 3, o.r));
           break;
         }
@@ -3914,7 +4461,8 @@ class Battle {
           break;
       }
       if (o.life <= 0 && !o.dead) {
-        if (o.kind === 'mine' || o.kind === 'turret' || o.kind === 'chaser' || o.kind === 'barrier') this.vfxImpact(o.vfx, o.color, o.x, o.y - 3, 0.5);
+        if (o.kind === 'mine' || o.kind === 'turret' || o.kind === 'chaser' || o.kind === 'barrier' || o.kind === 'top' || o.kind === 'beacon') this.vfxImpact(o.vfx, o.color, o.x, o.y - 3, 0.5);
+        if (o.clone != null) { this.killObj(o); continue; }
         o.dead = true;
       }
     }
@@ -4275,11 +4823,14 @@ class Battle {
         g.drawImage(discCanvas(r, o.color, Math.floor(T * 8) % 3), ox - r, oy - r);
         if (!o.puddle && !o.aura) { g.globalAlpha = 0.35 * fadeOut; g.drawImage(discCanvas(Math.round(r * 0.6), o.cl, Math.floor(T * 12) % 3), ox - Math.round(r * 0.6), oy - Math.round(r * 0.6)); }
         g.globalAlpha = (o.aura ? 0.35 : 0.95) * fadeOut;
-        if (!o.puddle) { pixRing(g, ox, oy, r, o.color, 2); dashRing(g, ox, oy, r - 4, o.cl, T * 12); pixRing(g, ox, oy, r * (0.3 + 0.7 * ((T * 0.9) % 1)), o.cl); }
+        if (o.swirl) { for (let k = 0; k < 4; k++) { const an = -T * 5 + k * 1.57; g.strokeStyle = k & 1 ? o.cl : '#ffffff'; g.lineWidth = 2; g.beginPath(); for (let q = 0; q <= 20; q++) { const t = q / 20, rr = r * (1 - t), a2 = an + t * 4; const px = ox + Math.cos(a2) * rr, py = oy + Math.sin(a2) * rr * 0.8; if (q) g.lineTo(px, py); else g.moveTo(px, py); } g.stroke(); } }
+        else if (o.ring) { const n = Math.max(30, Math.round(r / 2)); for (let k = 0; k < n; k++) { const an = k / n * 6.283, h = 6 + Math.abs(Math.sin(T * 12 + k)) * 10, px = Math.round(ox + Math.cos(an) * r), py = Math.round(oy + Math.sin(an) * r * 0.8); g.fillStyle = o.color; g.fillRect(px - 2, py - h, 4, h); g.fillStyle = o.cl; g.fillRect(px - 1, py - h + 2, 2, h - 3); } }
+        else if (o.netz) { for (let k = -4; k <= 4; k++) { this.line(g, ox + k * r / 4 - r * 0.3, oy - r * 0.7, ox + k * r / 4 + r * 0.3, oy + r * 0.7, '#e8e8f0', 1); this.line(g, ox - r * 0.9, oy + k * r / 5, ox + r * 0.9, oy + k * r / 5, '#e8e8f0', 1); } pixRing(g, ox, oy, r, '#ffffff', 2); }
+        else if (!o.puddle) { pixRing(g, ox, oy, r, o.color, 2); dashRing(g, ox, oy, r - 4, o.cl, T * 12); pixRing(g, ox, oy, r * (0.3 + 0.7 * ((T * 0.9) % 1)), o.cl); }
         else pixRing(g, ox, oy, r, o.dk);
         g.globalAlpha = 1;
       } else if (o.kind === 'drop' && !o.trig) {
-        const p = o.delay > 0 ? 0 : 1 - o.fall / 0.42, r = X(o.r);
+        const p = o.delay > 0 ? 0 : clamp(1 - o.fall / (o.fall0 || 0.42), 0, 1), r = X(o.r);
         g.globalAlpha = 0.25 + 0.3 * p; fillEll(g, ox, oy, r * (0.4 + 0.6 * p), r * (0.25 + 0.35 * p), '#000000'); g.globalAlpha = 1;
         if (Math.floor(T * 14) & 1) dashRing(g, ox, oy, r, o.color, T * 20);
         pixRing(g, ox, oy, Math.max(1, r * p), o.cl);
@@ -4303,6 +4854,34 @@ class Battle {
         g.globalAlpha = 0.85 * fade;
         for (let k = 0; k <= 10; k++) { const an = o.ang - half + (o.arc * k) / 10, wob = Math.sin(T * 30 + k) * 3; g.fillStyle = k & 1 ? o.cl : o.color; g.fillRect(Math.round(ox + Math.cos(an) * (L + wob)) - 1, Math.round(oy + Math.sin(an) * (L + wob) * 0.8) - 1, 3, 3); }
         g.globalAlpha = 1;
+      } else if (o.kind === 'flurry') {
+        const R = X(o.r), fade = Math.min(1, o.life / 0.1);
+        g.globalAlpha = 0.18 * fade; g.drawImage(discCanvas(R, o.color, 0), ox - R, oy - R); g.globalAlpha = fade;
+        for (let k = 0; k < 5; k++) { const a1 = Math.random() * 6.283, a2 = a1 + Math.PI + rnd(-0.5, 0.5), r1 = R * rnd(0.6, 1), r2 = R * rnd(0.6, 1); this.line(g, ox + Math.cos(a1) * r1, oy - 12 + Math.sin(a1) * r1 * 0.8, ox + Math.cos(a2) * r2, oy - 12 + Math.sin(a2) * r2 * 0.8, k & 1 ? '#ffffff' : o.color, 2); }
+        g.globalAlpha = 1;
+      } else if (o.kind === 'tornado') {
+        const R = X(o.r);
+        g.globalAlpha = 0.3; fillEll(g, ox, oy + 2, R, R * 0.4, '#000000'); g.globalAlpha = 1;
+        for (let k = 0; k < 7; k++) { const h = k * 9, rr = R * (0.35 + k * 0.12), an = T * 16 + k; g.globalAlpha = 0.8; g.strokeStyle = k & 1 ? o.cl : o.color; g.lineWidth = 3; g.beginPath(); g.ellipse(ox + Math.sin(T * 6 + k) * 3, oy - h, rr, rr * 0.35, 0, an, an + 4.2); g.stroke(); }
+        g.globalAlpha = 1;
+      } else if (o.kind === 'fwall') {
+        const n = 14, fade = Math.min(1, o.life / 0.3, o.age / 0.1);
+        for (let k = 0; k <= n; k++) { const t = k / n, px = X(lerp(o.ax, o.bx, t)), py = X(lerp(o.ay, o.by, t)), h = 10 + Math.abs(Math.sin(T * 14 + k * 1.7)) * 16; g.globalAlpha = fade; g.fillStyle = o.dk; g.fillRect(px - 4, py - h, 8, h); g.fillStyle = o.color; g.fillRect(px - 3, py - h + 2, 6, h - 2); g.fillStyle = o.cl; g.fillRect(px - 1, py - h + 4, 2, h - 6); }
+        g.globalAlpha = 1;
+      } else if (o.kind === 'surge' && o.ax != null) {
+        const n = 10;
+        for (let k = 0; k <= n; k++) { const t = k / n, px = X(lerp(o.ax, o.bx, t)), py = X(lerp(o.ay, o.by, t)), h = 8 + Math.abs(Math.sin(T * 20 + k)) * 10; g.fillStyle = o.dk; g.fillRect(px - 4, py - h, 8, h + 2); g.fillStyle = o.color; g.fillRect(px - 3, py - h, 6, h - 2); g.fillStyle = '#ffffff'; g.fillRect(px - 3, py - h, 6, 2); }
+      } else if (o.kind === 'mark') {
+        const R = X(o.r), p = clamp(o.age / o.fuse, 0, 1);
+        if (!o.trig) { dashRing(g, ox, oy, R, (Math.floor(T * (6 + p * 20)) & 1) ? '#ffffff' : o.color, T * 6); pixRing(g, ox, oy, Math.max(2, R * (1 - p)), o.cl, 2); for (let k = 0; k < 4; k++) { const an = k * Math.PI / 2 + T * 3; this.line(g, ox + Math.cos(an) * (R + 4), oy + Math.sin(an) * (R + 4), ox + Math.cos(an) * (R - 6), oy + Math.sin(an) * (R - 6), '#ff4d6d', 2); } }
+      } else if (o.kind === 'slash') {
+        const x0 = X(o.x0), y0 = X(o.y0), x1 = X(o.x1), y1 = X(o.y1);
+        if (!o.trig) { if (Math.floor(T * 20) & 1) { g.globalAlpha = 0.6; this.line(g, x0, y0, x1, y1, o.color, 1); g.globalAlpha = 1; } }
+        else { const p = clamp((o.age - o.fuse) / 0.25, 0, 1); g.globalAlpha = 1 - p; this.line(g, x0, y0, x1, y1, o.color, Math.round(9 * (1 - p)) + 2); this.line(g, x0, y0, x1, y1, '#ffffff', Math.round(4 * (1 - p)) + 1); g.globalAlpha = 1; }
+      } else if (o.kind === 'snipe') {
+        const x1 = X(o.x + Math.cos(o.ang) * o.len), y1 = X(o.y + Math.sin(o.ang) * o.len);
+        if (!o.trig) { const p = clamp(o.age / o.fuse, 0, 1); g.globalAlpha = 0.4 + 0.6 * p; this.line(g, ox, oy, x1, y1, (Math.floor(T * 24) & 1) ? '#ff4d6d' : '#ffffff', 1); fillDisc(g, ox, oy, 3 + Math.round(p * 5), o.color); g.globalAlpha = 1; }
+        else { const p = clamp((o.age - o.fuse) / 0.25, 0, 1); g.globalAlpha = 1 - p; this.line(g, ox, oy, x1, y1, o.color, Math.round(14 * (1 - p)) + 2); this.line(g, ox, oy, x1, y1, '#ffffff', Math.round(6 * (1 - p)) + 1); g.globalAlpha = 1; }
       } else if (o.kind === 'circle') {
         const p = 1 - o.life / o.max, r = X(o.r) * (0.5 + 0.5 * Math.min(1, p * 3));
         this.runeCircle(g, ox, oy, r, o.color, o.cl, T, Math.min(1, o.life / 0.15));
@@ -4316,7 +4895,7 @@ class Battle {
     const list = [];
     for (const f of this.fighters) if (!f.gone) list.push({ y: f.y, f });
     for (const w of m.walls) list.push({ y: w.key, w });
-    for (const o of objs) if (o.delay <= 0 && (o.kind === 'barrier' || o.kind === 'turret' || o.kind === 'chaser' || o.kind === 'pest')) list.push({ y: o.y, o });
+    for (const o of objs) if (o.delay <= 0 && (o.kind === 'barrier' || o.kind === 'turret' || o.kind === 'chaser' || o.kind === 'pest' || o.kind === 'top' || o.kind === 'beacon')) list.push({ y: o.y, o });
     for (const p of this.parts) if (p.k === 'after') list.push({ y: p.y - 0.1, p });
     list.sort((p, q) => p.y - q.y);
     for (const it of list) {
@@ -4347,6 +4926,20 @@ class Battle {
         g.fillStyle = '#2a2440'; g.fillRect(x - 10, y - 8, 21, 9); g.fillStyle = '#4a3f8f'; g.fillRect(x - 10, y - 8, 21, 2); g.fillStyle = '#15122b'; g.fillRect(x - 10, y, 21, 1);
         g.fillStyle = o.color; g.fillRect(x - 2, y - 5, 5, 2);
         drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - 18, 1, rotOf(Math.cos(o.aimA), Math.sin(o.aimA)));
+      } else if (o.kind === 'top') {
+        fillEll(g, x, y + 2, 9, 3, 'rgba(0,0,0,0.35)');
+        const wob = Math.sin(T * 30 + o.ph) * 2;
+        g.fillStyle = o.dk; g.fillRect(x - 1, y - 8, 3, 8);
+        drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x + wob, y - 16, 2, Math.floor(T * 20) & 3);
+      } else if (o.kind === 'beacon') {
+        const pulse = 1 - clamp(o.pulse / o.rate, 0, 1);
+        fillEll(g, x, y + 2, 10, 3, 'rgba(0,0,0,0.35)');
+        g.fillStyle = '#2a2440'; g.fillRect(x - 6, y - 14, 13, 14); g.fillStyle = o.color; g.fillRect(x - 4, y - 12, 9, 2); g.fillStyle = o.cl; g.fillRect(x - 2, y - 30, 5, 16);
+        g.globalAlpha = 0.4 + pulse * 0.6; fillDisc(g, x, y - 34, 6 + Math.round(pulse * 5), o.cl); g.globalAlpha = 1;
+        drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - 44, 1, 0);
+      } else if (o.clone != null) {
+        const cf = this.fighters[o.clone];
+        if (cf && cf.spr) { const sz = cf.size; g.globalAlpha = 0.75; g.drawImage(cf.spr, 0, 0, SW, SH, x - Math.round(OX * sz), y - Math.round(OY * sz) - Math.round(Math.abs(Math.sin(T * 14 + o.ph)) * 4), Math.round(SW * sz), Math.round(SH * sz)); g.globalAlpha = 1; dashRing(g, x, y, 10, o.color, T * 10); }
       } else {
         const hop = Math.abs(Math.sin((T + o.hop) * (o.kind === 'pest' ? 10 : 12))) * 9;
         fillEll(g, x, y + 1, 7, 2, 'rgba(0,0,0,0.35)');
@@ -4359,7 +4952,9 @@ class Battle {
       const x = X(o.x), y = X(o.y);
       switch (o.kind) {
         case 'shot': {
-          const big = o.r >= 3 ? 2 : 1, rows = moveRows(o.gm, T + o.ph);
+          const big = o.roll ? 3 : o.charged ? 3 : o.r >= 3 ? 2 : 1, rows = moveRows(o.gm, T + o.ph);
+          if (o.roll || o.charged) { fillEll(g, x, y + 14 + X(o.r), 8 + X(o.r), 4, 'rgba(0,0,0,0.3)'); if (o.charged) { g.globalAlpha = 0.6; fillDisc(g, x, y, 22 + Math.round(Math.sin(T * 30) * 3), o.color); fillDisc(g, x, y, 14, o.cl); g.globalAlpha = 1; } drawGlyph(g, rows, o.color, x, y, big, o.roll ? (Math.floor(T * 10) & 3) : rotOf(o.vx, o.vy)); break; }
+          if (o.net) { g.globalAlpha = 0.9; for (let k = -2; k <= 2; k++) { this.line(g, x + k * 4, y - 9, x + k * 4, y + 9, '#e8e8f0', 1); this.line(g, x - 9, y + k * 4, x + 9, y + k * 4, '#e8e8f0', 1); } g.globalAlpha = 1; }
           if (o.hook) {
             const ow = this.fighters[o.owner];
             if (ow) { const hx = X(ow.x), hy = X(this.bodyY(ow)), n = Math.max(2, Math.round(Math.hypot(x - hx, y - hy) / 6)); for (let k = 0; k <= n; k++) { g.fillStyle = k & 1 ? o.dk : '#d8d8e8'; g.fillRect(Math.round(hx + (x - hx) * k / n) - 1, Math.round(hy + (y - hy) * k / n) - 1, 3, 3); } }
@@ -4378,7 +4973,7 @@ class Battle {
           else drawGlyph(g, rows, o.color, x, y, big, o.spin ? (Math.floor(T * 16) & 3) : rotOf(o.vx, o.vy));
           break;
         }
-        case 'drop': if (!o.trig) { const hh = Math.max(0, o.fall) * 180 * RS; drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - 9 - hh, 1, 1); } break;
+        case 'drop': if (!o.trig) { const hh = Math.max(0, o.fall) * 180 * RS; drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - (o.big ? 30 : 9) - hh, o.big ? 3 : 1, 1); if (o.big && Math.random() < 0.8) this.addP('smoke', o.x + rnd(-4, 4), o.y - 10 - o.fall * 180, rnd(-10, 10), -20, 0.5, '#ff9a4a', 2); } break;
         case 'swing': {
           if (o.cur == null) break;
           const half = o.arc / 2, a0 = o.ang - o.dirS * half, a1 = o.cur, R = X(o.r), Ri = R * 0.42, fade = Math.min(1, o.life / 0.08 + 0.3);
@@ -4424,6 +5019,41 @@ class Battle {
           break;
         }
         case 'orbit': drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y, 1, (Math.floor(T * 10) & 3)); break;
+        case 'thrust': {
+          if (o.reach == null) break;
+          const ca = Math.cos(o.ang), sa = Math.sin(o.ang), x1 = x + ca * X(o.reach), y1 = y + sa * X(o.reach), w = Math.max(2, Math.round(o.w * RS * 0.6));
+          this.line(g, x + ca * 10, y + sa * 10, x1, y1, o.dk, w + 2); this.line(g, x + ca * 10, y + sa * 10, x1, y1, o.color, w); this.line(g, x + ca * 10, y + sa * 10, x1, y1, '#ffffff', 1);
+          drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x1, y1, 1, rotOf(ca, sa));
+          for (let k = 0; k < 3; k++) { const an = o.ang + Math.PI + rnd(-0.6, 0.6); this.line(g, x1, y1, x1 + Math.cos(an) * 10, y1 + Math.sin(an) * 10, '#ffffff', 1); }
+          break;
+        }
+        case 'whip': {
+          if (!o.pts) break;
+          for (let k = 1; k < o.pts.length; k++) { const [ax, ay] = o.pts[k - 1], [bx, by] = o.pts[k]; this.line(g, X(ax), X(ay), X(bx), X(by), o.dk, 4); this.line(g, X(ax), X(ay), X(bx), X(by), k > 5 ? o.cl : o.color, 2); }
+          const tip = o.pts[o.pts.length - 1];
+          drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, X(tip[0]), X(tip[1]), 1, Math.floor(T * 20) & 3);
+          if (o.life / o.max < 0.45) for (let k = 0; k < 5; k++) { const an = k * 1.256 + T * 9; this.line(g, X(tip[0]), X(tip[1]), X(tip[0]) + Math.cos(an) * 12, X(tip[1]) + Math.sin(an) * 12, '#ffffff', 1); }
+          break;
+        }
+        case 'chargev': {
+          const p = clamp(1 - o.life / o.max, 0, 1), r = Math.round(4 + p * 16);
+          g.globalAlpha = 0.5; fillDisc(g, x, y, r + 6, o.color); g.globalAlpha = 1; fillDisc(g, x, y, r, o.cl); fillDisc(g, x, y, Math.max(1, r - 5), '#ffffff');
+          pixRing(g, x, y, r + 10 - Math.round((T * 60) % 10), o.color, 1);
+          break;
+        }
+        case 'drain': {
+          const t = this.fighters[o.target];
+          if (!t) break;
+          const tx = X(t.x), ty = X(this.bodyY(t)), n = 16;
+          let px = x, py = y;
+          for (let k = 1; k <= n; k++) { const q = k / n, wob = Math.sin(q * 12 + T * 20) * 5 * Math.sin(q * Math.PI), qx = x + (tx - x) * q - (ty - y) / Math.max(1, Math.hypot(tx - x, ty - y)) * wob, qy = y + (ty - y) * q + (tx - x) / Math.max(1, Math.hypot(tx - x, ty - y)) * wob; this.line(g, px, py, qx, qy, k & 1 ? o.color : o.cl, 3); px = qx; py = qy; }
+          fillDisc(g, tx, ty, 6, o.color); fillDisc(g, tx, ty, 3, '#ffffff');
+          break;
+        }
+        case 'storm':
+          if (o.life > 0.2) { const R = X(o.cloudR); g.globalAlpha = 0.55; for (let k = 0; k < 6; k++) fillEll(g, x + Math.cos(k * 1.05 + T) * R * 0.5, y - X(90) + Math.sin(k * 2.1) * 6, R * 0.45, 12, k & 1 ? '#3a3450' : '#5a5470'); g.globalAlpha = 1; }
+          break;
+
         case 'beam': {
           const fade = clamp(o.life / 0.1, 0.25, 1), start = clamp(o.age / 0.06, 0.3, 1);
           const w = Math.max(2, Math.round(o.w * RS * (0.8 + 0.2 * Math.sin(T * 50)) * fade * start));
@@ -4580,7 +5210,10 @@ class Battle {
     const X = (v) => Math.round(v * RS);
     const sz = f.size;
     const hopU = f.moveMode === 'hop' && f.alive && Math.hypot(f.x - f.px, f.y - f.py) > 0.3 ? Math.abs(Math.sin(T * 9 + f.seed)) * 4 : 0;
-    const fx = X(f.x + (f.st.dance ? Math.sin(T * 18) * 1.5 : 0)), fy = X(f.y), lift = X(hopU);
+    let airU = f.st.air ? 10 + Math.sin(T * 9) * 2 : 0;
+    if (f.leap) airU = Math.sin(Math.min(1, f.leap.t / f.leap.dur) * Math.PI) * f.leap.h;
+    else if (f.leapVis) { const p = (T - f.leapVis.t0) / f.leapVis.dur; if (p >= 0 && p <= 1) airU = Math.sin(p * Math.PI) * f.leapVis.h; else f.leapVis = null; }
+    const fx = X(f.x + (f.st.dance ? Math.sin(T * 18) * 1.5 : 0)), fy = X(f.y), lift = X(hopU + airU);
     // 허수아비: 발밑 과녁과 나무 기둥
     if (f.dummy && f.alive) {
       for (const [r, c] of [[18, '#ff4d6d'], [12, '#f6edd9'], [6, '#ff4d6d']]) {
@@ -4823,6 +5456,13 @@ class Battle {
       case 'chain': return e.range * 0.7;
       case 'hook': return e.range * 0.6;
       case 'lob': return 100;
+      case 'thrust': case 'whip': return (e.len || 40) * 0.7;
+      case 'launch': case 'flurry': return 20;
+      case 'leap': case 'phantom': return e.dist * 0.7;
+      case 'meteor': case 'mark': case 'storm': case 'cross': return 110;
+      case 'snipe': case 'gatling': case 'spiral': case 'missiles': case 'charge': case 'net': return 100;
+      case 'prism': return e.len * 0.6;
+      case 'gust': return e.len * 0.5;
     }
     return 60;
   }
@@ -4879,6 +5519,22 @@ class Battle {
         case 'chain': return d < e.range * 1.2;
         case 'hook': return d < e.range && d > 30;
         case 'lob': return d < 180;
+        case 'thrust': return d < e.len + 8;
+        case 'whip': return d < e.len + 6;
+        case 'launch': return d < e.off + e.r + 6;
+        case 'flurry': return Math.abs(d - e.off) < e.r + 8;
+        case 'leap': case 'phantom': return d < e.dist + 20;
+        case 'meteor': case 'storm': case 'cross': return d < 180;
+        case 'mark': return d < e.range;
+        case 'spikering': return e.at === 'self' ? d < e.r + 10 : d < 170;
+        case 'tornado': case 'roll': case 'surge': case 'missiles': case 'charge': case 'snipe': case 'gatling': case 'spiral': case 'net': return d < 200;
+        case 'firewall': return d < e.off + 40;
+        case 'clone': case 'top': case 'beacon': return d < 160;
+        case 'vortex': case 'ring': return e.at === 'self' ? d < e.r + 10 : d < 170;
+        case 'prism': return d < e.len;
+        case 'skyline': return d < 22 + e.n * e.step;
+        case 'gust': return d < e.len;
+        case 'drain': return d < e.range;
       }
       return false;
     };

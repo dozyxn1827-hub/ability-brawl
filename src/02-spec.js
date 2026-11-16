@@ -62,6 +62,37 @@ function sanFx(e, slot) {
       return { t: 'hook', dmg: num(e.dmg, 1, 25, 8), speed: num(e.speed, 150, 340, 280), range: num(e.range, 50, 200, 130), st };
     case 'lob':
       return { t: 'lob', dmg: num(e.dmg, 1, 45, 14), r: num(e.r, 8, 50, 20), n: Math.round(num(e.n, 1, 5, 1)), kb: num(e.kb, 0, 10, 5), st };
+    /* ----- 추가 공격 30종 ----- */
+    case 'meteor': return { t: 'meteor', dmg: num(e.dmg, 5, 50, 24), r: num(e.r, 14, 56, 30), kb: num(e.kb, 0, 10, 8), st };
+    case 'thrust': return { t: 'thrust', dmg: num(e.dmg, 2, 30, 11), len: num(e.len, 20, 80, 44), w: num(e.w, 3, 12, 6), n: Math.round(num(e.n, 1, 4, 1)), kb: num(e.kb, 0, 10, 5), st };
+    case 'launch': return { t: 'launch', dmg: num(e.dmg, 2, 30, 10), r: num(e.r, 8, 30, 14), off: num(e.off, 6, 40, 14), kb: 1, st: { k: 'air', d: num(e.d, 0.4, slot === 'basic' ? 0.5 : 1.4, 0.8) } };
+    case 'leap': return { t: 'leap', dmg: num(e.dmg, 3, 40, 16), r: num(e.r, 12, 50, 26), dist: num(e.dist, 40, 150, 100), kb: num(e.kb, 0, 10, 8), st };
+    case 'flurry': return { t: 'flurry', dmg: num(e.dmg, 1, 8, 3), r: num(e.r, 10, 34, 18), off: num(e.off, 0, 50, 18), dur: num(e.dur, 0.2, 1.2, 0.5), ticks: Math.round(num(e.ticks, 2, 10, 5)), kb: num(e.kb, 0, 4, 0), st };
+    case 'spikering': return { t: 'spikering', dmg: num(e.dmg, 2, 30, 10), r: num(e.r, 14, 60, 26), n: Math.round(num(e.n, 4, 14, 8)), at: oneOf(e.at, ['self', 'target'], 'self'), kb: num(e.kb, 0, 10, 4), st };
+    case 'cross': return { t: 'cross', dmg: num(e.dmg, 2, 30, 12), n: Math.round(num(e.n, 1, 5, 3)), at: oneOf(e.at, ['self', 'target'], 'target'), kb: num(e.kb, 0, 10, 4), st };
+    case 'tornado': return { t: 'tornado', dmg: num(e.dmg, 1, 10, 4), r: num(e.r, 8, 26, 14), speed: num(e.speed, 30, 160, 80), life: num(e.life, 1, 5, 2.5), kb: num(e.kb, 0, 6, 2), st };
+    case 'roll': return { t: 'roll', dmg: num(e.dmg, 3, 30, 12), size: num(e.size, 5, 14, 8), speed: num(e.speed, 60, 220, 130), life: num(e.life, 0.8, 4, 2.2), bounce: Math.round(num(e.bounce, 0, 4, 2)), kb: num(e.kb, 0, 10, 7), st };
+    case 'firewall': return { t: 'firewall', dmg: num(e.dmg, 1, 8, 3), len: num(e.len, 30, 140, 70), off: num(e.off, 10, 90, 40), dur: num(e.dur, 1, 6, 3.5), st };
+    case 'net': return { t: 'net', dmg: num(e.dmg, 0, 20, 4), speed: num(e.speed, 120, 300, 220), range: num(e.range, 50, 200, 130), r: num(e.r, 10, 30, 16), d: num(e.d, 1, 4, 2) };
+    case 'surge': return { t: 'surge', dmg: num(e.dmg, 2, 30, 12), w: num(e.w, 20, 120, 50), len: num(e.len, 40, 260, 150), speed: num(e.speed, 80, 280, 170), kb: num(e.kb, 0, 10, 7), st };
+    case 'clone': return { t: 'clone', dmg: num(e.dmg, 3, 30, 12), n: Math.round(num(e.n, 1, 3, 1)), r: num(e.r, 10, 34, 18), dur: num(e.dur, 2, 8, 5), st };
+    case 'mark': return { t: 'mark', dmg: num(e.dmg, 4, 45, 18), r: num(e.r, 10, 40, 18), delay: num(e.delay, 0.6, 2.5, 1.2), range: num(e.range, 40, 220, 160), kb: num(e.kb, 0, 10, 6), st };
+    case 'charge': return { t: 'charge', dmg: num(e.dmg, 5, 40, 18), delay: num(e.delay, 0.2, 0.9, 0.4), speed: num(e.speed, 150, 340, 300), boom: num(e.boom, 0, 34, 0), kb: num(e.kb, 0, 10, 8), st };
+    case 'missiles': return { t: 'missiles', dmg: num(e.dmg, 2, 20, 6), n: Math.round(num(e.n, 2, 8, 4)), speed: num(e.speed, 120, 300, 220), kb: num(e.kb, 0, 6, 2), st };
+    case 'vortex': return { t: 'vortex', dmg: num(e.dmg, 0, 8, 3), r: num(e.r, 16, 60, 34), dur: num(e.dur, 1, 6, 3), pull: num(e.pull, 4, 14, 9), at: oneOf(e.at, ['self', 'target'], 'target'), st };
+    case 'storm': return { t: 'storm', dmg: num(e.dmg, 2, 20, 7), n: Math.round(num(e.n, 3, 12, 6)), r: num(e.r, 16, 70, 36), kb: num(e.kb, 0, 6, 2), st };
+    case 'ring': return { t: 'ring', dmg: num(e.dmg, 1, 10, 5), r: num(e.r, 18, 60, 32), dur: num(e.dur, 1, 6, 3.5), at: oneOf(e.at, ['self', 'target'], 'target'), st };
+    case 'phantom': return { t: 'phantom', dmg: num(e.dmg, 3, 40, 16), dist: num(e.dist, 40, 140, 100), st };
+    case 'spiral': return { t: 'spiral', dmg: num(e.dmg, 1, 12, 4), n: Math.round(num(e.n, 6, 24, 14)), speed: num(e.speed, 120, 300, 200), dir: e.dir === -1 ? -1 : 1, st };
+    case 'prism': return { t: 'prism', dmg: num(e.dmg, 1, 14, 4), len: num(e.len, 40, 260, 150), w: num(e.w, 2, 8, 4), spread: num(e.spread, 8, 45, 22), ticks: Math.round(num(e.ticks, 1, 5, 2)), dur: num(e.dur, 0.2, 1, 0.45), st };
+    case 'whip': return { t: 'whip', dmg: num(e.dmg, 2, 30, 10), len: num(e.len, 24, 90, 56), kb: num(e.kb, 0, 10, 5), st };
+    case 'skyline': return { t: 'skyline', dmg: num(e.dmg, 2, 30, 10), n: Math.round(num(e.n, 3, 10, 6)), step: num(e.step, 10, 30, 18), r: num(e.r, 6, 18, 10), st };
+    case 'gatling': return { t: 'gatling', dmg: num(e.dmg, 1, 8, 3), n: Math.round(num(e.n, 4, 20, 12)), spread: num(e.spread, 0, 50, 20), st };
+    case 'top': return { t: 'top', dmg: num(e.dmg, 1, 14, 5), n: Math.round(num(e.n, 1, 4, 2)), speed: num(e.speed, 60, 200, 120), dur: num(e.dur, 2, 8, 5), kb: num(e.kb, 0, 8, 4), st };
+    case 'beacon': return { t: 'beacon', dmg: num(e.dmg, 1, 14, 5), r: num(e.r, 16, 60, 34), rate: num(e.rate, 0.5, 2, 0.9), dur: num(e.dur, 2, 9, 5), kb: num(e.kb, 0, 8, 4), st };
+    case 'snipe': return { t: 'snipe', dmg: num(e.dmg, 5, 50, 24), delay: num(e.delay, 0.3, 1, 0.55), kb: num(e.kb, 0, 10, 8), st };
+    case 'gust': return { t: 'gust', dmg: num(e.dmg, 0, 10, 3), len: num(e.len, 30, 110, 70), arc: num(e.arc, 30, 120, 70), kb: num(e.kb, 4, 10, 10), st };
+    case 'drain': return slot === 'basic' ? null : { t: 'drain', dmg: num(e.dmg, 1, 8, 3), range: num(e.range, 40, 160, 110), dur: num(e.dur, 0.6, 3, 1.6), ticks: Math.round(num(e.ticks, 2, 10, 6)), heal: num(e.heal, 0, 5, 2), st };
     case 'blast':
       return { t: 'blast', dmg: num(e.dmg, 1, 50, 14), r: num(e.r, 6, 56, 18), at, off: num(e.off, 0, 140, 26), delay: num(e.delay, 0, 1.5, 0.15), kb: num(e.kb, -10, 10, 5), st };
     case 'zone':
@@ -112,6 +143,25 @@ function fxExpected(e) {
     case 'chain': return e.dmg * Math.min(2.2, 1 + e.n * 0.3);
     case 'hook': return e.dmg;
     case 'lob': return e.dmg * (1 + (e.n - 1) * 0.5);
+    case 'meteor': case 'leap': case 'launch': case 'mark': case 'snipe': case 'phantom': case 'charge': case 'whip': case 'cross': case 'spikering': case 'surge': return e.dmg * (e.t === 'thrust' ? e.n : 1);
+    case 'thrust': return e.dmg * e.n;
+    case 'flurry': return e.dmg * e.ticks * 0.8;
+    case 'tornado': return e.dmg * (e.life / 0.35) * 0.35;
+    case 'roll': return e.dmg * (1 + e.bounce * 0.3);
+    case 'firewall': case 'ring': return e.dmg * (e.dur / 0.5) * 0.35;
+    case 'vortex': return e.dmg * (e.dur / 0.5) * 0.4;
+    case 'net': return e.dmg + 6;
+    case 'clone': return e.dmg * e.n;
+    case 'missiles': return e.dmg * Math.min(e.n, 3) * 0.9;
+    case 'storm': return e.dmg * Math.min(3, e.n * 0.4);
+    case 'spiral': return e.dmg * Math.min(4, e.n * 0.25);
+    case 'prism': return e.dmg * e.ticks * 1.5;
+    case 'skyline': return e.dmg * 1.3;
+    case 'gatling': return e.dmg * Math.min(6, e.n * 0.5);
+    case 'top': return e.dmg * e.n * 1.5;
+    case 'beacon': return e.dmg * (e.dur / e.rate) * 0.4;
+    case 'gust': return e.dmg + 3;
+    case 'drain': return e.dmg * e.ticks + e.heal * e.ticks * 0.5;
     case 'summon':
       if (e.kind === 'turret') return e.dmg * e.rate * e.dur * 0.35 * e.n;
       if (e.kind === 'chaser') return e.dmg * e.n * 1.5;
@@ -615,7 +665,7 @@ ${sideList}
 
 [설계 순서] 아래 순서대로 속으로 깊이 생각한 뒤 결과만 출력한다(생각 과정은 출력하지 않는다).
 1. 해석: 능력 글을 단어 하나하나 글자 그대로 읽는다. 그 능력이 진짜로 있다면 싸움판에서 벌어질 웃긴 장면을 여러 개 떠올리고, 글에 가장 충실하면서 가장 황당한 해석을 고른다. 말장난, 과장, 일상 소재의 엉뚱한 활용, 숫자·조건의 지나치게 성실한 해석을 적극 쓴다. 가장 먼저 떠오르는 뻔한 해석은 한 번 더 비틀어 본다.
-2. 콩트 구성: 네 기술이 한 편의 콩트처럼 이어지게 한다. 네 기술의 공격 방식이 모두 달라야 한다(발사체만 네 개는 금지). 액션 게임처럼 휘두르기(swing), 분사(cone), 충격파(wave), 땅 가르기(line), 연쇄(chain), 갈고리(hook), 포물선 투척(lob), 광선 쓸기(beam sweep), 반격 자세(buff counter), 돌진·순간이동·소환·장판을 섞는다.
+2. 콩트 구성: 네 기술이 한 편의 콩트처럼 이어지게 한다. 네 기술의 공격 방식이 모두 달라야 한다(발사체만 네 개는 금지). 액션 게임처럼 휘두르기(swing), 분사(cone), 충격파(wave), 땅 가르기(line), 연쇄(chain), 갈고리(hook), 포물선 투척(lob), 광선 쓸기(beam sweep), 반격 자세(buff counter)와 추가 공격 30종(운석, 찌르기, 띄우기, 도약, 난무, 회오리, 굴러가는 구체, 불벽, 그물, 지면파, 분신, 표식, 모아 쏘기, 미사일, 소용돌이, 낙뢰, 고리, 환영 베기, 나선 탄막, 세 갈래 광선, 채찍, 검의 비, 개틀링, 팽이, 신호탑, 저격, 돌풍, 흡혈 줄 등) 가운데 능력 글에 가장 어울리는 것을 골라 섞는다.
    · basic: 그 능력의 대표 개그를 가볍고 빠르게 연타. 쏠 때마다 손맛이 나게.
    · s1: 예상 밖으로 비튼 활용. 상태이상이나 장판으로 판을 깐다.
    · s2: 능력을 엉뚱하게 써서 도망·접근·방어·소환. 위기 탈출이나 기습.
@@ -687,6 +737,15 @@ EFFECT (아레나 480x320px, 캐릭터 키 10px, 이동 속도 약 96px/초, 거
  {"t":"chain","dmg":2~25,"n":1~6,"range":40~140,"st":ST} 연쇄(가장 가까운 적에게 꽂히고 옆 적으로 n번 튄다)
  {"t":"hook","dmg":2~25,"speed":150~340,"range":50~200,"st":ST} 갈고리(줄 달린 무언가를 던져 맞은 적을 내 쪽으로 끌어온다)
  {"t":"lob","dmg":2~45,"r":8~50,"n":1~5,"kb":0~10,"st":ST} 포물선 투척(머리 위로 던져 표시된 곳에 떨어져 터진다. 벽을 넘어간다)
+ 추가 공격(이름: 형태 — 쓸 수 있는 값):
+ meteor 거대 낙하물(표시 후 큰 것이 떨어짐) dmg r · thrust 찌르기(좁고 긴 일격) dmg len w n · launch 띄우기(앞의 적을 공중에 띄워 잠시 못 움직이게) dmg r off d · leap 도약 내려찍기(적 쪽으로 뛰어올라 착지 충격) dmg r dist
+ flurry 난무(앞 구역을 마구 베기) dmg r off dur ticks · spikering 가시 고리(원형으로 솟음) dmg r n at:self|target · cross 십자 폭발(+모양) dmg n at · tornado 움직이는 회오리(끌어당기며 전진) dmg r speed life
+ roll 굴러가는 거대 구체(관통·벽에 튕김) dmg size speed life bounce · firewall 가로 불벽(앞에 세워 지나가면 피해) dmg len off dur · net 그물(맞은 자리 속박) dmg speed range r d · surge 전진하는 지면파(넓은 벽이 밀고 나감) dmg w len speed
+ clone 분신(내 모습이 달려가 터짐) dmg n r dur · mark 표식(적에게 붙어 잠시 후 폭발) dmg r delay range · charge 모아 쏘기(기를 모아 거대 관통탄) dmg delay speed boom · missiles 유도 미사일 연발 dmg n speed
+ vortex 소용돌이 장판(계속 빨아들임) dmg r dur pull at · storm 낙뢰(적 주변에 번개 연타) dmg n r · ring 가두는 고리(테두리를 넘으면 피해) dmg r dur at · phantom 환영 베기(돌진한 길이 뒤늦게 베어짐) dmg dist
+ spiral 나선 탄막 dmg n speed dir · prism 세 갈래 광선 dmg len w spread ticks dur · whip 채찍(휘는 긴 일격) dmg len · skyline 일직선 하늘 낙하(검의 비) dmg n step r · gatling 개틀링 연사 dmg n spread
+ top 팽이(돌아다니며 부딪힘) dmg n speed dur · beacon 신호탑(설치하면 주기적으로 충격파) dmg r rate dur · snipe 저격(조준선 후 한 방) dmg delay · gust 돌풍(넓게 강하게 밀침) dmg len arc kb · drain 흡혈 줄(연결해 피해를 주며 회복) dmg range dur ticks heal
+ 모든 추가 공격은 {"t":"이름", 값들..., "st":ST} 형태로 쓴다.
  {"t":"blast","dmg":4~50,"r":6~56,"at":"self|front|target","off":0~140,"delay":0~1.5,"kb":-10~10,"st":ST} 폭발(kb 음수는 끌어당김, front는 적 방향 off만큼 앞, target은 적 위치)
  {"t":"zone","dmg":0~8,"r":8~50,"dur":1.5~8,"at":"self|front|target","off":0~140,"follow":bool,"heal":0~6,"st":ST} 장판(0.5초마다 dmg, heal은 안에 선 자신 회복, follow는 자신을 따라다님)
  {"t":"trail","dmg":0~6,"r":6~16,"dur":1~6,"life":1~4,"st":ST} dur초 동안 지나간 자리에 흔적 장판을 남김

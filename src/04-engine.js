@@ -309,7 +309,7 @@ class Battle {
       if (hl && f.hp < f.maxHp && f.alive) f.hp = Math.min(f.maxHp, f.hp + hl);
     }
     if (!f.alive) return;
-    const stunned = !!(st.stun || st.freeze || st.dance || st.sleep);
+    const stunned = !!(st.stun || st.freeze || st.dance || st.sleep || st.air);
     f.size = sp.stats.size * f.base.size * (1 + f.stack.size) * (st.giant ? 1.5 : 1) * (st.tiny ? 0.65 : 1);
     const spd = sp.stats.speed * f.base.speed * (st.haste ? 1.45 : 1) * (st.slow ? 0.55 : 1) * (1 - f.stack.slow) * (st.giant ? 0.85 : 1) * (st.tiny ? 1.15 : 1)
       * (st.heavy ? 0.75 : 1) * (st.fly ? 1.15 : 1) * (sp.passive && sp.passive.k === 'swift' ? 1.15 : 1) * (st.morph ? 0.75 : 1)
@@ -327,7 +327,13 @@ class Battle {
     const ml = Math.hypot(mx, my);
     if (ml > 1) { mx /= ml; my /= ml; }
     if (ml > 0.15) f.mdir = Math.atan2(my, mx);
-    if (f.dash) {
+    if (f.leap) {
+      const L = f.leap; L.t += dt;
+      const p = Math.min(1, L.t / L.dur);
+      f.x = lerp(L.x0, L.x1, p); f.y = lerp(L.y0, L.y1, p); f.vx = 0; f.vy = 0;
+      if (Math.random() < 0.5) this.addP('after', f.x, f.y - Math.sin(p * Math.PI) * L.h, 0, 0, 0.15, f.color, 1, { dir: f.dir, f });
+      if (p >= 1) f.leap = null;
+    } else if (f.dash) {
       f.dash.t -= dt; f.vx = f.dash.vx; f.vy = f.dash.vy;
       if (f.dash.t <= 0) { f.vx = f.dash.vx * 0.2; f.vy = f.dash.vy * 0.2; f.dash = null; }
     } else {
@@ -449,7 +455,7 @@ class Battle {
 
   /* ---------- 능력 쓰기 ---------- */
   tryMove(f, slot) {
-    if (!f.alive || f.wind || f.dash || f.st.stun || f.st.freeze || f.hurtT > 0) return false;
+    if (!f.alive || f.wind || f.dash || f.leap || f.st.stun || f.st.freeze || f.st.air || f.hurtT > 0) return false;
     if (f.cd[slot] > 0) return false;
     f.tried[slot] = 1;
     if (f.lock[slot]) {
@@ -522,7 +528,18 @@ class Battle {
     const act = ['a', f.idx, SLOT_IDX[as], Math.round(f.x), Math.round(f.y), Math.round(f.aim * 180 / Math.PI), ++f.actN, Math.round(mul * 100), crit ? 1 : 0,
       tgt ? Math.round(tgt.x) : -1, tgt ? Math.round(tgt.y) : -1, tgt ? tgt.idx : -1, (Math.random() * 1e9) | 0, sw ? sw[0] : -1, sw ? sw[1] : -1];
     for (const e of mv.fx) {
-      if (e.t === 'dash') {
+      if (e.t === 'leap') {
+        if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
+        const [lx, ly] = this.leapTarget(f.x, f.y, tgt ? tgt.x : f.x + ca * 70, tgt ? tgt.y : f.y + sa * 70, f.aim, e.dist);
+        const dur = 0.32 + Math.hypot(lx - f.x, ly - f.y) / 500;
+        f.leap = { x0: f.x, y0: f.y, x1: lx, y1: ly, t: 0, dur, h: 22 + Math.hypot(lx - f.x, ly - f.y) * 0.2 };
+        f.dash = null; f.invT = Math.max(f.invT, dur + 0.05);
+      } else if (e.t === 'phantom') {
+        if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
+        const t = e.dist / DASH_V;
+        f.dash = { vx: ca * DASH_V, vy: sa * DASH_V, t };
+        f.invT = Math.max(f.invT, t + 0.08);
+      } else if (e.t === 'dash') {
         if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
         const t = e.dist / DASH_V;
         f.dash = { vx: ca * DASH_V, vy: sa * DASH_V, t };
@@ -556,6 +573,40 @@ class Battle {
     }
   }
 
+  /** 도약 착지점: 목표 쪽으로 최대 dist, 벽·구덩이·바깥이면 앞으로 당긴다 (모든 기기에서 같은 결과) */
+  leapTarget(x, y, tx, ty, ang, dist) {
+    const B = this.map.B;
+    let dx = tx - x, dy = ty - y, d = Math.hypot(dx, dy);
+    if (d < 1) { dx = Math.cos(ang); dy = Math.sin(ang); d = 1; }
+    const L = Math.min(dist, Math.max(20, d));
+    for (let k = 0; k < 8; k++) {
+      const s2 = L * (1 - k * 0.12), px = clamp(x + dx / d * s2, B + 8, W - B - 8), py = clamp(y + dy / d * s2, B + 10, H - B - 6);
+      if (!this.map.obs.some((ob) => px > ob.x - 4 && px < ob.x + ob.w + 4 && py > ob.y - 4 && py < ob.y + ob.h + 4)) return [Math.round(px), Math.round(py)];
+    }
+    return [x, y];
+  }
+  /** 조준 방향 가까이에서 가장 가까운 적 (front: 앞쪽만) */
+  pickTarget(c, x, y, ang, range, front) {
+    let best = null, bd = range;
+    for (const v of this.fighters) {
+      if (!v.alive || v.gone || v.idx === c.idx) continue;
+      const dx = v.x - x, dy = this.bodyY(v) - y, d = Math.hypot(dx, dy);
+      if (front) { let da = Math.atan2(dy, dx) - ang; da = Math.atan2(Math.sin(da), Math.cos(da)); if (Math.abs(da) > 1.3) continue; }
+      if (d < bd) { bd = d; best = v; }
+    }
+    return best;
+  }
+  /** 채찍 곡선 위의 점들 */
+  whipPts(o) {
+    const p = clamp(1 - o.life / o.max, 0, 1), ca = Math.cos(o.ang), sa = Math.sin(o.ang);
+    const L = o.len * Math.min(1, 0.35 + p * 1.6), bend = o.len * 0.45 * o.dirS * (1 - p) * (1 - p);
+    const pts = [];
+    for (let k = 0; k <= 8; k++) {
+      const t = k / 8, along = L * t, side = bend * Math.sin(t * Math.PI) * (0.5 + t);
+      pts.push([o.x + ca * along - sa * side, o.y + sa * along + ca * side * 0.8]);
+    }
+    return pts;
+  }
   doBlink(f, e, tgt, mv) {
     this.vfxImpact(mv.vfx, mv.color, f.x, this.bodyY(f), 0.7);
     for (let i = 0; i < 3; i++) this.addP('after', f.x, f.y, 0, 0, 0.25 + i * 0.05, mv.color, 1, { dir: f.dir, f });
@@ -732,6 +783,191 @@ class Battle {
           }
           this.sfx('dash', style);
           break;
+        /* ===== 추가 공격 30종 ===== */
+        case 'meteor': {
+          const o = base(i, 0, 'drop', e);
+          Object.assign(o, { x: cx(tx), y: cyy(ty), fall: 0.85, fall0: 0.85, r: e.r, life: 1.4, big: true });
+          this.objs.push(o); break;
+        }
+        case 'thrust':
+          for (let j = 0; j < e.n; j++) { const o = base(i, j, 'thrust', e); Object.assign(o, { follow: c, ang, len: e.len, w: e.w, life: 0.16, max: 0.16, delay: j * 0.13 }); this.objs.push(o); }
+          this.sfx('dash', style); break;
+        case 'launch': {
+          const o = base(i, 0, 'blast', e);
+          Object.assign(o, { x: cx(x + ca * e.off), y: cyy(cy + sa * e.off), r: e.r, delay0: 0.05, life: 0.45, trig: false });
+          this.objs.push(o);
+          for (let k = 0; k < 8; k++) this.addP('streak', o.x + rnd(-e.r, e.r) * 0.6, o.y, 0, -rnd(120, 220), 0.35, k & 1 ? '#ffffff' : mv.color, 1);
+          break;
+        }
+        case 'leap': {
+          const [lx, ly] = this.leapTarget(x, y, tx, ty, ang, e.dist), dur = 0.32 + Math.hypot(lx - x, ly - y) / 500;
+          const o = base(i, 0, 'blast', e);
+          Object.assign(o, { x: lx, y: ly - 4, r: e.r, delay0: dur, life: dur + 0.4, trig: false, land: true });
+          this.objs.push(o);
+          if (!c.owned) c.leapVis = { t0: this.t, dur, h: 22 + Math.hypot(lx - x, ly - y) * 0.2 };
+          break;
+        }
+        case 'flurry': {
+          const o = base(i, 0, 'flurry', e);
+          Object.assign(o, { x: cx(x + ca * e.off), y: cyy(y + sa * e.off), r: e.r, life: e.dur, max: e.dur, rehit: e.dur / e.ticks - 0.001 });
+          this.objs.push(o); this.sfx('dash', style); break;
+        }
+        case 'spikering': case 'cross': {
+          const hm = new Map(), pts = [];
+          const ox = e.at === 'target' ? tx : x, oy = e.at === 'target' ? ty : y;
+          if (e.t === 'spikering') for (let j = 0; j < e.n; j++) { const an = (j / e.n) * Math.PI * 2 + ang; pts.push([ox + Math.cos(an) * e.r, oy + Math.sin(an) * e.r * 0.8, j * 0.025]); }
+          else { pts.push([ox, oy, 0]); for (let k = 1; k <= e.n; k++) for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) pts.push([ox + dx * k * 15, oy + dy * k * 12, k * 0.06]); }
+          pts.forEach(([px, py, dl], j) => {
+            if (px < B || px > W - B || py < B || py > H - B || this.wallAt(px, py - 2)) return;
+            const o = base(i, j, 'spike', e);
+            Object.assign(o, { x: px, y: py, delay: dl, life: 0.34, r: e.t === 'cross' ? 8 : 7, hit: hm, big: e.t === 'cross' });
+            this.objs.push(o);
+          });
+          break;
+        }
+        case 'tornado': {
+          const o = base(i, 0, 'tornado', e);
+          Object.assign(o, { x: x + ca * 8, y: y + sa * 8, vx: ca * e.speed, vy: sa * e.speed, r: e.r, life: e.life, max: e.life, rehit: 0.35 });
+          this.objs.push(o); this.sfx('dash', 'wind'); break;
+        }
+        case 'roll': {
+          const o = base(i, 0, 'shot', e);
+          Object.assign(o, { x: x + ca * 6, y: cy + sa * 6, vx: ca * e.speed, vy: sa * e.speed, r: e.size, life: e.life, pierce: true, bounce: e.bounce, homing: 0, boom: 0, roll: true, rehit: 0.5 });
+          this.objs.push(o); break;
+        }
+        case 'firewall': {
+          const o = base(i, 0, 'fwall', e), mx2 = cx(x + ca * e.off), my2 = cyy(y + sa * e.off), hl = e.len / 2;
+          Object.assign(o, { x: mx2, y: my2, ax: mx2 - sa * hl, ay: my2 + ca * hl * 0.8, bx: mx2 + sa * hl, by: my2 - ca * hl * 0.8, life: e.dur, max: e.dur, rehit: 0.5 });
+          this.objs.push(o); break;
+        }
+        case 'net': {
+          const o = base(i, 0, 'shot', e);
+          Object.assign(o, { x: x + ca * 5, y: cy + sa * 5, vx: ca * e.speed, vy: sa * e.speed, r: 3, life: e.range / e.speed, net: { r: e.r, d: e.d }, homing: 0, bounce: 0, boom: 0 });
+          this.objs.push(o); break;
+        }
+        case 'surge': {
+          const o = base(i, 0, 'surge', e);
+          Object.assign(o, { x: x + ca * 10, y: y + sa * 10, ca, sa, hw: e.w / 2, vx: ca * e.speed, vy: sa * e.speed, life: e.len / e.speed, max: e.len / e.speed });
+          this.objs.push(o); this.shake = Math.max(this.shake, 2); break;
+        }
+        case 'clone':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'chaser', e), off = (j - (e.n - 1) / 2);
+            Object.assign(o, { x: x - sa * off * 14 + ca * 6, y: y + ca * off * 14 + sa * 6, vx: 0, vy: 0, r: 4, life: e.dur, max: e.dur, clone: c.idx, boom: e.r, d: 1, hop: 0 });
+            this.solid(o, 3, false); this.objs.push(o);
+          }
+          this.sfx('summon'); break;
+        case 'mark': {
+          const o = base(i, 0, 'mark', e);
+          const t = this.pickTarget(c, x, cy, ang, e.range, true);
+          Object.assign(o, { target: t ? t.idx : -1, x: t ? t.x : cx(x + ca * 50), y: t ? t.y : cyy(y + sa * 50), r: e.r, fuse: e.delay, life: e.delay + 0.35, max: e.delay + 0.35 });
+          this.objs.push(o); break;
+        }
+        case 'charge': {
+          const v = base(i, 0, 'chargev', e);
+          Object.assign(v, { follow: c, ang, life: e.delay, max: e.delay, dmg: 0 });
+          this.objs.push(v);
+          const o = base(i, 1, 'shot', e);
+          Object.assign(o, { x: x + ca * 6, y: cy + sa * 6, vx: ca * e.speed, vy: sa * e.speed, r: 4, life: 1.6, pierce: true, homing: 0, bounce: 0, boom: e.boom, delay: e.delay, charged: true });
+          this.objs.push(o); break;
+        }
+        case 'missiles':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'shot', e), side = j % 2 ? 1 : -1, an = ang + side * (1.3 + R() * 0.5);
+            Object.assign(o, { x: x + ca * 4, y: cy - 4, vx: Math.cos(an) * e.speed * 0.7, vy: Math.sin(an) * e.speed * 0.7 - 40, r: 2, life: 2, homing: 1, delay: j * 0.09, missile: true, bounce: 0, boom: 8 });
+            this.objs.push(o);
+          }
+          break;
+        case 'vortex': {
+          const o = base(i, 0, 'zone', e);
+          const at = e.at === 'self' ? [x, y] : [tx, ty];
+          Object.assign(o, { x: cx(at[0]), y: cyy(at[1] - 1), r: e.r, life: e.dur, max: e.dur, rehit: 0.5, heal: 0, pull: e.pull, swirl: true });
+          this.objs.push(o); break;
+        }
+        case 'storm': {
+          const o = base(i, 0, 'storm', e), pts = [];
+          for (let k = 0; k < e.n; k++) { const an = R() * 6.283, d = Math.sqrt(R()) * e.r; pts.push([cx(tx + Math.cos(an) * d), cyy(ty + Math.sin(an) * d * 0.8)]); }
+          Object.assign(o, { x: tx, y: ty, pts, k: 0, acc: 0.1, every: 0.12, sr: 11, life: e.n * 0.12 + 0.35, max: e.n * 0.12 + 0.35, rehit: 0.08, cloudR: e.r });
+          this.objs.push(o); break;
+        }
+        case 'ring': {
+          const o = base(i, 0, 'zone', e);
+          const at = e.at === 'self' ? [x, y] : [tx, ty];
+          Object.assign(o, { x: cx(at[0]), y: cyy(at[1] - 1), r: e.r, life: e.dur, max: e.dur, rehit: 0.4, heal: 0, ring: 6 });
+          this.objs.push(o); break;
+        }
+        case 'phantom': {
+          const o = base(i, 0, 'slash', e);
+          Object.assign(o, { x0: x, y0: cy, x1: cx(x + ca * e.dist), y1: cyy(cy + sa * e.dist), x: x, y: cy, fuse: 0.32, life: 0.58, max: 0.58 });
+          this.objs.push(o); break;
+        }
+        case 'spiral':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'shot', e), an = ang + j * 0.62 * (e.dir || 1);
+            Object.assign(o, { x: x, y: cy, vx: Math.cos(an) * e.speed, vy: Math.sin(an) * e.speed, r: 2, life: 1.1, delay: j * 0.045, homing: 0, bounce: 0, boom: 0 });
+            this.objs.push(o);
+          }
+          break;
+        case 'prism':
+          for (let j = -1; j <= 1; j++) {
+            const o = base(i, j + 1, 'beam', e), an = ang + j * e.spread * Math.PI / 180;
+            Object.assign(o, { follow: c, ang: an, ang0: an, sweep: 0, len: e.len, w: e.w, life: e.dur, dur: e.dur, rehit: e.dur / e.ticks - 0.001, both: false, hit: new Map() });
+            this.objs.push(o);
+          }
+          this.sfx('beam', style); break;
+        case 'whip': {
+          const o = base(i, 0, 'whip', e);
+          Object.assign(o, { follow: c, ang, len: e.len, life: 0.24, max: 0.24, dirS: R() < 0.5 ? 1 : -1 });
+          this.objs.push(o); this.sfx('dash', style); break;
+        }
+        case 'skyline': {
+          const hm = new Map();
+          for (let j = 0; j < e.n; j++) {
+            const dd = 22 + j * e.step, px = x + ca * dd, py = y + sa * dd;
+            if (px < B || px > W - B || py < B || py > H - B) break;
+            const o = base(i, j, 'drop', e);
+            Object.assign(o, { x: px, y: py, delay: j * 0.07, fall: 0.36, fall0: 0.36, r: e.r, life: 0.75, hit: hm });
+            this.objs.push(o);
+          }
+          break;
+        }
+        case 'gatling':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'shot', e), an = ang + (R() - 0.5) * e.spread * Math.PI / 180;
+            Object.assign(o, { x: x + ca * 6, y: cy + sa * 6, vx: Math.cos(an) * 330, vy: Math.sin(an) * 330, r: 1, life: 0.7, delay: j * 0.055, homing: 0, bounce: 0, boom: 0 });
+            this.objs.push(o);
+          }
+          break;
+        case 'top':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'top', e), an = ang + (j - (e.n - 1) / 2) * 0.5;
+            Object.assign(o, { x: x + ca * 8, y: y + sa * 8, vx: Math.cos(an) * e.speed, vy: Math.sin(an) * e.speed, r: 5, life: e.dur, max: e.dur, rehit: 0.4 });
+            this.objs.push(o);
+          }
+          this.sfx('summon'); break;
+        case 'beacon': {
+          const o = base(i, 0, 'beacon', e);
+          Object.assign(o, { x: cx(x + ca * 16), y: cyy(y + sa * 16), r: e.r, rate: e.rate, pulse: 0.25, pn: 0, life: e.dur, max: e.dur, dmg: e.dmg });
+          this.solid(o, 3, true); this.objs.push(o); this.sfx('summon'); break;
+        }
+        case 'snipe': {
+          const o = base(i, 0, 'snipe', e);
+          Object.assign(o, { x: x + ca * 5, y: cy + sa * 5, ang, len: 330, fuse: e.delay, life: e.delay + 0.25, max: e.delay + 0.25, w: 6 });
+          this.objs.push(o); break;
+        }
+        case 'gust': {
+          const o = base(i, 0, 'cone', e);
+          Object.assign(o, { follow: c, ang, len: e.len, arc: e.arc * Math.PI / 180, life: 0.18, max: 0.18, rehit: 0, gust: true });
+          this.objs.push(o);
+          for (let k = 0; k < 14; k++) { const an = ang + rnd(-0.5, 0.5) * e.arc * Math.PI / 180; this.addP('streak', x + Math.cos(an) * 6, cy + Math.sin(an) * 6, Math.cos(an) * 260, Math.sin(an) * 200, 0.3, k & 1 ? '#ffffff' : mv.color, 1); }
+          this.sfx('dash', 'wind'); break;
+        }
+        case 'drain': {
+          const o = base(i, 0, 'drain', e), t = this.pickTarget(c, x, cy, ang, e.range, false);
+          Object.assign(o, { follow: c, target: t ? t.idx : -1, range: e.range, life: t ? e.dur : 0.2, max: e.dur, rehit: e.dur / e.ticks - 0.001, healAmt: e.heal, hacc: 0, every: e.dur / e.ticks });
+          this.objs.push(o); break;
+        }
+
         case 'blast': case 'zone': {
           const o = base(i, 0, e.t, e);
           let ox = x, oy = e.t === 'zone' ? y - 1 : cy;
@@ -836,6 +1072,10 @@ class Battle {
   killObj(o, victim) {
     if (o.dead) return;
     o.dead = true;
+    if (o.net) {
+      this.objs.push({ uid: o.uid + 'n', owner: o.owner, kind: 'zone', dmg: 0, mul: o.mul, st: { k: 'root', d: 0.9 }, kb: 0, color: '#e8e8f0', cl: '#ffffff', dk: '#8a8aa0', rows: o.rows, gm: o.gm, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0.5, delay: 0, x: o.x, y: o.y + 3, r: o.net.r, life: o.net.d, max: o.net.d, heal: 0, netz: true });
+      this.vfxImpact(o.vfx, '#e8e8f0', o.x, o.y, 0.8);
+    }
     if (o.boom > 0) {
       const b = { uid: o.uid + 'b', owner: o.owner, kind: 'blast', dmg: o.kind === 'mine' ? o.dmg : o.dmg * 0.6, mul: o.mul, st: o.kind === 'mine' ? o.st : null, kb: 4, color: o.color, cl: o.cl, dk: o.dk, rows: o.rows, gm: o.gm, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0, delay: 0, x: o.x, y: o.kind === 'mine' ? o.y - 3 : o.y, r: o.boom, delay0: 0, life: 0.4, trig: false };
       if (victim != null) b.hit.set(victim, this.t);
@@ -892,6 +1132,9 @@ class Battle {
           o.x += o.vx * dt; o.y += o.vy * dt;
           if (o.tr) { o.tr.push(o.x, o.y); if (o.tr.length > 10) o.tr.splice(0, 2); }
           if (Math.random() < (o.child ? 0.4 : 0.9)) this.vfxTrail(o.vfx, o.color, o.x, o.y, -o.vx * 0.15, -o.vy * 0.15, o.r >= 3 ? 1.3 : 0.8);
+          if (o.missile && Math.random() < 0.8) this.addP('smoke', o.x, o.y, rnd(-6, 6), rnd(-10, 0), 0.5, '#d8d8e8', 1.5);
+          if (o.roll && Math.random() < 0.6) this.addP('smoke', o.x + rnd(-o.r, o.r), o.y + o.r, -o.vx * 0.1, -10, 0.5, o.dk, 2);
+          if (o.charged && Math.random() < 0.9) this.addP('ring', o.x, o.y, 0, 0, 0.2, o.cl, 1, { r0: 2, r1: 9 });
           let wall = false;
           if (o.x < B || o.x > W - B) { if (o.bounce > 0) { o.bounce--; o.vx = -o.vx; o.x = clamp(o.x, B, W - B); this.vfxImpact(o.vfx, o.color, o.x, o.y, 0.3); } else wall = true; }
           if (!wall && (o.y < B || o.y > H - B)) { if (o.bounce > 0) { o.bounce--; o.vy = -o.vy; o.y = clamp(o.y, B, H - B); this.vfxImpact(o.vfx, o.color, o.x, o.y, 0.3); } else wall = true; }
@@ -912,10 +1155,11 @@ class Battle {
           if (o.fall > 0 && Math.random() < 0.7) this.vfxTrail(o.vfx, o.color, o.x, o.y - 3 - o.fall * 180, 0, -40, 0.8);
           if (o.fall <= 0 && !o.trig) {
             o.trig = true;
-            this.vfxImpact(o.vfx, o.color, o.x, o.y - 2, 1);
+            this.vfxImpact(o.vfx, o.color, o.x, o.y - 2, o.big ? 3 : 1);
             this.decal(o.x, o.y, o.r * 0.7, o.dk);
-            this.sfx(o.boom > 0 ? 'boom' : 'hit', o.vfx);
-            this.shake = Math.max(this.shake, 1.5);
+            this.sfx(o.boom > 0 || o.big ? 'boom' : 'hit', o.vfx);
+            this.shake = Math.max(this.shake, o.big ? 6 : 1.5);
+            if (o.big) { this.addP('ring', o.x, o.y, 0, 0, 0.45, o.cl, 1, { r0: 4, r1: o.r * 1.6 }); this.punch = Math.max(this.punch, 0.5); for (let k = 0; k < 12; k++) this.addP('smoke', o.x + rnd(-o.r, o.r) * 0.7, o.y + rnd(-o.r, o.r) * 0.5, rnd(-30, 30), rnd(-40, 0), 0.9, '#3a3450', 3); }
             this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y - 2, o.r));
             if (o.boom > 0) { o.dead = true; this.killObj(Object.assign({}, o, { dead: false, kind: 'drop', y: o.y - 2, split: 0 })); }
           }
@@ -971,6 +1215,132 @@ class Battle {
         case 'chain':
           if (!o.fired) { o.fired = true; this.checkHits(o, (v) => o.path.includes(v.idx)); }
           break;
+        /* ===== 추가 공격 30종: 매 프레임 ===== */
+        case 'thrust': {
+          const c = o.follow;
+          if (!c.alive) { o.dead = true; break; }
+          o.x = c.x; o.y = this.bodyY(c);
+          const p = clamp(1 - o.life / o.max, 0, 1), reach = o.len * Math.min(1, p * 2.6);
+          o.reach = reach;
+          const x1 = o.x + Math.cos(o.ang) * reach, y1 = o.y + Math.sin(o.ang) * reach;
+          if (Math.random() < 0.7) this.vfxTrail(o.vfx, o.color, x1, y1, Math.cos(o.ang) * 60, Math.sin(o.ang) * 60, 0.8);
+          this.checkHits(o, (v) => segDist(v.x, this.bodyY(v), o.x, o.y, x1, y1) <= o.w / 2 + 4 * v.size);
+          break;
+        }
+        case 'flurry':
+          if (Math.random() < 0.8) this.vfxTrail(o.vfx, o.color, o.x + rnd(-o.r, o.r), o.y + rnd(-o.r, o.r) * 0.8 - 4, rnd(-40, 40), rnd(-40, 40), 1);
+          this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
+          break;
+        case 'tornado': {
+          o.x += o.vx * dt; o.y += o.vy * dt;
+          if (o.x < B + 6 || o.x > W - B - 6) { o.vx = -o.vx; o.x = clamp(o.x, B + 6, W - B - 6); }
+          if (o.y < B + 6 || o.y > H - B - 6) { o.vy = -o.vy; o.y = clamp(o.y, B + 6, H - B - 6); }
+          for (let k = 0; k < 2; k++) { const an = this.t * 14 + k * 3.14, rr = rnd(2, o.r); this.addP('px', o.x + Math.cos(an) * rr, o.y - rnd(0, 26), -Math.sin(an) * 50, -30, 0.35, k ? o.color : '#ffffff', 1); }
+          for (const v of this.fighters) if (v.owned && v.alive && v.idx !== o.owner && !v.st.invuln) { const d = Math.hypot(o.x - v.x, o.y - v.y); if (d < o.r * 2 && d > 2) { v.vx += (o.x - v.x) / d * 220 * dt; v.vy += (o.y - v.y) / d * 220 * dt; } }
+          this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
+          break;
+        }
+        case 'fwall':
+          if (Math.random() < 0.9) { const t = Math.random(); this.vfxTrail(o.vfx, o.color, lerp(o.ax, o.bx, t), lerp(o.ay, o.by, t) - 4, 0, -50, 1); }
+          this.checkHits(o, (v) => segDist(v.x, v.y, o.ax, o.ay, o.bx, o.by) <= 5 + 3 * v.size);
+          break;
+        case 'surge': {
+          o.x += o.vx * dt; o.y += o.vy * dt;
+          const ax = o.x - o.sa * o.hw, ay = o.y + o.ca * o.hw * 0.8, bx = o.x + o.sa * o.hw, by = o.y - o.ca * o.hw * 0.8;
+          o.ax = ax; o.ay = ay; o.bx = bx; o.by = by;
+          for (let k = 0; k < 3; k++) { const t = Math.random(); this.addP('smoke', lerp(ax, bx, t), lerp(ay, by, t), o.vx * 0.2, -20, 0.4, k ? o.dk : o.color, 2); }
+          if (this.wallAt(o.x, o.y - 2)) { o.life = Math.min(o.life, 0.05); }
+          this.checkHits(o, (v) => segDist(v.x, v.y, ax, ay, bx, by) <= 6 + 3 * v.size);
+          break;
+        }
+        case 'mark': {
+          const t = this.fighters[o.target];
+          if (t && t.alive) { o.x = t.x; o.y = t.y; }
+          if (!o.trig && o.age >= o.fuse) {
+            o.trig = true;
+            this.vfxImpact(o.vfx, o.color, o.x, o.y - 6, 1.6);
+            this.decal(o.x, o.y + 2, o.r * 0.6, o.dk);
+            this.shake = Math.max(this.shake, 3); this.sfx('boom', o.vfx);
+            this.checkHits(o, (v) => dist2(v.x, this.bodyY(v), o.x, o.y - 6) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
+          }
+          break;
+        }
+        case 'chargev': {
+          const c = o.follow;
+          if (!c.alive) { o.dead = true; break; }
+          o.x = c.x + Math.cos(o.ang) * 6; o.y = this.bodyY(c) + Math.sin(o.ang) * 6;
+          const an = Math.random() * 6.283; this.addP('px', o.x + Math.cos(an) * 18, o.y + Math.sin(an) * 14, -Math.cos(an) * 90, -Math.sin(an) * 70, 0.2, o.cl, 1);
+          break;
+        }
+        case 'storm':
+          o.acc -= dt;
+          while (o.acc <= 0 && o.k < o.pts.length) {
+            o.acc += o.every;
+            const [px, py] = o.pts[o.k++], pts = [[px + rnd(-4, 4), py - 90]];
+            for (let s2 = 1; s2 < 6; s2++) pts.push([px + rnd(-5, 5), py - 90 + s2 * 18]);
+            pts.push([px, py - 3]);
+            this.addP('bolt', px, py, 0, 0, 0.12, o.color, 1, { pts });
+            this.vfxImpact(o.vfx, o.color, px, py - 3, 0.6); this.decal(px, py + 1, 4, o.dk); this.lightFlash(px, py - 6, 26, o.color);
+            this.sfx('hit', 'electric');
+            this.checkHits(o, (v) => dist2(v.x, this.bodyY(v), px, py - 3) <= (o.sr + 4 * v.size) * (o.sr + 4 * v.size));
+          }
+          break;
+        case 'slash':
+          if (!o.trig && o.age >= o.fuse) {
+            o.trig = true;
+            this.sfx('hit', 'metal'); this.shake = Math.max(this.shake, 2);
+            for (let k = 0; k < 10; k++) { const t = k / 9; this.vfxTrail(o.vfx, o.color, lerp(o.x0, o.x1, t), lerp(o.y0, o.y1, t), rnd(-30, 30), rnd(-30, 30), 1); }
+            this.checkHits(o, (v) => segDist(v.x, this.bodyY(v), o.x0, o.y0, o.x1, o.y1) <= 7 + 4 * v.size);
+          }
+          break;
+        case 'whip': {
+          const c = o.follow;
+          if (!c.alive) { o.dead = true; break; }
+          o.x = c.x; o.y = this.bodyY(c);
+          const pts = this.whipPts(o);
+          o.pts = pts;
+          const tip = pts[pts.length - 1];
+          if (Math.random() < 0.8) this.vfxTrail(o.vfx, o.color, tip[0], tip[1], 0, 0, 1);
+          this.checkHits(o, (v) => { const bx = v.x, by = this.bodyY(v); for (let k = 1; k < pts.length; k++) if (segDist(bx, by, pts[k - 1][0], pts[k - 1][1], pts[k][0], pts[k][1]) <= 4 + 4 * v.size) return true; return false; });
+          break;
+        }
+        case 'top': {
+          const px = o.x, py = o.y;
+          o.x += o.vx * dt; o.y += o.vy * dt;
+          if (o.x < B + 4 || o.x > W - B - 4) { o.vx = -o.vx; o.x = px; }
+          if (o.y < B + 4 || o.y > H - B - 4) { o.vy = -o.vy; o.y = py; }
+          const w = this.wallAt(o.x, o.y - 2);
+          if (w) { if (px < w.x || px > w.x + w.w) o.vx = -o.vx; else o.vy = -o.vy; o.x = px; o.y = py; this.vfxImpact(o.vfx, o.color, o.x, o.y - 3, 0.3); }
+          if (Math.random() < 0.6) this.addP('px', o.x + rnd(-3, 3), o.y, rnd(-30, 30), rnd(-10, 0), 0.25, o.cl, 1);
+          this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y - 3, o.r));
+          break;
+        }
+        case 'beacon':
+          o.pulse -= dt;
+          if (o.pulse <= 0) {
+            o.pulse = o.rate;
+            this.objs.push({ uid: o.uid + 'w' + (o.pn++), owner: o.owner, kind: 'wave', dmg: o.dmg, mul: o.mul, st: o.st, kb: o.kb, color: o.color, cl: o.cl, dk: o.dk, rows: o.rows, gm: o.gm, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0, delay: 0, x: o.x, y: o.y, r: o.r, cur: 2, prev: 0, life: 0.42, max: 0.42 });
+          }
+          break;
+        case 'snipe':
+          if (!o.trig && o.age >= o.fuse) {
+            o.trig = true;
+            const x1 = o.x + Math.cos(o.ang) * o.len, y1 = o.y + Math.sin(o.ang) * o.len;
+            this.shake = Math.max(this.shake, 3); this.sfx('bighit'); this.lightFlash(o.x, o.y, 40, o.color);
+            for (let k = 0; k < 12; k++) { const t = Math.random(); this.addP('streak', lerp(o.x, x1, t), lerp(o.y, y1, t), Math.cos(o.ang) * 200, Math.sin(o.ang) * 200, 0.25, '#ffffff', 1); }
+            this.checkHits(o, (v) => segDist(v.x, this.bodyY(v), o.x, o.y, x1, y1) <= o.w / 2 + 4 * v.size);
+          }
+          break;
+        case 'drain': {
+          const c = o.follow, t = this.fighters[o.target];
+          if (!c.alive || !t || !t.alive || Math.hypot(t.x - c.x, t.y - c.y) > o.range * 1.35) { o.dead = true; break; }
+          o.x = c.x; o.y = this.bodyY(c);
+          if (Math.random() < 0.6) { const k = Math.random(); this.addP('px', lerp(t.x, c.x, k), lerp(this.bodyY(t), o.y, k), (c.x - t.x) * 1.5, (o.y - this.bodyY(t)) * 1.5, 0.2, o.cl, 1); }
+          this.checkHits(o, (v) => v.idx === o.target);
+          if (c.owned && o.healAmt > 0) { o.hacc += dt; if (o.hacc >= o.every) { o.hacc -= o.every; this.heal(c, o.healAmt, true); } }
+          break;
+        }
+
         case 'beam': {
           const c = o.follow;
           if (!c.alive) { o.dead = true; break; }
@@ -994,13 +1364,16 @@ class Battle {
               this.decal(o.x, o.y + 3, o.r * 0.6, o.dk);
               this.shake = Math.max(this.shake, Math.min(5, o.r / 9));
               this.sfx('boom', o.vfx);
+              if (o.land) { this.addP('ring', o.x, o.y + 4, 0, 0, 0.45, o.cl, 1, { r0: 4, r1: o.r * 1.5 }); this.shake = Math.max(this.shake, 4); }
               this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y, o.r));
             }
           }
           break;
         case 'zone': {
           if (o.follow) { if (!o.follow.alive) { o.dead = true; break; } o.x = o.follow.x; o.y = o.follow.y - 1; }
-          if (o.dmg > 0 || o.st) this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 3 * v.size) * (o.r + 3 * v.size));
+          if (o.pull) for (const v of this.fighters) if (v.owned && v.alive && v.idx !== o.owner && !v.st.invuln) { const d = Math.hypot(o.x - v.x, o.y - v.y); if (d < o.r * 1.5 && d > 3) { v.vx += (o.x - v.x) / d * o.pull * 9 * dt; v.vy += (o.y - v.y) / d * o.pull * 9 * dt; } }
+          if (o.ring) { if (o.dmg > 0 || o.st) this.checkHits(o, (v) => Math.abs(Math.hypot(v.x - o.x, (v.y - o.y) / 0.8) - o.r) <= o.ring + 3 * v.size); }
+          else if (o.dmg > 0 || o.st) this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 3 * v.size) * (o.r + 3 * v.size));
           if (o.heal > 0 && ow && ow.owned && ow.alive && dist2(ow.x, ow.y, o.x, o.y) <= o.r * o.r) {
             o.healT = (o.healT || 0) + dt;
             if (o.healT >= 0.5) { o.healT -= 0.5; this.heal(ow, o.heal, true); }
@@ -1043,6 +1416,10 @@ class Battle {
           o.x += o.vx * dt; o.y += o.vy * dt;
           this.solid(o, 3, false);
           if (Math.random() < 0.3) this.vfxTrail(o.vfx, o.color, o.x, o.y - 3, 0, 0, 0.6);
+          if (o.clone != null) {
+            if (t && dist2(t.x, t.y, o.x, o.y) < 100) { this.killObj(o); this.shake = Math.max(this.shake, 2); }
+            break;
+          }
           this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y - 3, o.r));
           break;
         }
@@ -1076,7 +1453,8 @@ class Battle {
           break;
       }
       if (o.life <= 0 && !o.dead) {
-        if (o.kind === 'mine' || o.kind === 'turret' || o.kind === 'chaser' || o.kind === 'barrier') this.vfxImpact(o.vfx, o.color, o.x, o.y - 3, 0.5);
+        if (o.kind === 'mine' || o.kind === 'turret' || o.kind === 'chaser' || o.kind === 'barrier' || o.kind === 'top' || o.kind === 'beacon') this.vfxImpact(o.vfx, o.color, o.x, o.y - 3, 0.5);
+        if (o.clone != null) { this.killObj(o); continue; }
         o.dead = true;
       }
     }
@@ -1437,11 +1815,14 @@ class Battle {
         g.drawImage(discCanvas(r, o.color, Math.floor(T * 8) % 3), ox - r, oy - r);
         if (!o.puddle && !o.aura) { g.globalAlpha = 0.35 * fadeOut; g.drawImage(discCanvas(Math.round(r * 0.6), o.cl, Math.floor(T * 12) % 3), ox - Math.round(r * 0.6), oy - Math.round(r * 0.6)); }
         g.globalAlpha = (o.aura ? 0.35 : 0.95) * fadeOut;
-        if (!o.puddle) { pixRing(g, ox, oy, r, o.color, 2); dashRing(g, ox, oy, r - 4, o.cl, T * 12); pixRing(g, ox, oy, r * (0.3 + 0.7 * ((T * 0.9) % 1)), o.cl); }
+        if (o.swirl) { for (let k = 0; k < 4; k++) { const an = -T * 5 + k * 1.57; g.strokeStyle = k & 1 ? o.cl : '#ffffff'; g.lineWidth = 2; g.beginPath(); for (let q = 0; q <= 20; q++) { const t = q / 20, rr = r * (1 - t), a2 = an + t * 4; const px = ox + Math.cos(a2) * rr, py = oy + Math.sin(a2) * rr * 0.8; if (q) g.lineTo(px, py); else g.moveTo(px, py); } g.stroke(); } }
+        else if (o.ring) { const n = Math.max(30, Math.round(r / 2)); for (let k = 0; k < n; k++) { const an = k / n * 6.283, h = 6 + Math.abs(Math.sin(T * 12 + k)) * 10, px = Math.round(ox + Math.cos(an) * r), py = Math.round(oy + Math.sin(an) * r * 0.8); g.fillStyle = o.color; g.fillRect(px - 2, py - h, 4, h); g.fillStyle = o.cl; g.fillRect(px - 1, py - h + 2, 2, h - 3); } }
+        else if (o.netz) { for (let k = -4; k <= 4; k++) { this.line(g, ox + k * r / 4 - r * 0.3, oy - r * 0.7, ox + k * r / 4 + r * 0.3, oy + r * 0.7, '#e8e8f0', 1); this.line(g, ox - r * 0.9, oy + k * r / 5, ox + r * 0.9, oy + k * r / 5, '#e8e8f0', 1); } pixRing(g, ox, oy, r, '#ffffff', 2); }
+        else if (!o.puddle) { pixRing(g, ox, oy, r, o.color, 2); dashRing(g, ox, oy, r - 4, o.cl, T * 12); pixRing(g, ox, oy, r * (0.3 + 0.7 * ((T * 0.9) % 1)), o.cl); }
         else pixRing(g, ox, oy, r, o.dk);
         g.globalAlpha = 1;
       } else if (o.kind === 'drop' && !o.trig) {
-        const p = o.delay > 0 ? 0 : 1 - o.fall / 0.42, r = X(o.r);
+        const p = o.delay > 0 ? 0 : clamp(1 - o.fall / (o.fall0 || 0.42), 0, 1), r = X(o.r);
         g.globalAlpha = 0.25 + 0.3 * p; fillEll(g, ox, oy, r * (0.4 + 0.6 * p), r * (0.25 + 0.35 * p), '#000000'); g.globalAlpha = 1;
         if (Math.floor(T * 14) & 1) dashRing(g, ox, oy, r, o.color, T * 20);
         pixRing(g, ox, oy, Math.max(1, r * p), o.cl);
@@ -1465,6 +1846,34 @@ class Battle {
         g.globalAlpha = 0.85 * fade;
         for (let k = 0; k <= 10; k++) { const an = o.ang - half + (o.arc * k) / 10, wob = Math.sin(T * 30 + k) * 3; g.fillStyle = k & 1 ? o.cl : o.color; g.fillRect(Math.round(ox + Math.cos(an) * (L + wob)) - 1, Math.round(oy + Math.sin(an) * (L + wob) * 0.8) - 1, 3, 3); }
         g.globalAlpha = 1;
+      } else if (o.kind === 'flurry') {
+        const R = X(o.r), fade = Math.min(1, o.life / 0.1);
+        g.globalAlpha = 0.18 * fade; g.drawImage(discCanvas(R, o.color, 0), ox - R, oy - R); g.globalAlpha = fade;
+        for (let k = 0; k < 5; k++) { const a1 = Math.random() * 6.283, a2 = a1 + Math.PI + rnd(-0.5, 0.5), r1 = R * rnd(0.6, 1), r2 = R * rnd(0.6, 1); this.line(g, ox + Math.cos(a1) * r1, oy - 12 + Math.sin(a1) * r1 * 0.8, ox + Math.cos(a2) * r2, oy - 12 + Math.sin(a2) * r2 * 0.8, k & 1 ? '#ffffff' : o.color, 2); }
+        g.globalAlpha = 1;
+      } else if (o.kind === 'tornado') {
+        const R = X(o.r);
+        g.globalAlpha = 0.3; fillEll(g, ox, oy + 2, R, R * 0.4, '#000000'); g.globalAlpha = 1;
+        for (let k = 0; k < 7; k++) { const h = k * 9, rr = R * (0.35 + k * 0.12), an = T * 16 + k; g.globalAlpha = 0.8; g.strokeStyle = k & 1 ? o.cl : o.color; g.lineWidth = 3; g.beginPath(); g.ellipse(ox + Math.sin(T * 6 + k) * 3, oy - h, rr, rr * 0.35, 0, an, an + 4.2); g.stroke(); }
+        g.globalAlpha = 1;
+      } else if (o.kind === 'fwall') {
+        const n = 14, fade = Math.min(1, o.life / 0.3, o.age / 0.1);
+        for (let k = 0; k <= n; k++) { const t = k / n, px = X(lerp(o.ax, o.bx, t)), py = X(lerp(o.ay, o.by, t)), h = 10 + Math.abs(Math.sin(T * 14 + k * 1.7)) * 16; g.globalAlpha = fade; g.fillStyle = o.dk; g.fillRect(px - 4, py - h, 8, h); g.fillStyle = o.color; g.fillRect(px - 3, py - h + 2, 6, h - 2); g.fillStyle = o.cl; g.fillRect(px - 1, py - h + 4, 2, h - 6); }
+        g.globalAlpha = 1;
+      } else if (o.kind === 'surge' && o.ax != null) {
+        const n = 10;
+        for (let k = 0; k <= n; k++) { const t = k / n, px = X(lerp(o.ax, o.bx, t)), py = X(lerp(o.ay, o.by, t)), h = 8 + Math.abs(Math.sin(T * 20 + k)) * 10; g.fillStyle = o.dk; g.fillRect(px - 4, py - h, 8, h + 2); g.fillStyle = o.color; g.fillRect(px - 3, py - h, 6, h - 2); g.fillStyle = '#ffffff'; g.fillRect(px - 3, py - h, 6, 2); }
+      } else if (o.kind === 'mark') {
+        const R = X(o.r), p = clamp(o.age / o.fuse, 0, 1);
+        if (!o.trig) { dashRing(g, ox, oy, R, (Math.floor(T * (6 + p * 20)) & 1) ? '#ffffff' : o.color, T * 6); pixRing(g, ox, oy, Math.max(2, R * (1 - p)), o.cl, 2); for (let k = 0; k < 4; k++) { const an = k * Math.PI / 2 + T * 3; this.line(g, ox + Math.cos(an) * (R + 4), oy + Math.sin(an) * (R + 4), ox + Math.cos(an) * (R - 6), oy + Math.sin(an) * (R - 6), '#ff4d6d', 2); } }
+      } else if (o.kind === 'slash') {
+        const x0 = X(o.x0), y0 = X(o.y0), x1 = X(o.x1), y1 = X(o.y1);
+        if (!o.trig) { if (Math.floor(T * 20) & 1) { g.globalAlpha = 0.6; this.line(g, x0, y0, x1, y1, o.color, 1); g.globalAlpha = 1; } }
+        else { const p = clamp((o.age - o.fuse) / 0.25, 0, 1); g.globalAlpha = 1 - p; this.line(g, x0, y0, x1, y1, o.color, Math.round(9 * (1 - p)) + 2); this.line(g, x0, y0, x1, y1, '#ffffff', Math.round(4 * (1 - p)) + 1); g.globalAlpha = 1; }
+      } else if (o.kind === 'snipe') {
+        const x1 = X(o.x + Math.cos(o.ang) * o.len), y1 = X(o.y + Math.sin(o.ang) * o.len);
+        if (!o.trig) { const p = clamp(o.age / o.fuse, 0, 1); g.globalAlpha = 0.4 + 0.6 * p; this.line(g, ox, oy, x1, y1, (Math.floor(T * 24) & 1) ? '#ff4d6d' : '#ffffff', 1); fillDisc(g, ox, oy, 3 + Math.round(p * 5), o.color); g.globalAlpha = 1; }
+        else { const p = clamp((o.age - o.fuse) / 0.25, 0, 1); g.globalAlpha = 1 - p; this.line(g, ox, oy, x1, y1, o.color, Math.round(14 * (1 - p)) + 2); this.line(g, ox, oy, x1, y1, '#ffffff', Math.round(6 * (1 - p)) + 1); g.globalAlpha = 1; }
       } else if (o.kind === 'circle') {
         const p = 1 - o.life / o.max, r = X(o.r) * (0.5 + 0.5 * Math.min(1, p * 3));
         this.runeCircle(g, ox, oy, r, o.color, o.cl, T, Math.min(1, o.life / 0.15));
@@ -1478,7 +1887,7 @@ class Battle {
     const list = [];
     for (const f of this.fighters) if (!f.gone) list.push({ y: f.y, f });
     for (const w of m.walls) list.push({ y: w.key, w });
-    for (const o of objs) if (o.delay <= 0 && (o.kind === 'barrier' || o.kind === 'turret' || o.kind === 'chaser' || o.kind === 'pest')) list.push({ y: o.y, o });
+    for (const o of objs) if (o.delay <= 0 && (o.kind === 'barrier' || o.kind === 'turret' || o.kind === 'chaser' || o.kind === 'pest' || o.kind === 'top' || o.kind === 'beacon')) list.push({ y: o.y, o });
     for (const p of this.parts) if (p.k === 'after') list.push({ y: p.y - 0.1, p });
     list.sort((p, q) => p.y - q.y);
     for (const it of list) {
@@ -1509,6 +1918,20 @@ class Battle {
         g.fillStyle = '#2a2440'; g.fillRect(x - 10, y - 8, 21, 9); g.fillStyle = '#4a3f8f'; g.fillRect(x - 10, y - 8, 21, 2); g.fillStyle = '#15122b'; g.fillRect(x - 10, y, 21, 1);
         g.fillStyle = o.color; g.fillRect(x - 2, y - 5, 5, 2);
         drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - 18, 1, rotOf(Math.cos(o.aimA), Math.sin(o.aimA)));
+      } else if (o.kind === 'top') {
+        fillEll(g, x, y + 2, 9, 3, 'rgba(0,0,0,0.35)');
+        const wob = Math.sin(T * 30 + o.ph) * 2;
+        g.fillStyle = o.dk; g.fillRect(x - 1, y - 8, 3, 8);
+        drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x + wob, y - 16, 2, Math.floor(T * 20) & 3);
+      } else if (o.kind === 'beacon') {
+        const pulse = 1 - clamp(o.pulse / o.rate, 0, 1);
+        fillEll(g, x, y + 2, 10, 3, 'rgba(0,0,0,0.35)');
+        g.fillStyle = '#2a2440'; g.fillRect(x - 6, y - 14, 13, 14); g.fillStyle = o.color; g.fillRect(x - 4, y - 12, 9, 2); g.fillStyle = o.cl; g.fillRect(x - 2, y - 30, 5, 16);
+        g.globalAlpha = 0.4 + pulse * 0.6; fillDisc(g, x, y - 34, 6 + Math.round(pulse * 5), o.cl); g.globalAlpha = 1;
+        drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - 44, 1, 0);
+      } else if (o.clone != null) {
+        const cf = this.fighters[o.clone];
+        if (cf && cf.spr) { const sz = cf.size; g.globalAlpha = 0.75; g.drawImage(cf.spr, 0, 0, SW, SH, x - Math.round(OX * sz), y - Math.round(OY * sz) - Math.round(Math.abs(Math.sin(T * 14 + o.ph)) * 4), Math.round(SW * sz), Math.round(SH * sz)); g.globalAlpha = 1; dashRing(g, x, y, 10, o.color, T * 10); }
       } else {
         const hop = Math.abs(Math.sin((T + o.hop) * (o.kind === 'pest' ? 10 : 12))) * 9;
         fillEll(g, x, y + 1, 7, 2, 'rgba(0,0,0,0.35)');
@@ -1521,7 +1944,9 @@ class Battle {
       const x = X(o.x), y = X(o.y);
       switch (o.kind) {
         case 'shot': {
-          const big = o.r >= 3 ? 2 : 1, rows = moveRows(o.gm, T + o.ph);
+          const big = o.roll ? 3 : o.charged ? 3 : o.r >= 3 ? 2 : 1, rows = moveRows(o.gm, T + o.ph);
+          if (o.roll || o.charged) { fillEll(g, x, y + 14 + X(o.r), 8 + X(o.r), 4, 'rgba(0,0,0,0.3)'); if (o.charged) { g.globalAlpha = 0.6; fillDisc(g, x, y, 22 + Math.round(Math.sin(T * 30) * 3), o.color); fillDisc(g, x, y, 14, o.cl); g.globalAlpha = 1; } drawGlyph(g, rows, o.color, x, y, big, o.roll ? (Math.floor(T * 10) & 3) : rotOf(o.vx, o.vy)); break; }
+          if (o.net) { g.globalAlpha = 0.9; for (let k = -2; k <= 2; k++) { this.line(g, x + k * 4, y - 9, x + k * 4, y + 9, '#e8e8f0', 1); this.line(g, x - 9, y + k * 4, x + 9, y + k * 4, '#e8e8f0', 1); } g.globalAlpha = 1; }
           if (o.hook) {
             const ow = this.fighters[o.owner];
             if (ow) { const hx = X(ow.x), hy = X(this.bodyY(ow)), n = Math.max(2, Math.round(Math.hypot(x - hx, y - hy) / 6)); for (let k = 0; k <= n; k++) { g.fillStyle = k & 1 ? o.dk : '#d8d8e8'; g.fillRect(Math.round(hx + (x - hx) * k / n) - 1, Math.round(hy + (y - hy) * k / n) - 1, 3, 3); } }
@@ -1540,7 +1965,7 @@ class Battle {
           else drawGlyph(g, rows, o.color, x, y, big, o.spin ? (Math.floor(T * 16) & 3) : rotOf(o.vx, o.vy));
           break;
         }
-        case 'drop': if (!o.trig) { const hh = Math.max(0, o.fall) * 180 * RS; drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - 9 - hh, 1, 1); } break;
+        case 'drop': if (!o.trig) { const hh = Math.max(0, o.fall) * 180 * RS; drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - (o.big ? 30 : 9) - hh, o.big ? 3 : 1, 1); if (o.big && Math.random() < 0.8) this.addP('smoke', o.x + rnd(-4, 4), o.y - 10 - o.fall * 180, rnd(-10, 10), -20, 0.5, '#ff9a4a', 2); } break;
         case 'swing': {
           if (o.cur == null) break;
           const half = o.arc / 2, a0 = o.ang - o.dirS * half, a1 = o.cur, R = X(o.r), Ri = R * 0.42, fade = Math.min(1, o.life / 0.08 + 0.3);
@@ -1586,6 +2011,41 @@ class Battle {
           break;
         }
         case 'orbit': drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y, 1, (Math.floor(T * 10) & 3)); break;
+        case 'thrust': {
+          if (o.reach == null) break;
+          const ca = Math.cos(o.ang), sa = Math.sin(o.ang), x1 = x + ca * X(o.reach), y1 = y + sa * X(o.reach), w = Math.max(2, Math.round(o.w * RS * 0.6));
+          this.line(g, x + ca * 10, y + sa * 10, x1, y1, o.dk, w + 2); this.line(g, x + ca * 10, y + sa * 10, x1, y1, o.color, w); this.line(g, x + ca * 10, y + sa * 10, x1, y1, '#ffffff', 1);
+          drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x1, y1, 1, rotOf(ca, sa));
+          for (let k = 0; k < 3; k++) { const an = o.ang + Math.PI + rnd(-0.6, 0.6); this.line(g, x1, y1, x1 + Math.cos(an) * 10, y1 + Math.sin(an) * 10, '#ffffff', 1); }
+          break;
+        }
+        case 'whip': {
+          if (!o.pts) break;
+          for (let k = 1; k < o.pts.length; k++) { const [ax, ay] = o.pts[k - 1], [bx, by] = o.pts[k]; this.line(g, X(ax), X(ay), X(bx), X(by), o.dk, 4); this.line(g, X(ax), X(ay), X(bx), X(by), k > 5 ? o.cl : o.color, 2); }
+          const tip = o.pts[o.pts.length - 1];
+          drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, X(tip[0]), X(tip[1]), 1, Math.floor(T * 20) & 3);
+          if (o.life / o.max < 0.45) for (let k = 0; k < 5; k++) { const an = k * 1.256 + T * 9; this.line(g, X(tip[0]), X(tip[1]), X(tip[0]) + Math.cos(an) * 12, X(tip[1]) + Math.sin(an) * 12, '#ffffff', 1); }
+          break;
+        }
+        case 'chargev': {
+          const p = clamp(1 - o.life / o.max, 0, 1), r = Math.round(4 + p * 16);
+          g.globalAlpha = 0.5; fillDisc(g, x, y, r + 6, o.color); g.globalAlpha = 1; fillDisc(g, x, y, r, o.cl); fillDisc(g, x, y, Math.max(1, r - 5), '#ffffff');
+          pixRing(g, x, y, r + 10 - Math.round((T * 60) % 10), o.color, 1);
+          break;
+        }
+        case 'drain': {
+          const t = this.fighters[o.target];
+          if (!t) break;
+          const tx = X(t.x), ty = X(this.bodyY(t)), n = 16;
+          let px = x, py = y;
+          for (let k = 1; k <= n; k++) { const q = k / n, wob = Math.sin(q * 12 + T * 20) * 5 * Math.sin(q * Math.PI), qx = x + (tx - x) * q - (ty - y) / Math.max(1, Math.hypot(tx - x, ty - y)) * wob, qy = y + (ty - y) * q + (tx - x) / Math.max(1, Math.hypot(tx - x, ty - y)) * wob; this.line(g, px, py, qx, qy, k & 1 ? o.color : o.cl, 3); px = qx; py = qy; }
+          fillDisc(g, tx, ty, 6, o.color); fillDisc(g, tx, ty, 3, '#ffffff');
+          break;
+        }
+        case 'storm':
+          if (o.life > 0.2) { const R = X(o.cloudR); g.globalAlpha = 0.55; for (let k = 0; k < 6; k++) fillEll(g, x + Math.cos(k * 1.05 + T) * R * 0.5, y - X(90) + Math.sin(k * 2.1) * 6, R * 0.45, 12, k & 1 ? '#3a3450' : '#5a5470'); g.globalAlpha = 1; }
+          break;
+
         case 'beam': {
           const fade = clamp(o.life / 0.1, 0.25, 1), start = clamp(o.age / 0.06, 0.3, 1);
           const w = Math.max(2, Math.round(o.w * RS * (0.8 + 0.2 * Math.sin(T * 50)) * fade * start));
@@ -1742,7 +2202,10 @@ class Battle {
     const X = (v) => Math.round(v * RS);
     const sz = f.size;
     const hopU = f.moveMode === 'hop' && f.alive && Math.hypot(f.x - f.px, f.y - f.py) > 0.3 ? Math.abs(Math.sin(T * 9 + f.seed)) * 4 : 0;
-    const fx = X(f.x + (f.st.dance ? Math.sin(T * 18) * 1.5 : 0)), fy = X(f.y), lift = X(hopU);
+    let airU = f.st.air ? 10 + Math.sin(T * 9) * 2 : 0;
+    if (f.leap) airU = Math.sin(Math.min(1, f.leap.t / f.leap.dur) * Math.PI) * f.leap.h;
+    else if (f.leapVis) { const p = (T - f.leapVis.t0) / f.leapVis.dur; if (p >= 0 && p <= 1) airU = Math.sin(p * Math.PI) * f.leapVis.h; else f.leapVis = null; }
+    const fx = X(f.x + (f.st.dance ? Math.sin(T * 18) * 1.5 : 0)), fy = X(f.y), lift = X(hopU + airU);
     // 허수아비: 발밑 과녁과 나무 기둥
     if (f.dummy && f.alive) {
       for (const [r, c] of [[18, '#ff4d6d'], [12, '#f6edd9'], [6, '#ff4d6d']]) {
@@ -1985,6 +2448,13 @@ class Battle {
       case 'chain': return e.range * 0.7;
       case 'hook': return e.range * 0.6;
       case 'lob': return 100;
+      case 'thrust': case 'whip': return (e.len || 40) * 0.7;
+      case 'launch': case 'flurry': return 20;
+      case 'leap': case 'phantom': return e.dist * 0.7;
+      case 'meteor': case 'mark': case 'storm': case 'cross': return 110;
+      case 'snipe': case 'gatling': case 'spiral': case 'missiles': case 'charge': case 'net': return 100;
+      case 'prism': return e.len * 0.6;
+      case 'gust': return e.len * 0.5;
     }
     return 60;
   }
@@ -2041,6 +2511,22 @@ class Battle {
         case 'chain': return d < e.range * 1.2;
         case 'hook': return d < e.range && d > 30;
         case 'lob': return d < 180;
+        case 'thrust': return d < e.len + 8;
+        case 'whip': return d < e.len + 6;
+        case 'launch': return d < e.off + e.r + 6;
+        case 'flurry': return Math.abs(d - e.off) < e.r + 8;
+        case 'leap': case 'phantom': return d < e.dist + 20;
+        case 'meteor': case 'storm': case 'cross': return d < 180;
+        case 'mark': return d < e.range;
+        case 'spikering': return e.at === 'self' ? d < e.r + 10 : d < 170;
+        case 'tornado': case 'roll': case 'surge': case 'missiles': case 'charge': case 'snipe': case 'gatling': case 'spiral': case 'net': return d < 200;
+        case 'firewall': return d < e.off + 40;
+        case 'clone': case 'top': case 'beacon': return d < 160;
+        case 'vortex': case 'ring': return e.at === 'self' ? d < e.r + 10 : d < 170;
+        case 'prism': return d < e.len;
+        case 'skyline': return d < 22 + e.n * e.step;
+        case 'gust': return d < e.len;
+        case 'drain': return d < e.range;
       }
       return false;
     };
