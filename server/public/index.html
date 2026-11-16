@@ -1471,7 +1471,9 @@ function nounsOf(text) {
   for (let w of String(text || '').replace(/[^\p{L}\p{N}\s]/gu, ' ').split(/\s+/)) {
     if (!w) continue;
     if (/(다|요|함|기|게|고|며|면|서|니|지|자|죠|네)$/.test(w) && w.length > 1 && !PARTICLE.test(w)) continue; // 동사·형용사
-    const stem = w.replace(PARTICLE, '') || w;
+    const stem = w.replace(PARTICLE, '');
+    if (!stem) continue;
+    if (/(어|아|워|와|여|해|려|러)$/.test(stem) && stem.length > 1 && !LEX.some(([re]) => re.test(stem))) continue;
     if (stem.length < 1 || STOP.has(stem) || /^\d+$/.test(stem)) continue;
     if (/(하|되|시키|당하|만들|부리|다루)$/.test(stem)) continue;
     if (!out.includes(stem)) out.push(stem);
@@ -1481,79 +1483,207 @@ function nounsOf(text) {
 const cut = (w, n) => Array.from(w).slice(0, n).join('');
 function hashText(t) { let h = 2166136261; for (const ch of String(t)) { h ^= ch.codePointAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
 
-/* ----- 기술 틀: 이름 짓기와 효과 만들기 ----- */
-const NAME_T = {
-  shot: ['{n} 던지기', '{n} 발사', '{n} 탄', '{n} 투척'],
-  rain: ['{n} 소나기', '하늘에서 {n}', '{n} 우박', '{n} 폭우'],
-  beam: ['{n} 광선', '{n} 빔', '{n} 레이저'],
-  boom: ['{n} 폭탄', '{n} 대폭발', '{n} 펑'],
-  zone: ['{n} 장판', '{n} 웅덩이', '{n} 구역', '{n} 안개'],
-  summon: ['{n} 군단', '{n} 소환', '{n} 친구들'],
-  turret: ['{n} 포탑', '{n} 설치'],
-  mine: ['{n} 지뢰', '{n} 함정'],
-  orbit: ['{n} 회전', '빙빙 {n}'],
-  dash: ['{n} 돌진', '{n} 박치기', '{n} 태클'],
-  blink: ['{n} 순간이동', '{n} 워프'],
-  invis: ['{n} 숨바꼭질', '{n} 은신'],
-  heal: ['{n} 충전', '{n} 회복', '{n} 먹기'],
-  shield: ['{n} 방패', '{n} 철벽', '{n} 갑옷'],
-  pull: ['{n} 블랙홀', '{n} 흡입', '{n} 당기기'],
-  big: ['거대 {n}', '{n} 뻥튀기'],
-  tiny: ['꼬마 {n}', '{n} 축소'],
-  haste: ['{n} 질주', '{n} 부스터'],
-  fly: ['{n} 비행', '날아라 {n}'],
-  trail: ['{n} 흔적', '{n} 길'],
-  swap: ['{n} 바꿔치기'],
-  reflect: ['{n} 반사'],
-  all: ['{n} 대참사', '온 세상 {n}', '{n} 대재앙'],
+
+/* ----- 전투 유형: 글의 의도를 보고 고른다. 유형마다 기술 네 개의 짜임·능력치·특성이 다르다 -----
+   fx(P, S, o): P = 위력 배율, S = 상태이상(글에서 찾은 것 또는 소재 기본), o = 글의 세부 옵션 */
+const SX = (S, d) => (S ? { k: S, d } : null);
+const STYLES = {
+  gunner: {
+    re: /총|저격|쏘|쏜|쏴|발사|활|화살|사격|명중|스나이퍼|탄|헤드샷/, keys: ['metal', 'ball'], mech: ['shot'],
+    title: ['스나이퍼', '총잡이', '명사수'], stats: { hp: 90, speed: 1.05 }, passive: 'crit', weapon: 'gun',
+    basic: { m: 'shot', fx: (P, S, o) => [{ t: 'shot', dmg: 7 * P, speed: 320, size: 1, pierce: o.pierce, homing: o.homing ? 0.4 : 0 }], name: ['{n} 따발총', '{n} 연사', '{n} 탕탕'], desc: ['{n을} 기관총처럼 갈긴다. 탄창 개념 없음', '{n을} 빛의 속도로 쏜다. 조준은 감'] },
+    s1: { m: 'shot', fx: (P, S, o) => [{ t: 'shot', dmg: 9 * P, n: 3, spread: 36, speed: 280, size: 2, bounce: 2, st: SX(S, 1.2) }], name: ['{n} 샷건', '{n} 3연발', '{n} 산탄'], desc: ['{n} 세 발을 부채꼴로 뿌린다. 벽에 맞으면 튕긴다'] },
+    s2: { m: 'blink', fx: (P) => [{ t: 'blink', to: 'back', dist: 90 }, { t: 'summon', kind: 'mine', n: 2, dmg: 11 * P, dur: 9 }], name: ['전략적 {n} 후퇴', '{n} 백스텝'], desc: ['뒤로 빠지면서 {n} 지뢰를 놓고 간다. 비겁하지만 효과적'] },
+    ult: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 10 * P, len: 320, w: 6, ticks: 4, dur: 0.6, kb: 6, st: SX(S || 'stun', 1.5) }], name: ['{n} 레일건', '{n} 헤드샷', '{n} 저격 한 방'], desc: ['맵 끝까지 꿰뚫는 {n} 한 발. 벽 따윈 신경 안 쓴다'] },
+  },
+  bomber: {
+    re: /폭탄|폭발|터뜨|터지|터진|펑|폭파|다이너마이트|수류탄|폭죽|불꽃놀이|자폭/, keys: ['fire'], mech: ['boom'],
+    title: ['폭탄마', '불꽃놀이 장인', '철거 전문가'], stats: { hp: 100, speed: 1 }, passive: 'rage', weapon: 'none',
+    basic: { m: 'boom', fx: (P, S) => [{ t: 'blast', at: 'front', off: 34, r: 14, dmg: 9 * P, delay: 0.25, kb: 5, st: SX(S, 0.8) }], name: ['{n} 수류탄', '{n} 딱총', '{n} 폭죽'], desc: ['{n을} 던지면 앞에서 펑! 터진다'] },
+    s1: { m: 'boom', fx: (P, S) => [{ t: 'shot', dmg: 10 * P, size: 3, speed: 210, boom: 22, split: 4, st: SX(S, 1.2) }], name: ['{n} 집속탄', '{n} 분열 폭탄'], desc: ['{n} 폭탄이 터지면서 작은 {n} 네 개로 갈라진다'] },
+    s2: { m: 'mine', fx: (P) => [{ t: 'summon', kind: 'mine', n: 3, dmg: 12 * P, dur: 10 }, { t: 'blink', to: 'back', dist: 60 }], name: ['{n} 지뢰밭', '{n} 깜짝 선물'], desc: ['{n} 지뢰를 깔고 튄다. 밟는 사람 책임'] },
+    ult: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 8, dmg: 8 * P, size: 3, boom: 18, speed: 240, st: SX(S, 1.5) }, { t: 'all', dmg: 3 * P, st: SX(S || 'stun', 1) }], name: ['{n} 융단 폭격', '{n} 불꽃놀이 대참사'], desc: ['하늘에서 {n} 폭탄이 비처럼 쏟아진다. 대피는 늦었다'] },
+  },
+  summoner: {
+    re: /소환|부르|불러|군단|부하|떼|무리|친구들|키우|애완|펫|동물|조련/, keys: ['animal', 'bug'], mech: ['summon'],
+    title: ['조련사', '군단장', '동물원 원장'], stats: { hp: 95, speed: 0.95 }, passive: 'aura', weapon: 'staff',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 220, size: 2, homing: 0.6, st: SX(S, 0.8) }], name: ['{n} 물어!', '{n} 던지기', '{n} 출동'], desc: ['{n} 한 마리를 던진다. 알아서 따라가서 문다'] },
+    s1: { m: 'summon', fx: (P, S, o) => [{ t: 'summon', kind: 'chaser', n: Math.max(3, Math.min(o.n, 4)), dmg: 7 * P, dur: 7, st: SX(S, 1) }], name: ['{n} 군단', '{n} 우르르', '{n} 친구들'], desc: ['{n}들이 우르르 몰려가 들이받는다'] },
+    s2: { m: 'orbit', fx: (P) => [{ t: 'summon', kind: 'orbit', n: 3, dmg: 5 * P, dur: 6 }, { t: 'buff', k: 'shield', d: 3, pow: 20 }], name: ['{n} 경호원', '{n} 호위대'], desc: ['{n} 경호원들이 주위를 빙빙 돌며 지켜 준다'] },
+    ult: { m: 'summon', fx: (P, S) => [{ t: 'summon', kind: 'chaser', n: 4, dmg: 9 * P, dur: 9, st: SX(S, 1.4) }, { t: 'summon', kind: 'turret', n: 1, dmg: 5 * P, rate: 1.2, dur: 8 }, { t: 'all', dmg: 3 * P, st: SX(S || 'weak', 1.5) }], name: ['{n} 민족 대이동', '{n} 총동원령'], desc: ['온 동네 {n이} 다 몰려온다. 감당은 각자'] },
+  },
+  brawler: {
+    re: /주먹|펀치|박치기|태권도|복싱|권투|씨름|레슬링|발차기|돌려차기|힘|괴력|근육|격투|싸움|때리|패|두들|헤드락|드롭킥|태클/, keys: ['power'], mech: ['dash'],
+    title: ['파이터', '동네 깡패', '근육맨'], stats: { hp: 115, speed: 1.05 }, passive: 'rage', weapon: 'none',
+    basic: { m: 'boom', fx: (P, S) => [{ t: 'blast', at: 'front', off: 12, r: 13, dmg: 10 * P, delay: 0, kb: 6, st: SX(S, 0.8) }], name: ['{n} 펀치', '{n} 싸대기', '{n} 잽'], desc: ['{n} 힘을 실은 주먹. 가까이서만 닿는다'] },
+    s1: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 100, dmg: 14 * P, invuln: true, kb: 8, st: SX(S || 'stun', 1) }], name: ['{n} 태클', '{n} 박치기', '{n} 돌진'], desc: ['머리부터 {n} 기운으로 냅다 들이받는다'] },
+    s2: { m: 'big', fx: (P) => [{ t: 'buff', k: 'giant', d: 4 }, { t: 'buff', k: 'armor', d: 4 }, { t: 'blast', at: 'self', r: 26, dmg: 10 * P, kb: 9 }], name: ['{n} 벌크업', '{n} 근육 펌핑'], desc: ['근육이 {n}처럼 부풀어 오르며 주변을 날려 버린다'] },
+    ult: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 130, dmg: 18 * P, invuln: true, kb: 6 }, { t: 'blast', at: 'self', r: 44, dmg: 30 * P, delay: 0.1, kb: 10, st: SX(S || 'stun', 1.6) }], name: ['{n} 필살 드롭킥', '{n} 지구 내려찍기'], desc: ['날아올라 {n} 기운으로 땅을 내려찍는다. 지진 주의'] },
+  },
+  assassin: {
+    re: /닌자|암살|그림자|몰래|숨|은신|투명|기습|뒤통수|등 뒤|사라|순간이동|텔레포트/, keys: ['dark', 'ghost'], mech: ['invis', 'blink'],
+    title: ['암살자', '닌자', '뒤통수 전문가'], stats: { hp: 85, speed: 1.2 }, passive: 'dodge', weapon: 'dagger',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 330, size: 1, homing: 0.3, st: SX(S, 0.8) }], name: ['{n} 표창', '{n} 암기', '{n} 비수'], desc: ['소리 없이 {n을} 날린다. 맞아도 뭔지 모른다'] },
+    s1: { m: 'blink', fx: (P, S) => [{ t: 'blink', to: 'behind', dist: 90 }, { t: 'blast', at: 'self', r: 16, dmg: 14 * P, delay: 0.05, kb: 4, st: SX(S, 1.2) }], name: ['뒤통수 {n}', '{n} 기습'], desc: ['순식간에 적 뒤로 가서 {n을} 꽂는다'] },
+    s2: { m: 'invis', fx: () => [{ t: 'buff', k: 'invis', d: 3.5 }, { t: 'buff', k: 'haste', d: 3.5 }], name: ['{n} 위장술', '나는 {n}이다', '{n} 은신'], desc: ['{n}인 척 숨는다. 아무도 못 알아본다(아마도)'] },
+    ult: { m: 'blink', fx: (P, S) => [{ t: 'blink', to: 'behind', dist: 120 }, { t: 'blast', at: 'self', r: 30, dmg: 28 * P, delay: 0.1, kb: 6, st: SX(S || 'silence', 2) }, { t: 'buff', k: 'invis', d: 2 }], name: ['{n} 그림자 처형', '{n} 무영각'], desc: ['그림자처럼 사라졌다가 {n으로} 한 방에 끝낸다'] },
+  },
+  tank: {
+    re: /단단|튼튼|철벽|방패|벽|버티|막|지키|보호|갑옷|탱크|거대|거인|뚱뚱|무거|바위/, keys: ['earth'], mech: ['shield', 'big'],
+    title: ['철벽', '인간 방패', '움직이는 벽'], stats: { hp: 135, speed: 0.85, size: 1.15 }, passive: 'armor', weapon: 'shield',
+    basic: { m: 'boom', fx: (P, S) => [{ t: 'blast', at: 'front', off: 16, r: 15, dmg: 9 * P, delay: 0, kb: 9, st: SX(S || 'heavy', 0.8) }], name: ['{n} 몸빵', '{n} 밀치기', '{n} 엉덩이 공격'], desc: ['{n} 같은 몸으로 밀쳐 버린다'] },
+    s1: { m: 'pull', fx: (P, S) => [{ t: 'blast', at: 'target', r: 34, kb: -9, dmg: 10 * P, delay: 0.3, st: SX(S || 'root', 1.2) }], name: ['{n} 이리 와', '{n} 끌어안기'], desc: ['{n} 힘으로 적을 내 쪽으로 끌어온다. 포옹은 덤'] },
+    s2: { m: 'shield', fx: () => [{ t: 'summon', kind: 'barrier', n: 2, dur: 7 }, { t: 'buff', k: 'shield', d: 4, pow: 40 }], name: ['{n} 철벽', '{n} 성벽', '{n} 방패'], desc: ['{n} 벽을 세우고 그 뒤에 숨는다'] },
+    ult: { m: 'big', fx: (P, S) => [{ t: 'buff', k: 'giant', d: 5 }, { t: 'blast', at: 'self', r: 52, dmg: 30 * P, kb: 10, delay: 0.2, st: SX(S || 'stun', 1.6) }, { t: 'all', dmg: 3 * P, st: { k: 'heavy', d: 2 } }], name: ['거대 {n} 강림', '{n} 대지진'], desc: ['집채만큼 커져서 땅을 쿵! 모두 휘청인다'] },
+  },
+  healer: {
+    re: /회복|치유|치료|살리|간호|의사|약|힐|낫게|돌봐|보살|응원|기도/, keys: ['plant', 'love', 'holy'], mech: ['heal'],
+    title: ['간호사', '동네 약사', '힐러'], stats: { hp: 100, speed: 1 }, passive: 'regen', weapon: 'staff',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 240, size: 2, st: SX(S || 'weak', 0.8) }], name: ['{n} 주사', '{n} 처방', '{n} 링거'], desc: ['{n을} 한 방 놓아 준다. 맞는 쪽은 아프다'] },
+    s1: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'target', r: 26, dur: 4, dmg: 3 * P, heal: 4, st: SX(S, 1) }], name: ['{n} 힐링존', '{n} 치료실'], desc: ['{n} 기운이 퍼지는 구역. 나는 낫고 적은 괴롭다'] },
+    s2: { m: 'heal', fx: () => [{ t: 'heal', amt: 22 }, { t: 'buff', k: 'regen', d: 4, pow: 4 }], name: ['{n} 보약', '{n} 응급처치', '{n} 한 그릇'], desc: ['{n으로} 기운을 쭉 채운다'] },
+    ult: { m: 'heal', fx: (P, S) => [{ t: 'heal', amt: 40 }, { t: 'all', dmg: 6 * P, st: SX(S || 'weak', 2) }, { t: 'buff', k: 'shield', d: 4, pow: 30 }], name: ['{n}의 기적', '{n} 대학병원'], desc: ['{n}의 기적! 나는 다 낫고 모두에게 {n} 폭격'] },
+  },
+  beamer: {
+    re: /광선|빔|레이저|뿜|내뿜|발사광|에너지파|파동|고함|외침|소리|비명/, keys: ['elec', 'holy', 'ki', 'sound'], mech: ['beam'],
+    title: ['빔 마니아', '인간 레이저', '발광체'], stats: { hp: 95, speed: 1 }, passive: 'crit', weapon: 'orb',
+    basic: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 4 * P, len: 120, w: 3, ticks: 2, dur: 0.3, st: SX(S, 0.6) }], name: ['{n} 빔', '{n} 광선', '{n} 레이저'], desc: ['{n을} 짧게 쭉 뿜는다'] },
+    s1: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 6 * P, len: 210, w: 6, ticks: 3, dur: 0.5, kb: 4, st: SX(S || 'slow', 1.2) }], name: ['굵은 {n} 빔', '{n} 대포'], desc: ['{n} 광선을 굵고 길게 뿜는다. 눈부심 주의'] },
+    s2: { m: 'reflect', fx: () => [{ t: 'buff', k: 'reflect', d: 2.5 }, { t: 'blink', to: 'back', dist: 70 }], name: ['{n} 반사막', '{n} 거울'], desc: ['{n} 막으로 공격을 튕겨 내고 뒤로 빠진다'] },
+    ult: { m: 'beam', fx: (P, S) => [{ t: 'beam', both: true, dmg: 9 * P, len: 320, w: 12, ticks: 5, dur: 1, kb: 5, st: SX(S || 'stun', 1.5) }], name: ['{n} 파멸의 광선', '{n} 앞뒤 빔'], desc: ['앞뒤로 동시에 {n} 광선 발사. 옆은 안전하다'] },
+  },
+  polluter: {
+    re: /냄새|방귀|독|오염|뿌리|뿌려|퍼뜨|흩뿌|더럽|침|콧물|코딱지|똥|썩|악취|구린/, keys: ['stink', 'poison', 'gross'], mech: ['zone', 'trail'],
+    title: ['테러리스트', '환경 파괴범', '민폐왕'], stats: { hp: 105, speed: 1 }, passive: 'thorns', weapon: 'none',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 230, size: 2, st: SX(S || 'poison', 1.2) }], name: ['{n} 투척', '{n} 한 방울', '{n} 묻히기'], desc: ['{n을} 묻혀 버린다. 냄새가 오래간다'] },
+    s1: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'target', r: 30, dur: 5, dmg: 4 * P, st: SX(S || 'poison', 1.5) }], name: ['{n} 지옥', '{n} 늪', '{n} 장판'], desc: ['바닥이 {n으로} 뒤덮인다. 들어가면 후회한다'] },
+    s2: { m: 'trail', fx: (P, S) => [{ t: 'trail', dmg: 3 * P, dur: 5, life: 3, st: SX(S || 'slow', 1) }, { t: 'buff', k: 'haste', d: 4 }], name: ['{n} 자국', '{n} 질주'], desc: ['빨리 달리면서 지나간 자리에 {n을} 남긴다'] },
+    ult: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'self', follow: true, r: 46, dur: 6, dmg: 5 * P, st: SX(S || 'poison', 1.5) }, { t: 'all', dmg: 4 * P, st: SX(S || 'confuse', 1.5) }], name: ['{n} 국가 재난', '{n} 대환장 파티'], desc: ['내 주변 전체가 {n} 구역이 된다. 숨 참으세요'] },
+  },
+  artillery: {
+    re: /하늘에서|쏟아|소나기|우박|떨어|폭우|비처럼|퍼붓|폭격|공습|내리/, keys: ['money', 'water', 'space', 'sweet'], mech: ['rain'],
+    title: ['기상캐스터', '포병', '하늘의 장난꾼'], stats: { hp: 90, speed: 0.95 }, passive: 'crit', weapon: 'wand',
+    basic: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 2, dmg: 6 * P, size: 2, speed: 240, st: SX(S, 0.6) }], name: ['{n} 낙하', '{n} 떨구기'], desc: ['하늘에서 {n} 두 개가 떨어진다'] },
+    s1: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 5, dmg: 6 * P, size: 3, boom: 10, speed: 240, st: SX(S || 'slow', 1.2) }], name: ['{n} 소나기', '{n} 우박'], desc: ['{n이} 소나기처럼 쏟아진다'] },
+    s2: { m: 'fly', fx: (P) => [{ t: 'buff', k: 'fly', d: 4 }, { t: 'shot', from: 'sky', n: 3, dmg: 5 * P, size: 2, speed: 220 }], name: ['{n} 열기구', '공중 {n} 투하'], desc: ['하늘로 둥실 떠올라 {n을} 떨군다'] },
+    ult: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 8, dmg: 8 * P, size: 3, boom: 16, speed: 250, st: SX(S || 'stun', 1.4) }, { t: 'all', dmg: 4 * P, st: SX(S || 'slow', 2) }], name: ['{n} 대홍수', '{n} 종말의 비'], desc: ['하늘이 뚫린 듯 {n이} 쏟아진다. 우산은 소용없다'] },
+  },
+  trickster: {
+    re: /마술|마법|홀리|혼란|최면|장난|거짓말|속이|사기|변신|헷갈|바꿔|웃기|웃게|간지|시간|멈추|되감|요술|주문/, keys: ['magic', 'time', 'ice'], mech: ['swap', 'all'],
+    title: ['마술사', '사기꾼', '장난꾸러기'], stats: { hp: 90, speed: 1.05 }, passive: 'dodge', weapon: 'wand',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 250, size: 2, bounce: 1, st: SX(S || 'confuse', 0.8) }], name: ['{n} 장난', '{n} 깜짝 상자', '{n} 트릭'], desc: ['{n을} 던진다. 맞으면 정신이 없다'] },
+    s1: { m: 'all', fx: (P, S) => [{ t: 'all', dmg: 3 * P, st: SX(S || 'confuse', 1.5) }], name: ['{n} 최면', '{n} 마술 쇼'], desc: ['모두가 {n}에 홀린다. 박수는 강제'] },
+    s2: { m: 'swap', fx: () => [{ t: 'swap' }, { t: 'buff', k: 'haste', d: 2.5 }], name: ['{n} 바꿔치기', '{n} 눈속임'], desc: ['{n} 마술로 적과 자리를 바꾼다. 어리둥절'] },
+    ult: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'target', r: 44, dur: 5, dmg: 3 * P, st: { k: 'morph', d: 2 } }, { t: 'all', dmg: 4 * P, st: SX(S || 'dance', 1.5) }], name: ['{n} 변신 쇼', '{n} 대환장 마술'], desc: ['구역 안의 모두가 {n} 때문에 변신한다'] },
+  },
+  speedster: {
+    re: /빠르|빨라|달리|질주|스피드|속도|번개처럼|총알처럼|광속|순식간|폭주|드리프트/, keys: ['speed', 'wind'], mech: ['haste', 'dash'],
+    title: ['폭주족', '배달의 달인', '스피드광'], stats: { hp: 85, speed: 1.3 }, passive: 'swift', weapon: 'none',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 5 * P, n: 2, spread: 10, speed: 330, size: 1, st: SX(S, 0.6) }], name: ['{n} 따다닥', '{n} 연타'], desc: ['{n을} 엄청 빠르게 두 번 날린다'] },
+    s1: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 115, dmg: 12 * P, kb: 6, st: SX(S, 1) }, { t: 'trail', dmg: 2 * P, dur: 3, life: 2, st: SX(S || 'slow', 1) }], name: ['{n} 드리프트', '{n} 질주'], desc: ['{n} 속도로 돌진하며 바퀴 자국을 남긴다'] },
+    s2: { m: 'haste', fx: () => [{ t: 'buff', k: 'haste', d: 4 }, { t: 'blink', to: 'side', dist: 70 }], name: ['{n} 잔상', '{n} 부스터'], desc: ['{n}보다 빨라져 잔상만 남는다'] },
+    ult: { m: 'dash', fx: (P, S) => [{ t: 'dash', dist: 130, dmg: 14 * P, invuln: true, kb: 4 }, { t: 'dash', dist: 130, dmg: 14 * P, invuln: true, kb: 4 }, { t: 'blast', at: 'self', r: 34, dmg: 18 * P, kb: 8, st: SX(S || 'stun', 1.2) }], name: ['{n} 마하 왕복', '{n} 광속 배달'], desc: ['눈에 안 보이는 속도로 왕복 돌진한다'] },
+  },
+  gravity: {
+    re: /중력|끌어당|당기|빨아들|흡입|블랙홀|자석|무게|무겁|짓눌|청소기/, keys: ['gravity'], mech: ['pull'],
+    title: ['블랙홀', '인간 자석', '진공청소기'], stats: { hp: 110, speed: 0.9 }, passive: 'aura', weapon: 'orb',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 7 * P, speed: 210, size: 3, st: SX(S || 'heavy', 0.8) }], name: ['무거운 {n}', '{n} 중력탄'], desc: ['맞으면 몸이 {n}처럼 무거워진다'] },
+    s1: { m: 'pull', fx: (P, S) => [{ t: 'blast', at: 'target', r: 36, kb: -10, dmg: 12 * P, delay: 0.3, st: SX(S || 'heavy', 1.5) }], name: ['{n} 블랙홀', '{n} 흡입'], desc: ['{n} 힘으로 주변을 한곳에 빨아들인다'] },
+    s2: { m: 'blink', fx: (P) => [{ t: 'blink', to: 'front', dist: 80 }, { t: 'blast', at: 'self', r: 22, dmg: 10 * P, kb: 8 }], name: ['{n} 공간 도약', '{n} 워프'], desc: ['공간을 접어서 {n}처럼 툭 나타난다'] },
+    ult: { m: 'pull', fx: (P, S) => [{ t: 'blast', at: 'target', r: 54, kb: -10, dmg: 22 * P, delay: 0.4, st: SX(S || 'heavy', 2) }, { t: 'all', dmg: 4 * P, st: { k: 'heavy', d: 2 } }, { t: 'shot', from: 'sky', n: 4, dmg: 6 * P, size: 3, speed: 240 }], name: ['{n} 특이점', '{n} 우주 붕괴'], desc: ['거대한 {n} 블랙홀이 모든 걸 빨아들인다'] },
+  },
+  engineer: {
+    re: /로봇|기계|설치|포탑|만들|조립|발명|공구|드론|컴퓨터|코딩|해킹/, keys: ['tech'], mech: ['turret'],
+    title: ['공돌이', '발명왕', '수리 기사'], stats: { hp: 100, speed: 0.95 }, passive: 'armor', weapon: 'hammer',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 270, size: 1, st: SX(S, 0.6) }], name: ['{n} 볼트', '{n} 부품 발사'], desc: ['{n} 부품을 쏜다. 반품 불가'] },
+    s1: { m: 'turret', fx: (P, S) => [{ t: 'summon', kind: 'turret', n: 1, dmg: 5 * P, rate: 1.4, dur: 9, st: SX(S, 0.8) }], name: ['{n} 포탑', '{n} 자동 사격기'], desc: ['{n} 포탑을 세워 대신 싸우게 한다'] },
+    s2: { m: 'shield', fx: () => [{ t: 'summon', kind: 'barrier', n: 2, dur: 7 }, { t: 'buff', k: 'shield', d: 3, pow: 25 }], name: ['{n} 바리케이드', '{n} 방어벽'], desc: ['{n으로} 벽을 뚝딱 쌓는다'] },
+    ult: { m: 'turret', fx: (P, S) => [{ t: 'summon', kind: 'turret', n: 3, dmg: 5 * P, rate: 1.3, dur: 10, st: SX(S, 1) }, { t: 'shot', from: 'sky', n: 5, dmg: 6 * P, size: 2, boom: 10, speed: 240 }], name: ['{n} 공장 가동', '{n} 로봇 군단'], desc: ['{n} 포탑이 줄줄이 세워지고 하늘에서도 쏟아진다'] },
+  },
+  glutton: {
+    re: /먹|삼키|마시|배고프|먹방|폭식|식욕|씹|맛있|요리|굽|구워|튀겨|끓/, keys: ['food'], mech: ['heal', 'pull'],
+    title: ['먹방러', '대식가', '요리왕'], stats: { hp: 120, speed: 0.95, size: 1.1 }, passive: 'lifesteal', weapon: 'hammer',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 7 * P, speed: 220, size: 2, st: SX(S || 'heavy', 0.8) }], name: ['{n} 투척', '남은 {n} 퉤', '{n} 배달'], desc: ['먹던 {n을} 퉤 뱉는다. 아깝다'] },
+    s1: { m: 'pull', fx: (P, S) => [{ t: 'blast', at: 'target', r: 30, kb: -9, dmg: 10 * P, delay: 0.25, st: SX(S || 'slow', 1.2) }], name: ['{n} 흡입', '후루룩 {n}'], desc: ['{n} 먹듯이 적을 후루룩 빨아들인다'] },
+    s2: { m: 'heal', fx: () => [{ t: 'heal', amt: 22 }, { t: 'buff', k: 'giant', d: 3 }], name: ['{n} 먹방', '{n} 폭식'], desc: ['{n을} 허겁지겁 먹고 기운이 난다(살도 찐다)'] },
+    ult: { m: 'big', fx: (P, S) => [{ t: 'buff', k: 'giant', d: 5 }, { t: 'blast', at: 'target', r: 50, kb: -10, dmg: 24 * P, delay: 0.3, st: SX(S || 'heavy', 1.6) }, { t: 'heal', amt: 20 }], name: ['{n} 무한 리필', '세상 {n} 정식'], desc: ['거대해져서 세상을 {n}처럼 먹어 치운다'] },
+  },
+  lazy: {
+    re: /멍|게으|귀찮|눕|누워|빈둥|뒹굴|아무것도|잠|졸|낮잠|하품|쉬|백수|침대|이불/, keys: ['sleep'], mech: [],
+    title: ['백수', '프로 낮잠러', '귀차니스트'], stats: { hp: 110, speed: 0.85 }, passive: 'regen', weapon: 'none',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 6 * P, speed: 180, size: 2, st: SX(S || 'slow', 0.8) }], name: ['{n} 하품', '대충 {n}', '{n} 휴'], desc: ['귀찮게 {n을} 대충 던진다'] },
+    s1: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'target', r: 30, dur: 4, dmg: 2 * P, st: SX(S || 'sleep', 1.2) }], name: ['{n} 자장가', '{n} 낮잠 구역'], desc: ['여기 들어오면 누구든 {n}처럼 잠든다'] },
+    s2: { m: 'heal', fx: () => [{ t: 'heal', amt: 20 }, { t: 'buff', k: 'armor', d: 3 }], name: ['{n} 드러눕기', '{n} 이불 속'], desc: ['그냥 눕는다. 의외로 회복된다'] },
+    ult: { m: 'all', fx: (P, S) => [{ t: 'all', dmg: 4 * P, st: SX(S || 'sleep', 2) }, { t: 'zone', at: 'self', r: 44, dur: 5, dmg: 2 * P, heal: 5, st: { k: 'sleep', d: 1.5 } }], name: ['{n} 주말 낮잠', '{n} 겨울잠'], desc: ['세상 모두가 {n} 때문에 잠든다. 나만 쉰다'] },
+  },
+  idol: {
+    re: /노래|춤|댄스|아이돌|가수|랩|떼창|콘서트|공연|무대|팬|케이팝|트로트|박수/, keys: ['sound', 'love'], mech: [],
+    title: ['아이돌', '트로트 신동', '춤신춤왕'], stats: { hp: 95, speed: 1.1 }, passive: 'aura', weapon: 'none',
+    basic: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 4 * P, len: 110, w: 3, ticks: 2, dur: 0.3, st: SX(S, 0.6) }], name: ['{n} 고음', '{n} 샤우팅'], desc: ['{n} 고음을 빔처럼 쏜다. 귀가 아프다'] },
+    s1: { m: 'all', fx: (P, S) => [{ t: 'all', dmg: 3 * P, st: SX(S || 'dance', 1.4) }], name: ['{n} 챌린지', '{n} 떼창'], desc: ['모두가 {n}에 맞춰 춤을 춘다(강제)'] },
+    s2: { m: 'orbit', fx: (P) => [{ t: 'summon', kind: 'orbit', n: 3, dmg: 5 * P, dur: 6 }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 백댄서', '{n} 응원단'], desc: ['{n} 백댄서들이 주위를 돈다. 칼군무'] },
+    ult: { m: 'zone', fx: (P, S) => [{ t: 'zone', at: 'self', follow: true, r: 46, dur: 6, dmg: 4 * P, st: SX(S || 'dance', 1.5) }, { t: 'all', dmg: 4 * P, st: { k: 'confuse', d: 1.5 } }], name: ['{n} 월드 투어', '{n} 앙코르'], desc: ['{n} 콘서트 개최! 근처 모두 강제 관객'] },
+  },
+  nagger: {
+    re: /잔소리|숙제|시험|공부|훈화|설교|회의|야근|보고서|수행평가|과제|출근|월요일|엄마|선생님|상사|부장/, keys: ['nag'], mech: [],
+    title: ['잔소리꾼', '교장 선생님', '부장님'], stats: { hp: 105, speed: 0.95 }, passive: 'aura', weapon: 'book',
+    basic: { m: 'beam', fx: (P, S) => [{ t: 'beam', dmg: 4 * P, len: 120, w: 3, ticks: 2, dur: 0.3, st: SX(S || 'slow', 0.8) }], name: ['{n} 한마디', '{n} 잔소리'], desc: ['{n} 잔소리가 귀에 꽂힌다'] },
+    s1: { m: 'all', fx: (P, S) => [{ t: 'all', dmg: 3 * P, st: SX(S || 'sleep', 1.3) }], name: ['{n} 훈화 말씀', '{n} 1시간 강의'], desc: ['끝나지 않는 {n} 이야기에 모두 존다'] },
+    s2: { m: 'shield', fx: () => [{ t: 'buff', k: 'shield', d: 3, pow: 30 }, { t: 'buff', k: 'reflect', d: 2 }], name: ['못 들은 척', '{n} 귀 막기'], desc: ['{n이고} 뭐고 귀를 막는다. 공격도 튕긴다'] },
+    ult: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 8, dmg: 7 * P, size: 3, boom: 10, speed: 240 }, { t: 'all', dmg: 4 * P, st: SX(S || 'weak', 2) }], name: ['{n} 폭탄 투하', '{n} 지옥 주간'], desc: ['{n이} 비처럼 쏟아진다. 마감은 오늘까지'] },
+  },
+  spinner: {
+    re: /부메랑|회전|팽이|빙빙|돌려|돌린|휘둘|토네이도|소용돌이|원반|요요/, keys: ['ball'], mech: ['orbit'],
+    title: ['팽이', '회전왕', '어지러운 사람'], stats: { hp: 100, speed: 1.05 }, passive: 'thorns', weapon: 'none',
+    basic: { m: 'shot', fx: (P, S) => [{ t: 'shot', dmg: 7 * P, speed: 240, size: 2, ret: true, st: SX(S, 0.6) }], name: ['{n} 부메랑', '돌아오는 {n}'], desc: ['{n을} 던지면 다시 돌아온다. 받을 때 아프다'] },
+    s1: { m: 'orbit', fx: (P, S) => [{ t: 'summon', kind: 'orbit', n: 3, dmg: 6 * P, dur: 5, st: SX(S, 0.8) }], name: ['빙빙 {n}', '{n} 회전'], desc: ['{n이} 몸 주위를 빙빙 돈다'] },
+    s2: { m: 'dash', fx: (P) => [{ t: 'dash', dist: 95, dmg: 10 * P, kb: 9 }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 팽이 돌진', '{n} 토네이도'], desc: ['팽이처럼 돌면서 들이받는다. 본인도 어지럽다'] },
+    ult: { m: 'orbit', fx: (P, S) => [{ t: 'summon', kind: 'orbit', n: 4, dmg: 8 * P, dur: 7, st: SX(S, 1) }, { t: 'shot', from: 'around', n: 8, dmg: 6 * P, size: 2, speed: 250, ret: true }], name: ['{n} 허리케인', '{n} 대회전'], desc: ['{n이} 사방으로 회전하며 날아갔다 돌아온다'] },
+  },
+  flyer: {
+    re: /날아|날개|비행|하늘을 나|공중|떠다|날 수|새처럼|글라이더|헬리콥터|비행기/, keys: [], mech: ['fly'],
+    title: ['비행사', '하늘의 무법자', '조류'], stats: { hp: 90, speed: 1.15 }, passive: 'dodge', weapon: 'none',
+    basic: { m: 'rain', fx: (P, S) => [{ t: 'shot', from: 'sky', n: 1, dmg: 7 * P, size: 2, speed: 260, st: SX(S, 0.6) }], name: ['{n} 투하', '{n} 공습'], desc: ['하늘에서 {n을} 떨어뜨린다'] },
+    s1: { m: 'fly', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 4 }, { t: 'shot', dmg: 8 * P, n: 3, spread: 30, speed: 250, size: 2, st: SX(S, 1) }], name: ['{n} 날갯짓', '{n} 비행 사격'], desc: ['{n} 날개로 날아올라 공격한다'] },
+    s2: { m: 'blink', fx: () => [{ t: 'blink', to: 'side', dist: 80 }, { t: 'buff', k: 'haste', d: 3 }], name: ['{n} 활공', '{n} 급강하'], desc: ['{n}처럼 휙 활공한다'] },
+    ult: { m: 'rain', fx: (P, S) => [{ t: 'buff', k: 'fly', d: 5 }, { t: 'shot', from: 'sky', n: 8, dmg: 8 * P, size: 3, boom: 12, speed: 250, st: SX(S, 1.4) }], name: ['{n} 대공습', '{n} 하늘 지배'], desc: ['하늘을 지배하며 {n} 폭탄을 쏟아붓는다'] },
+  },
 };
-const ULT_PRE = ['초거대', '궁극의', '최종', '전설의', '무한', '대폭주', '분노의'];
-const DESC_T = {
-  shot: (n) => `${josa(n, '을', '를')} 던진다`, rain: (n) => `하늘에서 ${josa(n, '이', '가')} 쏟아진다`, beam: (n) => `${josa(n, '을', '를')} 광선처럼 뿜는다`,
-  boom: (n) => `${josa(n, '을', '를')} 터뜨린다`, zone: (n) => `바닥에 ${josa(n, '을', '를')} 깔아 버린다`, summon: (n) => `${josa(n, '을', '를')} 불러 싸우게 한다`,
-  turret: (n) => `${josa(n, '을', '를')} 세워 대신 쏘게 한다`, mine: (n) => `${josa(n, '을', '를')} 몰래 심어 둔다`, orbit: (n) => `${josa(n, '을', '를')} 몸 주위로 빙빙 돌린다`,
-  dash: (n) => `${n} 기운으로 냅다 들이받는다`, blink: (n) => `${n} 힘으로 순식간에 사라졌다 나타난다`, invis: (n) => `${n} 뒤에 숨어 안 보이게 된다`,
-  heal: (n) => `${josa(n, '으로', '로')} 기운을 채운다`, shield: (n) => `${josa(n, '으로', '로')} 몸을 감싸 막는다`, pull: (n) => `${n} 힘으로 적을 끌어당긴다`,
-  big: (n) => `${n} 힘으로 몸이 거대해진다`, tiny: (n) => `${n}처럼 작아져 빠르게 피한다`, haste: (n) => `${n} 힘으로 엄청 빨라진다`, fly: (n) => `${n} 힘으로 하늘을 난다`,
-  trail: (n) => `지나간 자리에 ${josa(n, '이', '가')} 남는다`, swap: (n) => `${n} 힘으로 적과 자리를 바꾼다`, reflect: (n) => `${josa(n, '으로', '로')} 공격을 튕겨 낸다`,
-  all: (n) => `모든 적에게 ${josa(n, '이', '가')} 덮친다`,
-};
-/** 기술 방식 하나를 효과 목록으로 */
-function mechFx(mech, slot, o) {
-  const U = slot === 'ult', B = slot === 'basic', P = o.pow; // P: 글의 세기 (0.6 약함 ~ 1.4 셈)
-  const st = o.st ? { k: o.st, d: U ? 2 : 1.3 } : null;
-  const n = o.n;
-  switch (mech) {
-    case 'shot': return [{ t: 'shot', dmg: (B ? 7 : U ? 9 : 13) * P, n: B ? (n > 1 ? Math.min(n, 3) : 1) : U ? Math.max(5, Math.min(n || 6, 8)) : Math.min(n || 1, 4), spread: U ? 70 : n > 1 ? 30 : 0, speed: B ? 240 : 220, size: B ? 2 : 3, homing: o.homing ? 0.5 : 0, bounce: o.bounce ? 2 : 0, pierce: !!o.pierce, ret: !!o.ret, split: !B && o.split ? 3 : 0, boom: U ? 12 : 0, st: B ? (st ? { k: st.k, d: 0.8 } : null) : st }];
-    case 'rain': return [{ t: 'shot', from: 'sky', dmg: (U ? 8 : 6) * P, n: U ? 8 : B ? 2 : 5, size: B ? 2 : 3, boom: U ? 14 : 8, speed: 230, st }];
-    case 'beam': return [{ t: 'beam', dmg: (U ? 9 : B ? 4 : 6) * P, len: U ? 240 : B ? 110 : 160, w: U ? 9 : B ? 3 : 5, ticks: U ? 5 : B ? 2 : 3, dur: U ? 0.9 : 0.4, st }];
-    case 'boom': return [{ t: 'blast', at: B ? 'front' : 'target', off: 30, dmg: (U ? 36 : B ? 9 : 17) * P, r: U ? 46 : B ? 14 : 24, delay: U ? 0.4 : 0.25, kb: U ? 9 : 6, st }];
-    case 'zone': return [{ t: 'zone', at: B ? 'front' : 'target', dmg: (U ? 5 : 3) * P, r: U ? 42 : B ? 12 : 24, dur: U ? 5 : 4, st }];
-    case 'summon': return [{ t: 'summon', kind: 'chaser', n: U ? 4 : B ? 1 : Math.min(Math.max(n, 2), 3), dmg: 7 * P, dur: 7, st }];
-    case 'turret': return [{ t: 'summon', kind: 'turret', n: U ? 2 : 1, dmg: 5 * P, rate: 1.2, dur: 8, st }];
-    case 'mine': return [{ t: 'summon', kind: 'mine', n: U ? 4 : 3, dmg: 13 * P, dur: 10, st }];
-    case 'orbit': return [{ t: 'summon', kind: 'orbit', n: U ? 4 : 3, dmg: 5 * P, dur: U ? 7 : 5, st }];
-    case 'dash': return [{ t: 'dash', dist: U ? 130 : 95, dmg: (U ? 24 : B ? 8 : 13) * P, invuln: !B, kb: 6, st }];
-    case 'blink': return [{ t: 'blink', to: 'behind', dist: 90 }, { t: 'blast', at: 'self', dmg: (U ? 20 : 9) * P, r: U ? 36 : 16, delay: 0.05, kb: 5, st }];
-    case 'invis': return [{ t: 'buff', k: 'invis', d: U ? 4 : 3 }, { t: 'buff', k: 'haste', d: 3 }];
-    case 'heal': return [{ t: 'heal', amt: U ? 35 : 18 }, { t: 'buff', k: 'regen', d: 4, pow: 4 }];
-    case 'shield': return o.wall ? [{ t: 'summon', kind: 'barrier', n: U ? 3 : 1, dur: 7 }, { t: 'buff', k: 'shield', d: 3, pow: 20 }] : [{ t: 'buff', k: 'shield', d: 4, pow: U ? 50 : 30 }, { t: 'blast', at: 'self', dmg: 6 * P, r: 18, kb: 7 }];
-    case 'pull': return [{ t: 'blast', at: 'target', dmg: (U ? 16 : 10) * P, r: U ? 50 : 34, kb: -9, delay: 0.3, st: st || { k: 'heavy', d: 1.5 } }];
-    case 'big': return [{ t: 'buff', k: 'giant', d: 5 }, { t: 'blast', at: 'self', dmg: (U ? 26 : 12) * P, r: U ? 44 : 26, kb: 9, st: { k: 'stun', d: 0.8 } }];
-    case 'tiny': return [{ t: 'buff', k: 'tiny', d: 4 }, { t: 'buff', k: 'haste', d: 4 }];
-    case 'haste': return [{ t: 'buff', k: 'haste', d: 4 }, { t: 'dash', dist: 80, dmg: 8 * P, kb: 4 }];
-    case 'fly': return [{ t: 'buff', k: 'fly', d: 4 }, { t: 'shot', from: 'sky', dmg: 6 * P, n: 3, size: 2, speed: 220 }];
-    case 'trail': return [{ t: 'trail', dmg: 3 * P, dur: 4, life: 3, st }, { t: 'buff', k: 'haste', d: 4 }];
-    case 'swap': return [{ t: 'swap' }, { t: 'blast', at: 'self', dmg: 10 * P, r: 20, kb: 4, st }];
-    case 'reflect': return [{ t: 'buff', k: 'reflect', d: U ? 4 : 2.5 }, { t: 'buff', k: 'armor', d: 3 }];
-    case 'all': return [{ t: 'all', dmg: (U ? 9 : 5) * P, st: st || { k: 'stun', d: 1.2 } }, { t: 'shot', from: 'sky', dmg: 5 * P, n: U ? 6 : 3, size: 2, speed: 230 }];
+const THEME_STYLE = { fire: 'bomber', ice: 'trickster', elec: 'beamer', water: 'artillery', wind: 'speedster', earth: 'tank', plant: 'healer', stink: 'polluter', poison: 'polluter', holy: 'beamer', dark: 'assassin', space: 'gravity', time: 'trickster', sound: 'idol', love: 'healer', sleep: 'lazy', metal: 'gunner', tech: 'engineer', food: 'glutton', sweet: 'artillery', animal: 'summoner', bug: 'summoner', money: 'artillery', gross: 'polluter', ghost: 'assassin', magic: 'trickster', nag: 'nagger', gravity: 'gravity', speed: 'speedster', power: 'brawler', ball: 'gunner', ki: 'beamer' };
+/** 글의 의도를 보고 전투 유형 점수를 매긴다 (높은 순) */
+function rankStyles(text, keys, said) {
+  const sc = {};
+  for (const k in STYLES) {
+    const S = STYLES[k];
+    let v = 0;
+    const g = new RegExp(S.re.source, 'g');
+    v += (String(text).match(g) || []).length * 3;
+    if (keys.some((x) => S.keys.includes(x))) v += 1.5;
+    if (keys[0] && THEME_STYLE[keys[0]] === k) v += 2;
+    for (const m of said) if (S.mech.includes(m)) v += 2;
+    sc[k] = v;
   }
-  return [{ t: 'shot', dmg: 8 * P, speed: 220, size: 2 }];
+  return Object.keys(sc).sort((a, b) => sc[b] - sc[a]).map((k) => [k, sc[k]]);
 }
-const BASIC_OK = new Set(['shot', 'rain', 'beam', 'boom', 'zone', 'dash']);
-const CTRL = ['zone', 'boom', 'beam', 'pull', 'rain', 'mine', 'summon', 'turret', 'orbit', 'shot', 'trail'];
-const MOBI = ['dash', 'blink', 'invis', 'shield', 'heal', 'haste', 'fly', 'big', 'tiny', 'swap', 'reflect', 'trail', 'turret', 'orbit', 'summon'];
-const ULT_OK = ['all', 'rain', 'boom', 'beam', 'pull', 'summon', 'big', 'zone', 'dash', 'shot'];
+/** "{n을}" 같은 자리에 단어와 알맞은 조사를 넣는다 */
+function fmtN(tpl, n) {
+  return tpl.replace(/\{n(을|이다|이야|이고|이|은|으로|과)?\}/g, (_, j) => {
+    if (!j) return n;
+    if (j === '이다' || j === '이야' || j === '이고') return n + (hasJong(n) ? j : j.slice(1));
+    const jj = { 을: ['을', '를'], 이: ['이', '가'], 은: ['은', '는'], 으로: ['으로', '로'], 과: ['과', '와'] }[j];
+    if (j === '으로') { const c = n.charCodeAt(n.length - 1); const jong = c >= 0xac00 && c <= 0xd7a3 ? (c - 0xac00) % 28 : 0; return n + (jong && jong !== 8 ? '으로' : '로'); }
+    return josa(n, jj[0], jj[1]);
+  });
+}
+const FUN = {
+  ultPre: ['지구 멸망급', '우주 최강', '대환장', '역대급', '국가 비상', '엄마도 놀란', '초특급', '울트라', '전설의', '교장도 무릎 꿇는'],
+  say: ['{n} 배송 왔습니다', '{n} 받아라!', '{n} 맛 좀 볼래?', '{n} 무료 나눔!', '이게 {n이다}!', '{n} 사세요~', '{n} 간다잉', '{n} 사랑해!!', '{n} 어택!'],
+  ultSay: ['{n} 대폭주!!', '지구여 안녕', '{n으로} 덮어라!', '이게 진짜 {n이다}', '엄마 나 {n} 됐어', '{n} 만세!!!', '다 {n이야}!!'],
+  intro: ['{n} 없인 못 살아', '오늘의 메뉴는 {n}', '{n} 장인 등장', '너도 {n} 좋아하지?', '{n} 맛 좀 볼래?', '{n}의 시간이다', '{n} 주의보 발령'],
+  ko: ['{n}… 미안해…', '{n이} 부족했어', '다음 생엔 {n으로}…', '{n} 다시 충전…', '내 {n} 돌려줘', '{n은} 죄가 없다'],
+  win: ['{n} 만세!!', '{n은} 사랑입니다', '{n} 앞에 무릎 꿇어라', '역시 {n}밖에 없어', '{n} 구독 좋아요', '{n} 최고! 박수!'],
+  titlePre: ['', '', '전설의 ', '동네 ', '자칭 ', '전직 ', '프로 '],
+};
 
 /** 글 하나로 설계서 원본(검증 전)을 조립한다 */
 function composeRaw(ability, sides, noDraw) {
@@ -1575,7 +1705,8 @@ function composeRaw(ability, sides, noDraw) {
   // 2) 이름에 쓸 말: 글에 나온 명사를 그대로
   const nouns = nounsOf(text);
   const nm = (f, i) => cut((f.word && nouns.find((w) => w.includes(f.word))) || f.word || nouns[i] || nouns[0] || '기', 5);
-  const n1 = nm(t1, 0), n2 = nm(t2, 1), n3 = nm(t3, 2);
+  const realNoun = (f) => f.word && nouns.some((w) => w === f.word || w.startsWith(f.word));
+  const n1 = nm(t1, 0), n2 = t2 !== t1 && realNoun(t2) ? nm(t2, 1) : n1, n3 = t3 !== t1 && realNoun(t3) ? nm(t3, 2) : n2;
   // 3) 행동 찾기
   const mechs = [];
   for (const [re, k] of MECH) { const m = text.match(re); if (m) mechs.push({ at: m.index, k }); }
@@ -1585,67 +1716,70 @@ function composeRaw(ability, sides, noDraw) {
   for (const [re, k] of STATUS_WORDS) if (re.test(text)) { st = k; break; }
   const nm1 = text.match(/(\d+)\s*(개|마리|발|명|번)/);
   const o = {
-    pow: 0.55 * (/엄청|거대|최강|무한|최고|강력|세게|완전|미친|전설|궁극|세상에서 가장/.test(text) ? 1.25 : /약한|작은|쓸모없|조금|살짝|별로|하찮|소심/.test(text) ? 0.7 : 1),
+    pow: 0.65 * (/엄청|거대|최강|무한|최고|강력|세게|완전|미친|전설|궁극|세상에서 가장/.test(text) ? 1.25 : /약한|작은|쓸모없|조금|살짝|별로|하찮|소심/.test(text) ? 0.7 : 1),
     n: nm1 ? clamp(+nm1[1], 1, 8) : /여러|많은|떼|군단|무리|잔뜩|수많/.test(text) ? 4 : 1,
     homing: /따라가|추적|유도|쫓아가/.test(text), bounce: /튕기|튕겨|통통/.test(text), pierce: /관통|꿰뚫|뚫고/.test(text),
     ret: /부메랑|돌아온|되돌아/.test(text), split: /분열|쪼개|갈라|나뉘/.test(text), wall: /벽|성벽|담장/.test(text),
   };
-  // 4) 칸마다 방식 고르기: 글에 쓴 행동 → 소재가 어울리는 행동 → 기본값
-  const used = new Set();
-  const choose = (pool, prefer) => {
-    for (const k of prefer) if (pool.includes(k) && !used.has(k)) { used.add(k); return k; }
-    for (const k of pool) if (!used.has(k)) { used.add(k); return k; }
-    return pool[0];
-  };
-  const pref = said.concat(T(t1).feel, T(t2).feel, ['shot', 'boom', 'dash', 'zone', 'all']);
-  const firstSaid = said.find((k) => BASIC_OK.has(k));
-  const basicM = choose([...BASIC_OK], [firstSaid && firstSaid !== 'boom' ? firstSaid : T(t1).basic || 'shot']);
-  const s1M = choose(CTRL, pref);
-  const s2M = choose(MOBI, pref);
-  const ultM = choose(ULT_OK, said.includes('all') ? ['all'] : said.concat(['rain', 'boom', 'all', 'beam', 'pull']));
-  const plan = { basic: [basicM, t1, n1], s1: [s1M, t2, n2], s2: [s2M, t3 === t1 ? t2 : t3, n3 === n1 ? n2 : n3], ult: [ultM, t1, n1] };
+  // 4) 글의 의도 → 전투 유형 (가장 잘 맞는 유형이 중심, 두 번째 유형이 능력 3을 맡는다)
+  const keys = themes.map((f) => f.key).filter((k, i, a) => a.indexOf(k) === i);
+  const ranks = rankStyles(text, keys, said);
+  const sA = ranks[0][0], sB = ranks[1] && ranks[1][1] >= 3 ? ranks[1][0] : sA, sC = ranks[2] && ranks[2][1] >= 5 ? ranks[2][0] : sA;
+  const SA = STYLES[sA];
+  const kitOf = { basic: SA, s1: sC !== sA && sC !== sB ? STYLES[sC] : SA, s2: STYLES[sB], ult: SA };
+  const plan = { basic: [t1, n1], s1: [t2, n2], s2: [t3 === t1 ? t2 : t3, n3 === n1 ? n2 : n3], ult: [t1, n1] };
   // 5) 기술 만들기
   const moves = {};
   const quote = (text.match(/["'“‘「]([^"'”’」]{1,10})["'”’」]/) || [])[1];
+  const short = (pool, n, max) => { for (let i = 0; i < 6; i++) { const v = fmtN(pk(pool), n); if (Array.from(v).length <= max) return v; } return cut(`${n}!`, max); };
   for (const s of SLOTS) {
-    const [mech, th, n] = plan[s];
-    const tt = T(th);
-    const myst = st || tt.st;
-    let fx = mechFx(mech, s, Object.assign({}, o, { st: myst }));
-    if (s === 'ult' && mech !== 'all' && said.includes('all')) fx = fx.concat(mechFx('all', 'ult', Object.assign({}, o, { st: myst }))).slice(0, 3);
-    else if (s === 'ult' && fx.length < 2) fx.push({ t: 'all', dmg: 4, st: { k: myst || 'stun', d: 1.2 } });
-    let name = pk(NAME_T[mech] || NAME_T.shot).replace('{n}', n);
-    if (s === 'ult') name = `${pk(ULT_PRE)} ${name.replace(/^(거대|꼬마|하늘에서|온 세상|빙빙|날아라)\s/, '')}`;
-    name = cut(name, 12);
-    const desc = (s === 'ult' ? '한계까지 끌어올려 ' : '') + (DESC_T[mech] || DESC_T.shot)(n);
-    const sayPool = s === 'ult' ? [`${n} 대폭발이다!`, `받아라 ${n}!!`, `${n}의 끝을 보여주마`, `세상이 ${n} 된다!`] : [`${n}!`, `${n} 맛 좀 봐라`, `${n} 간다!`, `에잇 ${n}!`];
+    const K = kitOf[s][s], [th, n] = plan[s], tt = T(th);
+    const S = st || tt.st;
+    let fx = K.fx(o.pow, S, o).filter(Boolean);
+    for (const e of fx) if (e.t === 'shot') {
+      if (o.homing) e.homing = Math.max(e.homing || 0, 0.5);
+      if (o.bounce) e.bounce = Math.max(e.bounce || 0, 2);
+      if (o.pierce) e.pierce = true;
+      if (o.ret) e.ret = true;
+      if (o.split && s !== 'basic') e.split = Math.max(e.split || 0, 3);
+      if (o.n > 1 && s !== 'basic' && e.from !== 'sky') e.n = clamp(Math.max(e.n || 1, o.n), 1, 8);
+    }
+    let name = fmtN(pk(K.name), n);
+    if (s === 'ult' && Array.from(name).length <= 8 && R() < 0.7) name = `${pk(FUN.ultPre)} ${name}`;
+    const pic = pixFor(n) || pixFor(th.word) || (s !== 'basic' ? null : pixFor(text));
     moves[s] = {
-      name, desc: cut(desc, 44), say: s === 'ult' && quote ? quote : s === 'basic' ? '' : cut(pk(sayPool), 10),
-      cd: { basic: 0.55, s1: 1.9, s2: 2.7, ult: 7.5 }[s] * (mech === 'heal' || mech === 'big' ? 1.25 : 1),
-      color: s === 'ult' ? tt.c[1] : s === 's2' ? tt.c[1] : tt.c[0], vfx: tt.vfx, shape: tt.shape,
+      name: cut(name, 12), desc: cut(fmtN(pk(K.desc), n), 44),
+      say: s === 'basic' ? '' : s === 'ult' ? (quote || short(FUN.ultSay, n, 10)) : short(FUN.say, n, 10),
+      cd: { basic: 0.55, s1: 1.9, s2: 2.7, ult: 7.5 }[s] * (K.m === 'heal' || K.m === 'big' || K.m === 'turret' ? 1.25 : 1),
+      color: pic ? pic.color : s === 'ult' || s === 's2' ? tt.c[1] : tt.c[0], vfx: tt.vfx, shape: tt.shape, pix: pic ? pic.pix : undefined,
       sfx: { kind: tt.sfx, pitch: { basic: 1.25, s1: 1, s2: 1.1, ult: 0.75 }[s], len: { basic: 0.7, s1: 1, s2: 0.9, ult: 1.5 }[s] },
-      fx, _k: th.key, _m: mech, _w: th.word,
+      fx, _k: th.key, _m: K.m, _w: th.word,
     };
   }
-  // 6) 겉모습·능력치·특성
+  // 6) 겉모습·능력치·특성: 유형과 글에서
   const L = T(t1);
-  const look = { skin: pk(['#f2c79b', '#e8b48a', '#c98a5e', '#f6d8b8', '#8a5a3a']), hair: L.hair, body: L.body, accent: L.c[0], head: L.head, outfit: 'plain', weapon: 'none', aura: L.aura };
-  const W = [[/칼|검/, 'sword'], [/지팡이|마법|마술/, 'staff'], [/요술봉|마녀/, 'wand'], [/총|대포/, 'gun'], [/활|화살/, 'bow'], [/망치|해머|프라이팬/, 'hammer'], [/낫|저승/, 'scythe'], [/책|공부|숙제|사전/, 'book'], [/수정구|구슬/, 'orb'], [/방패/, 'shield'], [/단검|암살|닌자/, 'dagger'], [/도끼/, 'axe'], [/창(?!문)/, 'spear']];
+  const look = { skin: pk(['#f2c79b', '#e8b48a', '#c98a5e', '#f6d8b8', '#8a5a3a']), hair: L.hair, body: L.body, accent: L.c[0], head: L.head, outfit: 'plain', weapon: SA.weapon || 'none', aura: L.aura };
+  const W = [[/칼|검(?!은)/, 'sword'], [/지팡이|마법|마술/, 'staff'], [/요술봉|마녀/, 'wand'], [/총|대포/, 'gun'], [/활|화살/, 'bow'], [/망치|해머|프라이팬/, 'hammer'], [/낫|저승/, 'scythe'], [/책|공부|숙제|사전/, 'book'], [/수정구|구슬/, 'orb'], [/방패/, 'shield'], [/단검|암살|닌자/, 'dagger'], [/도끼/, 'axe'], [/창(?!문)/, 'spear']];
   for (const [re, w] of W) if (re.test(text)) { look.weapon = w; break; }
-  const HD = [[/왕|여왕|부자|황제/, 'crown'], [/천사/, 'halo'], [/악마/, 'horns'], [/고양이|토끼|여우|강아지|햄스터/, 'ears'], [/로봇|기계|ai|AI/, 'robot'], [/닌자|도둑|복면/, 'mask'], [/기사|군인|전사/, 'helmet'], [/마법사|마녀/, 'hat'], [/대머리/, 'bald']];
+  const HD = [[/왕|여왕|부자|황제/, 'crown'], [/천사/, 'halo'], [/악마/, 'horns'], [/고양이|토끼|여우|강아지|햄스터/, 'ears'], [/로봇|기계|ai|AI/, 'robot'], [/닌자|도둑|복면|암살/, 'mask'], [/기사|군인|전사/, 'helmet'], [/마법사|마녀|마술/, 'hat'], [/대머리/, 'bald']];
   for (const [re, hd] of HD) if (re.test(text)) { look.head = hd; break; }
+  const OF = { tank: 'armor', healer: 'robe', trickster: 'robe', nagger: 'suit', idol: 'dress', speedster: 'stripes', engineer: 'stripes', polluter: 'spots', gunner: 'suit' };
+  look.outfit = OF[sA] || 'plain';
   if (/마법|마녀|요술|주문/.test(text)) look.outfit = 'robe'; else if (/기사|갑옷|전사|군인/.test(text)) look.outfit = 'armor'; else if (/회사|출근|야근|사장|보고서/.test(text)) look.outfit = 'suit'; else if (/공주|드레스|여왕/.test(text)) look.outfit = 'dress'; else if (/죄수|줄무늬|얼룩말/.test(text)) look.outfit = 'stripes'; else if (/점박|무당벌레|달마시안/.test(text)) look.outfit = 'spots';
-  const stats = { hp: /단단|튼튼|거대|철벽|탱크|뚱뚱/.test(text) ? 120 : /약한|작은|하찮/.test(text) ? 85 : 100, speed: /빠르|빨라|스피드|번개처럼|날쌘/.test(text) ? 1.25 : /느리|느린|거북|굼뜬/.test(text) ? 0.85 : 1, size: /거대|거인|큰 몸/.test(text) ? 1.25 : /작은 몸|꼬마|작아/.test(text) ? 0.85 : 1 };
-  const PS = [[/회복|재생|치유|불사/, 'regen'], [/가시|선인장|고슴도치/, 'thorns'], [/흡혈|뱀파이어|빨아/, 'lifesteal'], [/단단|강철|철벽|갑옷/, 'armor'], [/분노|화가|빡/, 'rage'], [/부활|좀비|불사조/, 'revive'], [/빠르|날쌘|바람/, 'swift'], [/운|럭키|행운|도박/, 'crit'], [/피하|회피|닌자|미끌/, 'dodge']];
-  let passive = null;
-  for (const [re, k] of PS) if (re.test(text)) { passive = { k, desc: `${cut(text, 14)}에서 나온 특성` }; break; }
-  const title = cut(pk([`${n1}의 달인`, `${n1} 인간`, `${n1}술사`, `${n1} 마스터`, `걸어 다니는 ${n1}`, `${n1} 장인`]), 14);
-  const lines = {
-    intro: cut(pk([`${n1} 맛 좀 볼래?`, `${josa(n1, '이', '가')} 왔다!`, `오늘은 ${n1} 데이`, `${n1}의 힘을 보아라`]), 14),
-    ko: cut(pk([`내 ${josa(n1, '이', '가')}…`, `${n1}가 부족했어`, `${n1} 다시 충전…`]), 14),
-    win: cut(pk([`${josa(n1, '은', '는')} 최강이야!`, `역시 ${n1}밖에 없어`, `${n1} 앞에 무릎 꿇어라`]), 22),
+  const base = Object.assign({ hp: 100, speed: 1, size: 1 }, SA.stats);
+  const stats = {
+    hp: base.hp + (/단단|튼튼|거대|철벽|탱크|뚱뚱/.test(text) ? 15 : 0) - (/약한|작은|하찮/.test(text) ? 15 : 0),
+    speed: base.speed * (/빠르|빨라|스피드|번개처럼|날쌘/.test(text) ? 1.12 : /느리|느린|거북|굼뜬/.test(text) ? 0.88 : 1),
+    size: /거대|거인|큰 몸/.test(text) ? 1.25 : /작은 몸|꼬마|작아/.test(text) ? 0.85 : base.size,
   };
-  const raw = { title, concept: cut(text, 50) || '정체불명의 능력', look, stats, moves, passive, lines };
+  const PS = [[/회복|재생|치유|불사/, 'regen'], [/가시|선인장|고슴도치/, 'thorns'], [/흡혈|뱀파이어|빨아/, 'lifesteal'], [/단단|강철|철벽|갑옷/, 'armor'], [/분노|화가|빡/, 'rage'], [/부활|좀비|불사조/, 'revive'], [/빠르|날쌘|바람/, 'swift'], [/운|럭키|행운|도박/, 'crit'], [/피하|회피|닌자|미끌/, 'dodge']];
+  let pkey = SA.passive;
+  for (const [re, k] of PS) if (re.test(text)) { pkey = k; break; }
+  const passive = pkey ? { k: pkey, desc: cut(`${n1} ${PASSIVE_KO[pkey]}`, 30) } : null;
+  const title = cut(`${pk(FUN.titlePre)}${n1} ${pk(SA.title)}`, 14);
+  const lines = { intro: short(FUN.intro, n1, 14), ko: short(FUN.ko, n1, 14), win: short(FUN.win, n1, 22) };
+  const style = sA;
+  const raw = { title, concept: cut(text, 50) || '정체불명의 능력', look, stats, moves, passive, lines, style };
   if (!noDraw) raw.drawbacks = (sides || []).map((s) => smartDrawback(s.text, { text, moves, n1, themes, aura: look.aura }));
   return raw;
 }
@@ -1667,7 +1801,7 @@ function smartDrawback(side, ctx) {
   const SL = [[/궁극기|궁|필살기/, 'ult'], [/능력\s?1|첫\s?번째|기본/, 'basic'], [/능력\s?2|두\s?번째/, 's1'], [/능력\s?3|세\s?번째/, 's2']];
   // "~을 못 쓴다": 글자 그대로. 그 소재·행동이 들어간 기술은 정말로 그 소재가 안 나오는 기술로 바뀐다
   const NEG = /못\s?[가-힣]|안\s?(나(온|와|옴)|된|돼|써|쓰|생|통|먹)|사용\s?(불가|금지)|봉인|쓸 수 없|금지|할 수 없|사라(진|져|짐)|잃(는|어|었|음)|없어(진|져|짐)|빼앗|뺏|막힌|막혀/;
-  if (ctx && has(NEG) && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못|못 자|못 걷|못 뛰|못 피|못 먹(?!.*(능력|기술))/)) {
+  if (ctx && has(NEG) && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못|못 자|못 걷|못 뛰|못 피/)) {
     const slot = SL.find(([re]) => re.test(t));
     // 부작용 글에 나온 소재(사전으로 같은 주제까지) + 행동
     const keys = new Set(), words = [];
@@ -1735,7 +1869,8 @@ function smartDrawback(side, ctx) {
   if (PEST || chaser) add({ t: 'pest', every: 6, dmg: 3, name: chaser && !STOP.has(chaser[1]) ? chaser[1] : PEST ? PEST[1] : '무언가', color: '#ffe14a' });
   if (has(/춤/)) add({ t: 'tick', every: 7, st: { k: 'dance', d: 1.5 } });
   if (has(/잠|졸|하품/)) add({ t: 'tick', every: 8, st: { k: 'sleep', d: 2 } });
-  if (has(/재채기|딸꾹|기침|방귀|트림/)) add({ t: 'tick', every: 6, st: { k: 'stun', d: 1 } });
+  if (has(/방귀|뿡|트림|꺽/) && !say) add({ t: 'shout', on: 'skills', text: has(/트림|꺽/) ? '꺼억~' : pick(['뿌웅~', '뿡!', '뿌지직']) });
+  if (has(/재채기|딸꾹|기침/)) add({ t: 'tick', every: 6, st: { k: 'stun', d: 1 } });
   if (has(/대머리|머리가 빠/)) add({ t: 'look', head: 'bald' });
   if (has(/분홍|핑크/)) add({ t: 'look', body: '#ff9ad0', hair: '#ff7ab0' });
   if (has(/초록|녹색/)) add({ t: 'look', body: '#4fbf5f', skin: '#a8e08a' });
@@ -1773,6 +1908,13 @@ function smartDrawback(side, ctx) {
     const h = hashText(t);
     add([{ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } }, { t: 'move', mode: 'drunk' }, { t: 'reverse', on: 'skills', chance: 40 }, { t: 'tick', every: 8, st: { k: 'sleep', d: 1.5 } }, { t: 'fail', on: 'skills', chance: 35, back: 'fizzle' }][h % 5]);
   }
+  if (has(/가끔|때때로|종종|어쩌다|확률|랜덤하게|간혹/)) for (const x of out) if (x.chance != null) x.chance = 40;
+  if (ctx && ctx.moves) {
+    const COND = [[/숨으면|숨을 때|은신하면/, 'invis'], [/던지면|던질 때|쏘면|쏠 때|발사하면/, 'shot'], [/날면|날 때|날아오르면/, 'fly'], [/먹으면|먹을 때|마시면/, 'heal'], [/부르면|소환하면|부를 때/, 'summon'], [/터뜨리면|터질 때|폭발하면/, 'boom'], [/돌진하면|달려들면|박치기하면/, 'dash'], [/순간이동하면|사라지면/, 'blink'], [/뿜으면|광선을 쏘면/, 'beam']];
+    const c = COND.find(([re]) => re.test(t));
+    const slot = c && SLOTS.find((s) => ctx.moves[s]._m === c[1]);
+    if (slot) for (const x of out) if (x.on === 'skills') x.on = slot;
+  }
   const clean = out.map((x) => [x, sanDfx(x)]).filter(([, c]) => c);
   const fx = clean.length ? clean[0][1] : sanDfx({ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } });
   const f = fx, more = clean.slice(1).map(([, c]) => c), rawMore = clean.slice(1).map(([x]) => x);
@@ -1788,6 +1930,161 @@ function lameMoves(n) {
   M.s2.name = cut(pk([`${n} 없이 도망`, '줄행랑']), 12);
   M.ult.name = cut(pk([`${n} 없이 떼쓰기`, `${n} 돌려줘!`, `${n} 장례식`]), 12); M.ult.say = cut(`${n} 돌려줘!!`, 10);
   return M;
+}
+
+/* ===== 소재 그림책: 글에 나온 물건을 발사체·소환물 그림으로 (12x12, 오른쪽을 본다) =====
+   '#' 기본색 · 'o' 밝은 곳 · '.' 어두운 곳 · 'w' 흰색 · 'k' 검정 · ' ' 빈칸 */
+const PIXBOOK = [
+  [/양말|스타킹/, '#e8e8f0', [
+    '   ####     ', '   wwww     ', '   #o##     ', '   wwww     ', '   #o##     ', '   #o##     ',
+    '   #o####   ', '   #o#####  ', '   ######## ', '   ######## ', '    ......  ', '            ']],
+  [/방귀|냄새|구린|악취|가스|트림/, '#a8d84f', [
+    '            ', '   ###  ##  ', '  #oo####o# ', ' #oo#######.', '#o##k###k###', '############',
+    '#####..#####', ' #...kk...# ', '  ##.  .##  ', '            ', ' .   .   .  ', '  .   .   . ']],
+  [/똥|응가|변기|설사|변비/, '#8a5a2a', [
+    '     ##     ', '    #o#     ', '   #oo##    ', '   ######   ', '  #o######  ', '  ##k##k##  ',
+    ' #o######## ', ' ###kkkk### ', '############', '############', ' .......... ', '            ']],
+  [/라면|국수|우동|짬뽕|라멘|마라탕|쌀국수|짜장/, '#f0c050', [
+    '  w  w  w   ', '   w  w  w  ', '  w  w  w   ', '            ', '#o#o#o#o#o##', '############',
+    '............', ' .......... ', '  ........  ', '   ......   ', '            ', '            ']],
+  [/치킨|닭다리|고기|삼겹살|족발|스테이크|갈비|소시지|햄|베이컨/, '#c8782f', [
+    '      ####  ', '    #oooo## ', '   #oo#####.', '   #o######.', '   #######..', '    #####.. ',
+    '   ww....   ', '  www       ', ' www        ', 'ww w        ', 'w           ', '            ']],
+  [/피자/, '#ffcf3a', [
+    'oo          ', '#o##        ', '##..##      ', '#o..###     ', '#######.##  ', '##..########',
+    '##..########', '#######.##  ', '#o..###     ', '####        ', '##          ', '            ']],
+  [/햄버거|버거|샌드위치/, '#d8963a', [
+    '            ', '   ######   ', '  #o#o#o##  ', ' #o########.', ' ##########.', ' wwwwwwwwww ',
+    ' .......... ', ' .k.k.k.k.. ', ' wwwwwwwwww ', ' ########## ', '  ########  ', '            ']],
+  [/바나나/, '#ffe14a', [
+    '          ..', '         #o ', '        #o# ', '       #o## ', '      #o##  ', '    ##o###  ',
+    '  ##o####.  ', '###o####..  ', ' ######..   ', '  .....     ', '            ', '            ']],
+  [/사탕|캔디|롤리팝|츄파춥스/, '#ff6ab0', [
+    '            ', '            ', '#.   ##   .#', '##. #oo# .##', '###wo#w#.###', '###o#w##.###',
+    '##. #w.# .##', '#.   ##   .#', '            ', '            ', '            ', '            ']],
+  [/아이스크림|빙과|소프트콘|젤라또/, '#ff9ad0', [
+    '   ####     ', '  #oo###    ', ' #o######   ', ' ########   ', ' #w##w###   ', '  ......    ',
+    '  ......    ', '   ....     ', '   ....     ', '    ..      ', '    ..      ', '            ']],
+  [/도넛|케이크|마카롱|쿠키|빵(?!꾸)|식빵|토스트|와플|팬케이크/, '#ff8ac0', [
+    '            ', '   ######   ', '  #ow##w##  ', ' #o##w###w# ', ' #w##  ##w# ', ' ###    ### ',
+    ' ##w#  #### ', ' #w####w##. ', '  #####w#.  ', '   ......   ', '            ', '            ']],
+  [/고양이|냥/, '#ffb050', [
+    ' #       #  ', ' ##     ##  ', ' #o#####o#  ', ' #########  ', ' ##k###k##  ', ' ##w###w##  ',
+    'w####.####w ', ' ###k.k###  ', 'w#########w ', '  #######   ', '            ', '            ']],
+  [/강아지|개(?!구리|미|그)|멍멍|늑대|여우/, '#c8905a', [
+    '..      ..  ', '...####...  ', '..#oo###..  ', '..######..  ', ' .#k##k#.   ', '  ######    ',
+    '  ##kk##    ', '  #wkkw#    ', '   #ww#     ', '    ##      ', '            ', '            ']],
+  [/돼지|꿀꿀/, '#ffb0c8', [
+    '            ', ' #      #   ', ' ##    ##   ', ' #o######   ', ' ##k##k##   ', ' ########   ',
+    ' ##....##   ', ' ##.k.k.#   ', ' ##....##   ', '  ######    ', '            ', '            ']],
+  [/오리|거위|닭|병아리|새(?!로|우|벽)|참새|비둘기|펭귄|앵무새/, '#ffe14a', [
+    '      ####  ', '     #o###  ', '     ##k#...', '     #####..', '  #  ####   ', ' ##########.',
+    ' #o#########', ' ##########.', '  ########  ', '   ......   ', '            ', '            ']],
+  [/물고기|상어|고래|붕어|잉어|금붕어|연어|참치|고등어|멸치|복어|돌고래/, '#6ab0ff', [
+    '            ', '     ###    ', '   #oo####  ', '#  #o####k# ', '## ########.', '###########.',
+    '## #######. ', '#   ######  ', '     ...    ', '            ', '            ', '            ']],
+  [/벌(?!레)|꿀벌|말벌|모기|파리|벌레|나비|매미|무당벌레/, '#ffcf3a', [
+    '            ', '    ww ww   ', '   wwwwww   ', '    ww ww   ', '  ##k#k##   ', ' #o#k#k###k ',
+    'k##k#k#k##kk', ' ##k#k#k##k ', '  ##k#k##   ', '            ', '            ', '            ']],
+  [/돈|동전|지폐|월급|용돈|로또|복권|부자|코인|비트코인/, '#ffcf3a', [
+    '    #  #    ', '     ##     ', '    ####    ', '   #oo###   ', '  #o##k###  ', ' #o##kkk###.',
+    ' ####k#####.', ' #####kk##..', ' ##k###k##..', '  ##kkk##.. ', '   ......   ', '            ']],
+  [/책|숙제|시험|교과서|공부|사전|공책|보고서|수행평가|과제/, '#d84f4f', [
+    '            ', ' #########  ', ' #ooooooo#w ', ' #o#kk#kk#w ', ' #########w ', ' #k#k#kk##w ',
+    ' #########w ', ' #o#kk#k##w ', ' #########w ', ' ........ww ', '            ', '            ']],
+  [/휴대폰|핸드폰|스마트폰|폰|카톡|인스타|유튜브|틱톡|알림/, '#3a3a4a', [
+    '  ######    ', '  #wwww#    ', '  #wwww#    ', '  #wkkw#    ', '  #wwww#    ', '  #wwww#    ',
+    '  #wwww#    ', '  ##oo##    ', '  ######    ', '            ', '            ', '            ']],
+  [/칼|검(?!은|사)|단검|비수|가위|낫|도끼/, '#c8c8d8', [
+    '            ', '            ', '   .        ', '   .        ', '...#wwwwwww ', '...#ooooooo#',
+    '...####### ', '   .        ', '   .        ', '            ', '            ', '            ']],
+  [/총|권총|물총|기관총|저격|대포|탄환/, '#4a4a5a', [
+    '            ', '            ', ' ########## ', ' #oooooooo# ', ' ##########k', '  ###.      ',
+    '  ##..      ', '  ##.       ', '  ##        ', '            ', '            ', '            ']],
+  [/폭탄|다이너마이트|수류탄|폭죽/, '#3a3a4a', [
+    '        w w ', '       .w   ', '      .  w  ', '   ####.    ', '  #o#####   ', ' #o#######  ',
+    ' #w#######  ', ' #########  ', ' #########  ', '  #######   ', '   #####    ', '            ']],
+  [/귀신|유령|영혼|빙의|처녀귀신|달걀귀신/, '#e8e8ff', [
+    '   #####    ', '  #ooo###   ', ' #o#######  ', ' ##k###k##  ', ' ##k###k##  ', ' #########  ',
+    ' ###kkk###  ', ' #########  ', ' #########  ', ' ## ### ##  ', ' #   #   #  ', '            ']],
+  [/해골|뼈|좀비|미라|저승/, '#f0f0e0', [
+    '            ', '  ######    ', ' #oo#####   ', '#o########  ', '##kk##kk##  ', '##kk##kk##  ',
+    '#####k####  ', ' ########   ', '  #k#k#k#   ', '  #######   ', '            ', '            ']],
+  [/눈송이|눈(?=을|이|\s|$)|눈사람|눈덩이|눈보라|얼음|빙하|고드름/, '#bff0ff', [
+    '     #      ', '   # # #    ', '    ###     ', ' #   w   #  ', '  #  #  #   ', '###########',
+    '  #  #  #   ', ' #   #   #  ', '    ###     ', '   # # #    ', '     #      ', '            ']],
+  [/태양|해님|햇빛|햇살/, '#ffcf3a', [
+    '     #      ', '  #  #  #   ', '   #####    ', '  #oo####   ', '###o#####.##', '  #k###k#.  ',
+    '  ########  ', '  #k###k#.  ', '   #kkk#.   ', '  #  #  #   ', '     #      ', '            ']],
+  [/시계|시간|타이머|알람|초시계|모래시계/, '#f0f0f0', [
+    '            ', '   ......   ', '  .######.  ', ' .###k####. ', ' .###k####. ', ' .###kkk##. ',
+    ' .########. ', ' .########. ', '  .######.  ', '   ......   ', '            ', '            ']],
+  [/로봇|기계|AI|ai|안드로이드|사이보그/, '#9ab0c8', [
+    '     k      ', '     #      ', '  #######   ', '  #w###w#   ', '  #k###k#   ', '  #######   ',
+    '  #kkkkk#   ', '  #######   ', ' .#######.  ', '  ##   ##   ', '            ', '            ']],
+  [/냉장고|세탁기|전자레인지|에어컨|자판기/, '#e8f0f8', [
+    ' ########   ', ' #o######   ', ' #o#####k   ', ' #o######   ', ' ........   ', ' #o######   ',
+    ' #o#####k   ', ' #o######   ', ' #o######   ', ' #o######   ', ' ########   ', '  .    .    ']],
+  [/우산|양산/, '#ff4d6d', [
+    '            ', '    ####    ', '  #o######  ', ' #o######## ', '############', '#.#.#.#.#.#.',
+    '     .      ', '     .      ', '     .      ', '   . .      ', '    .       ', '            ']],
+  [/신발|슬리퍼|운동화|구두|장화/, '#4f8fff', [
+    '            ', '   ####     ', '   #oo#     ', '   #oo##    ', '  ##o####   ', '  ######### ',
+    ' #o#########', ' ###########', ' wwwwwwwwww ', '            ', '            ', '            ']],
+  [/공(?!격|부|룡|기|간|중|주|포|장)|축구|농구|배구|피구|볼링|테니스|탁구|야구공/, '#ffffff', [
+    '            ', '   ####     ', '  #oo###    ', ' #o#kk###   ', ' ##kkkk##.  ', ' ###kk###.  ',
+    ' #k####k#.  ', ' #kk##kk#.  ', '  ######.   ', '   ....     ', '            ', '            ']],
+  [/풍선|비눗방울|거품/, '#ff5a8a', [
+    '   ####     ', '  #oo###    ', ' #o######   ', ' #o######   ', ' ########   ', ' #######.   ',
+    '  #####.    ', '   ###.     ', '    #       ', '    .       ', '     .      ', '    .       ']],
+  [/프라이팬|냄비|후라이팬/, '#5a5a6a', [
+    '            ', '  ######    ', ' #......#   ', '#..w.....#  ', '#.........##', '#.........##',
+    '#........#  ', ' #......#   ', '  ######    ', '            ', '            ', '            ']],
+  [/주먹|펀치|근육|힘|괴력|태권도|복싱|권투/, '#f2c79b', [
+    '            ', '   #####    ', '  #o#o#o#   ', '  #######.  ', '  #o#o#o#.  ', ' ########.  ',
+    ' #o######.  ', ' #######..  ', '  #####..   ', '   ....     ', '            ', '            ']],
+  [/마이크|노래|고음|랩|샤우팅|아이돌|떼창/, '#5a5a6a', [
+    '     ###    ', '    #ooo#   ', '    #o#o#   ', '    #ooo#   ', '     ###    ', '     .#.    ',
+    '      #     ', '      #     ', '      #     ', '     ...    ', '            ', '            ']],
+  [/당근|채소|오이|고추|가지/, '#ff8a2f', [
+    ' ..  ..     ', '  ....      ', '   ##       ', '  #o##      ', '  #o###     ', '   ####     ',
+    '   #o##     ', '    ###     ', '    ##      ', '    #       ', '            ', '            ']],
+  [/계란|달걀|에그|오믈렛/, '#ffcf3a', [
+    '            ', '   wwww     ', ' wwwwwwww   ', 'wwww##wwww  ', 'www#oo#www  ', 'www####www  ',
+    'wwww##wwww  ', ' wwwwwwww   ', '   wwww     ', '            ', '            ', '            ']],
+  [/버섯/, '#e83a3a', [
+    '            ', '   ######   ', '  #ow##w##  ', ' #o######## ', ' ##w###w### ', '############',
+    '   wwwwww   ', '   wwkwkw   ', '   wwwwww   ', '    wwww    ', '            ', '            ']],
+  [/보석|다이아|크리스탈|수정|금괴/, '#7fe8ff', [
+    '            ', '            ', '  ########  ', ' #oo#o#####.', '############', ' ########.. ',
+    '  ######..  ', '   ####..   ', '    ##..    ', '     ..     ', '            ', '            ']],
+  [/로켓|우주선|미사일|인공위성/, '#e8e8f0', [
+    '            ', '  .         ', '  ..        ', 'w  #######  ', 'ww#o###kk## ', 'ww#o###kk###',
+    'w  #######  ', '  ..        ', '  .         ', '            ', '            ', '            ']],
+  [/자동차|트럭|버스|택시|스포츠카|레이싱/, '#ff4d4d', [
+    '            ', '   #####    ', '  #ww#ww#   ', ' #ww##ww##  ', '###########.', '#o#########.',
+    '############', ' kk     kk  ', ' kk     kk  ', '            ', '            ', '            ']],
+  [/이빨|앞니|송곳니|어금니|치아/, '#ffffff', [
+    '            ', '  ######    ', ' #oooooo#   ', ' #o######   ', ' ########   ', ' ########   ',
+    '  ######    ', '  ##  ##    ', '  #    #    ', '            ', '            ', '            ']],
+  [/쓰레기|휴지통|음식물/, '#7a8a7a', [
+    '            ', ' ########## ', '  ..####..  ', '  ########  ', '  #o#o#o##  ', '  #o#o#o##  ',
+    '  #o#o#o##  ', '  ########  ', '   ......   ', '            ', '            ', '            ']],
+  [/꽃|장미|해바라기|튤립|벚꽃/, '#ff6ab0', [
+    '    ##      ', '  ##oo##    ', '  #o##o#    ', ' ###ww###   ', ' #o#ww#o#   ', '  ##..##    ',
+    '  ##..##    ', '    ..      ', '   ...      ', '    ..      ', '            ', '            ']],
+  [/휴지|두루마리|화장지/, '#f8f8f8', [
+    '            ', '  ######    ', ' #oooooo#   ', ' #o#..#o#   ', ' #o#..#o#   ', ' #oooooo####',
+    ' #########o#', '  ######### ', '            ', '            ', '            ', '            ']],
+  [/코딱지|콧물|가래|침|땀|눈물|오줌/, '#b8e04f', [
+    '            ', '     #      ', '    ##      ', '   #o#      ', '  #o###     ', ' #o#####    ',
+    ' #######.   ', ' #######.   ', '  #####.    ', '   ...      ', '            ', '            ']],
+];
+/** 소재 단어에 맞는 그림 (없으면 null) */
+function pixFor(word) {
+  if (!word) return null;
+  for (const [re, color, pix] of PIXBOOK) if (re.test(word)) return { color, pix };
+  return null;
 }
 
 /* ===== 픽셀 그림 (고해상도: 게임 1칸 = 3x3 픽셀) ===== */
