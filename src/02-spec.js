@@ -93,6 +93,19 @@ function sanFx(e, slot) {
     case 'snipe': return { t: 'snipe', dmg: num(e.dmg, 5, 50, 24), delay: num(e.delay, 0.3, 1, 0.55), kb: num(e.kb, 0, 10, 8), st };
     case 'gust': return { t: 'gust', dmg: num(e.dmg, 0, 10, 3), len: num(e.len, 30, 110, 70), arc: num(e.arc, 30, 120, 70), kb: num(e.kb, 4, 10, 10), st };
     case 'drain': return slot === 'basic' ? null : { t: 'drain', dmg: num(e.dmg, 1, 8, 3), range: num(e.range, 40, 160, 110), dur: num(e.dur, 0.6, 3, 1.6), ticks: Math.round(num(e.ticks, 2, 10, 6)), heal: num(e.heal, 0, 5, 2), st };
+    /* ----- 추가 공격 12종 (단어 전용 패턴용) ----- */
+    case 'bite': return { t: 'bite', dmg: num(e.dmg, 3, 40, 14), r: num(e.r, 10, 34, 16), range: num(e.range, 20, 140, 40), kb: num(e.kb, 0, 10, 4), st };
+    case 'stampede': return { t: 'stampede', dmg: num(e.dmg, 2, 25, 9), n: Math.round(num(e.n, 1, 8, 4)), speed: num(e.speed, 100, 320, 200), len: num(e.len, 80, 300, 200), size: num(e.size, 4, 14, 7), kb: num(e.kb, 0, 10, 6), st };
+    case 'pillar': return { t: 'pillar', dmg: num(e.dmg, 2, 30, 10), n: Math.round(num(e.n, 2, 9, 5)), step: num(e.step, 12, 32, 20), r: num(e.r, 6, 18, 10), lift: bool(e.lift), kb: num(e.kb, 0, 8, 2), st };
+    case 'lasergrid': return { t: 'lasergrid', dmg: num(e.dmg, 3, 35, 14), n: Math.round(num(e.n, 2, 6, 4)), delay: num(e.delay, 0.4, 1.2, 0.7), kb: num(e.kb, 0, 8, 3), st };
+    case 'hop': return { t: 'hop', dmg: num(e.dmg, 3, 30, 12), n: Math.round(num(e.n, 1, 5, 3)), r: num(e.r, 10, 40, 22), size: num(e.size, 4, 14, 8), kb: num(e.kb, 0, 10, 6), st };
+    case 'swarm': return slot === 'basic' ? null : { t: 'swarm', dmg: num(e.dmg, 1, 6, 2), r: num(e.r, 10, 34, 18), dur: num(e.dur, 1.5, 7, 4), speed: num(e.speed, 30, 120, 70), st };
+    case 'bubble': return { t: 'bubble', dmg: num(e.dmg, 0, 20, 5), n: Math.round(num(e.n, 1, 3, 1)), speed: num(e.speed, 70, 220, 130), size: num(e.size, 2, 8, 4), d: num(e.d, 0.5, slot === 'basic' ? 0.6 : 1.6, 1) };
+    case 'grab': return { t: 'grab', dmg: num(e.dmg, 3, 40, 14), r: num(e.r, 10, 28, 16), range: num(e.range, 50, 240, 160), delay: num(e.delay, 0.25, 0.9, 0.45), kb: num(e.kb, 0, 10, 8), st };
+    case 'claw': return { t: 'claw', dmg: num(e.dmg, 2, 18, 6), r: num(e.r, 14, 50, 26), kb: num(e.kb, 0, 6, 2), st };
+    case 'crack': return { t: 'crack', dmg: num(e.dmg, 3, 35, 13), len: num(e.len, 50, 240, 140), speed: num(e.speed, 100, 300, 190), r: num(e.r, 6, 20, 11), kb: num(e.kb, 0, 10, 5), st };
+    case 'stomp': return { t: 'stomp', dmg: num(e.dmg, 2, 25, 8), n: Math.round(num(e.n, 1, 4, 3)), r: num(e.r, 12, 40, 20), kb: num(e.kb, 0, 10, 5), st };
+    case 'sonic': return { t: 'sonic', dmg: num(e.dmg, 1, 18, 6), n: Math.round(num(e.n, 1, 4, 2)), len: num(e.len, 40, 180, 110), arc: num(e.arc, 30, 140, 70), kb: num(e.kb, 0, 10, 3), st };
     case 'blast':
       return { t: 'blast', dmg: num(e.dmg, 1, 50, 14), r: num(e.r, 6, 56, 18), at, off: num(e.off, 0, 140, 26), delay: num(e.delay, 0, 1.5, 0.15), kb: num(e.kb, -10, 10, 5), st };
     case 'zone':
@@ -161,6 +174,15 @@ function fxExpected(e) {
     case 'top': return e.dmg * e.n * 1.5;
     case 'beacon': return e.dmg * (e.dur / e.rate) * 0.4;
     case 'gust': return e.dmg + 3;
+    case 'bite': case 'grab': case 'crack': return e.dmg;
+    case 'stampede': return e.dmg * Math.min(e.n, 3) * 0.7;
+    case 'pillar': case 'lasergrid': return e.dmg * 1.3;
+    case 'hop': return e.dmg * Math.min(e.n, 3) * 0.6;
+    case 'swarm': return e.dmg * (e.dur / 0.4) * 0.45;
+    case 'bubble': return e.dmg + 8;
+    case 'claw': return e.dmg * 2.2;
+    case 'stomp': return e.dmg * Math.min(e.n, 3) * 0.7;
+    case 'sonic': return e.dmg * e.n * 0.8;
     case 'drain': return e.dmg * e.ticks + e.heal * e.ticks * 0.5;
     case 'summon':
       if (e.kind === 'turret') return e.dmg * e.rate * e.dur * 0.35 * e.n;
@@ -745,6 +767,10 @@ EFFECT (아레나 480x320px, 캐릭터 키 10px, 이동 속도 약 96px/초, 거
  vortex 소용돌이 장판(계속 빨아들임) dmg r dur pull at · storm 낙뢰(적 주변에 번개 연타) dmg n r · ring 가두는 고리(테두리를 넘으면 피해) dmg r dur at · phantom 환영 베기(돌진한 길이 뒤늦게 베어짐) dmg dist
  spiral 나선 탄막 dmg n speed dir · prism 세 갈래 광선 dmg len w spread ticks dur · whip 채찍(휘는 긴 일격) dmg len · skyline 일직선 하늘 낙하(검의 비) dmg n step r · gatling 개틀링 연사 dmg n spread
  top 팽이(돌아다니며 부딪힘) dmg n speed dur · beacon 신호탑(설치하면 주기적으로 충격파) dmg r rate dur · snipe 저격(조준선 후 한 방) dmg delay · gust 돌풍(넓게 강하게 밀침) dmg len arc kb · drain 흡혈 줄(연결해 피해를 주며 회복) dmg range dur ticks heal
+ bite 거대한 입(앞이나 가까운 적을 덥석 문다) dmg r range · stampede 떼 돌진(무리가 한 방향으로 우르르 달려감) dmg n speed len size · pillar 솟는 기둥 연쇄(앞으로 줄줄이 솟음, lift면 띄움) dmg n step r lift
+ lasergrid 레이저망(적 주변에 경고선이 깜빡인 뒤 한꺼번에 발사) dmg n delay · hop 통통 튀는 덩어리(적에게 뛰어가 착지할 때마다 쿵) dmg n r size · swarm 떼구름(벌레·새 떼가 적을 쫓아다니며 쪼음) dmg r dur speed
+ bubble 거품 감옥(맞으면 거품에 갇혀 둥둥 뜸) dmg n speed size d · grab 거대 손(땅에서 손이 솟아 잡아채 내 앞으로 패대기) dmg r range delay · claw 할퀴기(세 줄 손톱) dmg r · crack 땅 균열(갈라짐이 앞으로 달려감) dmg len speed r
+ stomp 발 구르기(내 자리에서 점점 커지는 쿵쿵) dmg n r · sonic 음파(앞으로 부채꼴 고리가 퍼짐) dmg n len arc
  모든 추가 공격은 {"t":"이름", 값들..., "st":ST} 형태로 쓴다.
  {"t":"blast","dmg":4~50,"r":6~56,"at":"self|front|target","off":0~140,"delay":0~1.5,"kb":-10~10,"st":ST} 폭발(kb 음수는 끌어당김, front는 적 방향 off만큼 앞, target은 적 위치)
  {"t":"zone","dmg":0~8,"r":8~50,"dur":1.5~8,"at":"self|front|target","off":0~140,"follow":bool,"heal":0~6,"st":ST} 장판(0.5초마다 dmg, heal은 안에 선 자신 회복, follow는 자신을 따라다님)

@@ -968,6 +968,87 @@ class Battle {
           this.objs.push(o); break;
         }
 
+        /* ----- 추가 공격 12종 ----- */
+        case 'bite': {
+          const o = base(i, 0, 'bite', e), t = this.pickTarget(c, x, cy, ang, e.range, true), dd = Math.min(e.range, 14 + e.r);
+          Object.assign(o, { x: t ? t.x : cx(x + ca * dd), y: t ? this.bodyY(t) : cyy(cy + sa * dd), r: e.r, fuse: 0.24, life: 0.55, max: 0.55 });
+          this.objs.push(o); break;
+        }
+        case 'stampede':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'runner', e), off = (j - (e.n - 1) / 2) * (e.size * 2 + 6), back = 14 + (j % 2) * 10;
+            Object.assign(o, { x: cx(x - ca * back - sa * off), y: cyy(y - sa * back + ca * off), vx: ca * e.speed, vy: sa * e.speed, r: e.size, life: e.len / e.speed + 0.2, max: e.len / e.speed + 0.2, delay: (j % 3) * 0.06 });
+            this.objs.push(o);
+          }
+          this.shake = Math.max(this.shake, 2); this.sfx('dash', style); break;
+        case 'pillar':
+          for (let j = 0; j < e.n; j++) {
+            const d = 16 + j * e.step, o = base(i, j, 'pillar', e);
+            Object.assign(o, { x: cx(x + ca * d), y: cyy(y + sa * d), r: e.r, delay: j * 0.07, life: 0.55, max: 0.55, trig: false, st: e.lift ? { k: 'air', d: 0.6 } : e.st });
+            this.objs.push(o);
+          }
+          break;
+        case 'lasergrid': {
+          const o = base(i, 0, 'lgrid', e), segs = [], L = 150, half = (Math.ceil(e.n / 2) - 1) / 2;
+          for (let j = 0; j < e.n; j++) {
+            const off = (Math.floor(j / 2) - half) * 34 + (R() - 0.5) * 8;
+            if (j % 2 === 0) segs.push([cx(tx - L), cyy(ty - 5 + off), cx(tx + L), cyy(ty - 5 + off)]);
+            else segs.push([cx(tx + off), cyy(ty - 5 - L * 0.7), cx(tx + off), cyy(ty - 5 + L * 0.7)]);
+          }
+          Object.assign(o, { x: tx, y: ty, segs, fuse: e.delay, life: e.delay + 0.3, max: e.delay + 0.3 });
+          this.objs.push(o); this.sfx('beam', style); break;
+        }
+        case 'hop': {
+          const o = base(i, 0, 'hopper', e);
+          Object.assign(o, { x: x + ca * 8, y: y + sa * 8, x0: x, y0: y, x1: x, y1: y, r: e.r, size: e.size, hops: e.n, hk: 0, ht: 0, hdur: 0.42, life: e.n * 0.42 + 0.3, max: e.n * 0.42 + 0.3, ang, h: 0 });
+          this.objs.push(o); this.sfx('summon'); break;
+        }
+        case 'swarm': {
+          const o = base(i, 0, 'swarm', e);
+          Object.assign(o, { x: x + ca * 10, y: cy + sa * 10, r: e.r, speed: e.speed, life: e.dur, max: e.dur, rehit: 0.4, bugs: Array.from({ length: 10 }, () => [R() * 6.28, 0.4 + R() * 0.6]) });
+          this.objs.push(o); this.sfx('summon'); break;
+        }
+        case 'bubble':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'shot', e), an = ang + (e.n > 1 ? (j / (e.n - 1) - 0.5) * 0.5 : 0);
+            Object.assign(o, { x: x + ca * 6, y: cy + sa * 6, vx: Math.cos(an) * e.speed, vy: Math.sin(an) * e.speed, r: e.size, life: 2.2, homing: 0.25, bounce: 1, boom: 0, bubble: e.d, st: { k: 'air', d: e.d } });
+            this.objs.push(o);
+          }
+          break;
+        case 'grab': {
+          const t = this.pickTarget(c, x, cy, ang, e.range, false), o = base(i, 0, 'grab', e);
+          Object.assign(o, { x: t ? t.x : cx(x + ca * 60), y: t ? t.y : cyy(y + sa * 60), r: e.r, fuse: e.delay, life: e.delay + 0.5, max: e.delay + 0.5 });
+          this.objs.push(o); break;
+        }
+        case 'claw': {
+          const fx0 = x + ca * (e.r * 0.4 + 8), fy0 = cy + sa * (e.r * 0.4 + 8), px = -sa, py = ca, dx = ca * 0.5 + px * 0.85, dy = sa * 0.5 + py * 0.85;
+          for (let j = 0; j < 3; j++) {
+            const o = base(i, j, 'slash', e), off = (j - 1) * 7, mx = fx0 + ca * off * 0.3 + px * off, my = fy0 + sa * off * 0.3 + py * off, L = e.r * 0.5;
+            Object.assign(o, { x0: mx - dx * L, y0: my - dy * L, x1: mx + dx * L, y1: my + dy * L, x: mx, y: my, fuse: 0.03 + j * 0.05, life: 0.33 + j * 0.05, max: 0.33 + j * 0.05, claw: true });
+            this.objs.push(o);
+          }
+          this.sfx('dash', style); break;
+        }
+        case 'crack': {
+          const o = base(i, 0, 'crack', e);
+          Object.assign(o, { x: x + ca * 8, y: y + sa * 8, ang, speed: e.speed, r: e.r, len: e.len, gone: 0, pts: [[x + ca * 8, y + sa * 8]], life: e.len / e.speed + 0.7, max: e.len / e.speed + 0.7 });
+          this.objs.push(o); this.sfx('boom', style); break;
+        }
+        case 'stomp':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'blast', e);
+            Object.assign(o, { x, y: y - 2, r: e.r * (1 + j * 0.35), delay0: 0.12 + j * 0.3, life: 0.5 + j * 0.3, trig: false, land: true });
+            this.objs.push(o);
+          }
+          break;
+        case 'sonic':
+          for (let j = 0; j < e.n; j++) {
+            const o = base(i, j, 'wave', e);
+            Object.assign(o, { x, y, r: e.len, cur: 2, prev: 0, life: 0.5, max: 0.5, delay: j * 0.15, arc: e.arc * Math.PI / 180, ang, puffed: true });
+            this.objs.push(o);
+          }
+          this.sfx('beam', style); break;
+
         case 'blast': case 'zone': {
           const o = base(i, 0, e.t, e);
           let ox = x, oy = e.t === 'zone' ? y - 1 : cy;
@@ -1072,6 +1153,7 @@ class Battle {
   killObj(o, victim) {
     if (o.dead) return;
     o.dead = true;
+    if (o.bubble && victim >= 0 && this.fighters[victim]) this.objs.push({ uid: o.uid + 'q', owner: o.owner, kind: 'btrap', fid: victim, x: o.x, y: o.y, dmg: 0, mul: 1, st: null, kb: 0, color: o.color, cl: o.cl, dk: o.dk, rows: o.rows, gm: o.gm, vfx: o.vfx, hit: new Map(), age: 0, life: o.bubble, max: o.bubble, delay: 0, ph: 0 });
     if (o.net) {
       this.objs.push({ uid: o.uid + 'n', owner: o.owner, kind: 'zone', dmg: 0, mul: o.mul, st: { k: 'root', d: 0.9 }, kb: 0, color: '#e8e8f0', cl: '#ffffff', dk: '#8a8aa0', rows: o.rows, gm: o.gm, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0.5, delay: 0, x: o.x, y: o.y + 3, r: o.net.r, life: o.net.d, max: o.net.d, heal: 0, netz: true });
       this.vfxImpact(o.vfx, '#e8e8f0', o.x, o.y, 0.8);
@@ -1209,7 +1291,7 @@ class Battle {
           o.prev = o.cur; o.cur = 2 + (o.r - 2) * (1 - (1 - p) * (1 - p));
           for (let k = 0; k < 3; k++) { const an = Math.random() * 6.283; this.addP('px', o.x + Math.cos(an) * o.cur, o.y + Math.sin(an) * o.cur * 0.8, Math.cos(an) * 30, Math.sin(an) * 20 - 20, 0.35, k ? o.color : '#ffffff', 1); }
           if (!o.puffed) { o.puffed = true; this.decal(o.x, o.y + 1, Math.min(14, o.r * 0.3), o.dk); this.sfx('boom', o.vfx); }
-          this.checkHits(o, (v) => { const d = Math.hypot(v.x - o.x, (v.y - o.y) / 0.8); return d <= o.cur + 5 * v.size && d >= o.prev - 8 - 4 * v.size; });
+          this.checkHits(o, (v) => { const d = Math.hypot(v.x - o.x, (v.y - o.y) / 0.8); if (o.arc) { const da = Math.atan2(v.y - o.y, v.x - o.x) - o.ang; if (Math.abs(Math.atan2(Math.sin(da), Math.cos(da))) > o.arc / 2 + 0.25) return false; } return d <= o.cur + 5 * v.size && d >= o.prev - 8 - 4 * v.size; });
           break;
         }
         case 'chain':
@@ -1320,6 +1402,87 @@ class Battle {
           if (o.pulse <= 0) {
             o.pulse = o.rate;
             this.objs.push({ uid: o.uid + 'w' + (o.pn++), owner: o.owner, kind: 'wave', dmg: o.dmg, mul: o.mul, st: o.st, kb: o.kb, color: o.color, cl: o.cl, dk: o.dk, rows: o.rows, gm: o.gm, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0, delay: 0, x: o.x, y: o.y, r: o.r, cur: 2, prev: 0, life: 0.42, max: 0.42 });
+          }
+          break;
+        case 'bite':
+          if (!o.trig && o.age >= o.fuse) {
+            o.trig = true;
+            this.shake = Math.max(this.shake, 3); this.sfx('hit', 'metal'); this.punch = Math.max(this.punch, 0.5);
+            for (let k = 0; k < 10; k++) this.addP('px', o.x + rnd(-o.r, o.r) * 0.6, o.y + rnd(-4, 4), rnd(-60, 60), rnd(-80, 0), 0.4, k & 1 ? '#ffffff' : o.color, 1);
+            this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y, o.r));
+          }
+          break;
+        case 'runner':
+          o.x += o.vx * dt; o.y += o.vy * dt;
+          if (o.x < B || o.x > W - B || o.y < B || o.y > H - B) { o.dead = true; break; }
+          if (Math.random() < 0.6) this.addP('smoke', o.x - o.vx * 0.04 + rnd(-3, 3), o.y + 2, -o.vx * 0.1, rnd(-14, -4), 0.45, '#8a7a6a', 1.5 + o.r * 0.15);
+          this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y - o.r * 0.6, o.r));
+          break;
+        case 'pillar':
+          if (!o.trig) {
+            o.trig = true;
+            this.decal(o.x, o.y + 2, o.r * 0.7, o.dk); this.vfxImpact(o.vfx, o.color, o.x, o.y - 6, 0.7);
+            for (let k = 0; k < 5; k++) this.addP('px', o.x + rnd(-o.r, o.r) * 0.7, o.y, rnd(-30, 30), -rnd(60, 140), 0.4, k & 1 ? o.cl : o.dk, 1);
+            this.shake = Math.max(this.shake, 1.5); this.sfx('hit', o.vfx);
+            this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
+          }
+          break;
+        case 'lgrid':
+          if (!o.trig && o.age >= o.fuse) {
+            o.trig = true;
+            this.shake = Math.max(this.shake, 3); this.sfx('bighit'); this.lightFlash(o.x, o.y - 5, 50, o.color);
+            for (const sg of o.segs) for (let k = 0; k < 6; k++) { const t = Math.random(); this.addP('px', lerp(sg[0], sg[2], t), lerp(sg[1], sg[3], t), rnd(-40, 40), rnd(-40, 40), 0.3, '#ffffff', 1); }
+            this.checkHits(o, (v) => o.segs.some((sg) => segDist(v.x, this.bodyY(v), sg[0], sg[1], sg[2], sg[3]) <= 5 + 4 * v.size));
+          }
+          break;
+        case 'hopper': {
+          if (o.hk >= o.hops) { o.h = 0; break; }
+          if (o.ht === 0) {
+            const t = ow && this.pickTarget(ow, o.x, o.y, o.ang, 260, false);
+            const an = t ? Math.atan2(t.y - o.y, t.x - o.x) : o.ang, dd = t ? Math.min(70, Math.hypot(t.x - o.x, t.y - o.y)) : 55;
+            o.ang = an; o.x0 = o.x; o.y0 = o.y; o.x1 = clamp(o.x + Math.cos(an) * dd, B + 6, W - B - 6); o.y1 = clamp(o.y + Math.sin(an) * dd, B + 8, H - B - 4);
+          }
+          o.ht += dt;
+          const p = clamp(o.ht / o.hdur, 0, 1);
+          o.x = lerp(o.x0, o.x1, p); o.y = lerp(o.y0, o.y1, p); o.h = Math.sin(p * Math.PI) * (22 + o.r * 0.5);
+          if (p >= 1) {
+            o.ht = 0; o.hk++; o.hit.clear(); o.h = 0;
+            this.addP('ring', o.x, o.y + 2, 0, 0, 0.35, o.cl, 1, { r0: 3, r1: o.r * 1.4 }); this.decal(o.x, o.y + 2, o.r * 0.5, o.dk);
+            this.shake = Math.max(this.shake, 2.5); this.sfx('boom', o.vfx);
+            this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
+          }
+          break;
+        }
+        case 'swarm': {
+          const t = ow && this.pickTarget(ow, o.x, o.y, 0, 400, false);
+          if (t) { const dx = t.x - o.x, dy = this.bodyY(t) - o.y, d = Math.hypot(dx, dy) || 1; o.x += dx / d * o.speed * dt; o.y += dy / d * o.speed * dt; }
+          this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y, o.r));
+          break;
+        }
+        case 'btrap': {
+          const f = this.fighters[o.fid];
+          if (!f || !f.alive) { o.dead = true; break; }
+          o.x = f.x; o.y = this.bodyY(f) - 4;
+          if (o.life <= dt * 1.5 && !o.popd) { o.popd = true; for (let k = 0; k < 10; k++) { const an = k / 10 * 6.28; this.addP('px', o.x + Math.cos(an) * 12, o.y + Math.sin(an) * 12, Math.cos(an) * 70, Math.sin(an) * 70, 0.3, k & 1 ? '#ffffff' : o.cl, 1); } this.sfx('tick'); }
+          break;
+        }
+        case 'grab':
+          if (!o.trig && o.age >= o.fuse) {
+            o.trig = true;
+            this.shake = Math.max(this.shake, 3); this.sfx('boom', o.vfx); this.decal(o.x, o.y + 2, o.r * 0.6, o.dk);
+            for (let k = 0; k < 8; k++) this.addP('px', o.x + rnd(-o.r, o.r), o.y, rnd(-40, 40), -rnd(40, 120), 0.4, k & 1 ? o.cl : '#3a3450', 1);
+            this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
+          }
+          break;
+        case 'crack':
+          if (o.gone < o.len) {
+            const stp = o.speed * dt; o.gone += stp;
+            o.x = clamp(o.x + Math.cos(o.ang) * stp, B + 2, W - B - 2); o.y = clamp(o.y + Math.sin(o.ang) * stp, B + 4, H - B - 2);
+            const last = o.pts[o.pts.length - 1];
+            if (Math.hypot(o.x - last[0], o.y - last[1]) > 7) o.pts.push([o.x + rnd(-3, 3), o.y + rnd(-3, 3)]);
+            if (Math.random() < 0.8) this.addP('px', o.x + rnd(-4, 4), o.y, rnd(-20, 20), -rnd(40, 110), 0.35, Math.random() < 0.5 ? o.color : '#5a4a3a', 1);
+            this.shake = Math.max(this.shake, 1.2);
+            this.checkHits(o, (v) => dist2(v.x, v.y, o.x, o.y) <= (o.r + 4 * v.size) * (o.r + 4 * v.size));
           }
           break;
         case 'snipe':
@@ -1508,6 +1671,7 @@ class Battle {
       let dx, dy;
       if (o.kind === 'shot') { dx = o.vx; dy = o.vy; }
       else if (o.kind === 'beam') { dx = Math.cos(o.ang); dy = Math.sin(o.ang); if (o.both && (v.x - o.x) * dx + (v.y - o.y) * dy < 0) { dx = -dx; dy = -dy; } }
+      else if (o.kind === 'grab' && a) { dx = a.x - v.x; dy = a.y - v.y; }
       else if ((o.kind === 'hb' || o.kind === 'all' || o.kind === 'swing' || o.kind === 'cone' || o.kind === 'chain') && a) { dx = v.x - a.x; dy = v.y - a.y; }
       else { dx = v.x - o.x; dy = this.bodyY(v) - o.y; }
       const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
@@ -1833,8 +1997,8 @@ class Battle {
         pixRing(g, ox, oy, r * p, o.cl, 2);
       } else if (o.kind === 'wave') {
         const p = clamp(1 - o.life / o.max, 0, 1), R = X(o.cur), a = 1 - p * 0.8;
-        const ell = (rr, col, th) => { const n = Math.max(24, Math.round(rr / 2)); g.fillStyle = col; for (let k = 0; k < n; k++) { const an = k / n * 6.283; g.fillRect(Math.round(ox + Math.cos(an) * rr) - (th >> 1), Math.round(oy + Math.sin(an) * rr * 0.8) - (th >> 1), th, th); } };
-        g.globalAlpha = 0.25 * a; g.drawImage(discCanvas(Math.max(2, R), o.color, Math.floor(T * 20) % 3), ox - R, oy - Math.round(R * 0.8), R * 2, Math.round(R * 1.6)); g.globalAlpha = a;
+        const ell = (rr, col, th) => { const n = Math.max(24, Math.round(rr / 2)); g.fillStyle = col; for (let k = 0; k < n; k++) { const an = k / n * 6.283; if (o.arc && Math.abs(Math.atan2(Math.sin(an - o.ang), Math.cos(an - o.ang))) > o.arc / 2) continue; g.fillRect(Math.round(ox + Math.cos(an) * rr) - (th >> 1), Math.round(oy + Math.sin(an) * rr * 0.8) - (th >> 1), th, th); } };
+        if (!o.arc) { g.globalAlpha = 0.25 * a; g.drawImage(discCanvas(Math.max(2, R), o.color, Math.floor(T * 20) % 3), ox - R, oy - Math.round(R * 0.8), R * 2, Math.round(R * 1.6)); } g.globalAlpha = a;
         ell(R, o.dk, 5); ell(R, o.color, 3); ell(Math.max(1, R - 3), '#ffffff', 1); if (R > 12) ell(R * 0.7, o.cl, 1);
         g.globalAlpha = 1;
       } else if (o.kind === 'cone') {
@@ -1870,6 +2034,43 @@ class Battle {
         const x0 = X(o.x0), y0 = X(o.y0), x1 = X(o.x1), y1 = X(o.y1);
         if (!o.trig) { if (Math.floor(T * 20) & 1) { g.globalAlpha = 0.6; this.line(g, x0, y0, x1, y1, o.color, 1); g.globalAlpha = 1; } }
         else { const p = clamp((o.age - o.fuse) / 0.25, 0, 1); g.globalAlpha = 1 - p; this.line(g, x0, y0, x1, y1, o.color, Math.round(9 * (1 - p)) + 2); this.line(g, x0, y0, x1, y1, '#ffffff', Math.round(4 * (1 - p)) + 1); g.globalAlpha = 1; }
+      } else if (o.kind === 'bite') {
+        const R = X(o.r), p = o.trig ? 1 : clamp(o.age / o.fuse, 0, 1), gap = Math.round(R * 0.9 * (1 - p * p)), fade = o.trig ? clamp(1 - (o.age - o.fuse) / 0.3, 0, 1) : 1;
+        const jaw = (yy, dir) => {
+          const by0 = dir > 0 ? yy - 6 : yy;
+          g.fillStyle = o.dk; g.fillRect(ox - R - 2, by0, R * 2 + 4, 6); g.fillStyle = o.color; g.fillRect(ox - R - 2, by0 + (dir > 0 ? 0 : 2), R * 2 + 4, 4);
+          const nT = Math.max(3, Math.round(R / 5));
+          g.fillStyle = '#ffffff';
+          for (let k = 0; k < nT; k++) { const tx0 = ox - R + Math.round((k + 0.5) * 2 * R / nT); for (let h = 0; h < 6; h++) { const w = Math.max(1, 5 - h); g.fillRect(tx0 - (w >> 1), dir > 0 ? yy + h : yy - 1 - h, w, 1); } }
+        };
+        g.globalAlpha = fade * 0.35; fillDisc(g, ox, oy, R, '#1a0f1f'); g.globalAlpha = fade;
+        jaw(oy - gap, 1); jaw(oy + gap, -1);
+        if (o.trig) { g.globalAlpha = fade * 0.8; pixRing(g, ox, oy, R + Math.round((1 - fade) * 10), '#ffffff', 2); }
+        g.globalAlpha = 1;
+      } else if (o.kind === 'runner') {
+        const bob = Math.abs(Math.sin(T * 22 + o.ph)) * 4, k = o.r >= 9 ? 3 : 2;
+        fillEll(g, ox, oy + 2, X(o.r) + 2, 3, 'rgba(0,0,0,0.35)');
+        drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, ox, oy - X(o.r) - Math.round(bob), k, 0);
+      } else if (o.kind === 'pillar') {
+        const p = clamp(o.age / o.max, 0, 1), up = p < 0.2 ? p / 0.2 : p > 0.7 ? (1 - p) / 0.3 : 1, Hh = Math.round(X(o.r) * 2.6 * up), Wd = Math.max(4, Math.round(X(o.r) * 0.9));
+        fillEll(g, ox, oy + 1, Wd + 3, 3, 'rgba(0,0,0,0.35)');
+        g.fillStyle = o.dk; g.fillRect(ox - Wd, oy - Hh, Wd * 2, Hh);
+        g.fillStyle = o.color; g.fillRect(ox - Wd + 2, oy - Hh, Wd * 2 - 4, Hh);
+        g.fillStyle = o.cl; g.fillRect(ox - Wd + 2, oy - Hh, 2, Hh);
+        for (let h = 0; h < Wd; h++) { g.fillStyle = h & 1 ? o.cl : o.color; g.fillRect(ox - Wd + h, oy - Hh - 1 - h, (Wd - h) * 2, 1); }
+      } else if (o.kind === 'lgrid') {
+        for (const sg of o.segs) {
+          const x0 = X(sg[0]), y0 = X(sg[1]), x1 = X(sg[2]), y1 = X(sg[3]);
+          if (!o.trig) { const p = clamp(o.age / o.fuse, 0, 1); g.globalAlpha = 0.3 + 0.5 * p; this.line(g, x0, y0, x1, y1, (Math.floor(T * (10 + p * 30)) & 1) ? '#ff4d6d' : o.color, 1); }
+          else { const p = clamp((o.age - o.fuse) / 0.3, 0, 1); g.globalAlpha = 1 - p; this.line(g, x0, y0, x1, y1, o.color, Math.round(10 * (1 - p)) + 2); this.line(g, x0, y0, x1, y1, '#ffffff', Math.round(4 * (1 - p)) + 1); }
+        }
+        g.globalAlpha = 1;
+      } else if (o.kind === 'crack') {
+        const fade = Math.min(1, o.life / 0.5), pts = o.pts;
+        g.globalAlpha = fade;
+        for (let k = 1; k < pts.length; k++) { const a0 = pts[k - 1], a1 = pts[k], x0 = X(a0[0]), y0 = X(a0[1]), x1 = X(a1[0]), y1 = X(a1[1]); this.line(g, x0, y0, x1, y1, '#1a1426', 4); this.line(g, x0, y0, x1, y1, o.color, 2); if (k % 2) this.line(g, x1, y1, x1 + ((k * 7) % 9) - 4, y1 + 5, '#1a1426', 2); }
+        if (o.gone < o.len) { g.globalAlpha = 0.6; fillDisc(g, ox, oy, X(o.r), o.cl); }
+        g.globalAlpha = 1;
       } else if (o.kind === 'snipe') {
         const x1 = X(o.x + Math.cos(o.ang) * o.len), y1 = X(o.y + Math.sin(o.ang) * o.len);
         if (!o.trig) { const p = clamp(o.age / o.fuse, 0, 1); g.globalAlpha = 0.4 + 0.6 * p; this.line(g, ox, oy, x1, y1, (Math.floor(T * 24) & 1) ? '#ff4d6d' : '#ffffff', 1); fillDisc(g, ox, oy, 3 + Math.round(p * 5), o.color); g.globalAlpha = 1; }
@@ -1943,7 +2144,47 @@ class Battle {
       if (o.delay > 0) continue;
       const x = X(o.x), y = X(o.y);
       switch (o.kind) {
+        case 'hopper': {
+          const hh = X(o.h), k = Math.max(2, Math.round(o.size / 3));
+          fillEll(g, x, y + 2, Math.max(4, Math.round((8 + o.size) * (1 - o.h / 80))), 3, 'rgba(0,0,0,0.35)');
+          if (o.h < 1 && o.hk > 0) { g.globalAlpha = 0.5; pixRing(g, x, y, X(o.r), o.cl, 1); g.globalAlpha = 1; }
+          drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y - hh - 4 * k, k, 0);
+          break;
+        }
+        case 'swarm': {
+          const fade = Math.min(1, o.life / 0.4, o.age / 0.2), R = X(o.r);
+          g.globalAlpha = 0.16 * fade; fillDisc(g, x, y, R, o.color); g.globalAlpha = fade;
+          for (const [a0, sp] of o.bugs) {
+            const an = a0 + T * sp * 9, bx = x + Math.round(Math.cos(an) * R * 0.9 * (0.5 + 0.5 * Math.sin(T * 3 + a0))), by = y + Math.round(Math.sin(an * 1.3) * R * 0.6);
+            if (o.custom) drawGlyph(g, moveRows(o.gm, T + a0), o.color, bx, by, 1, 0);
+            else { g.fillStyle = o.dk; g.fillRect(bx - 1, by - 1, 3, 3); g.fillStyle = (Math.floor(T * 30 + a0 * 5) & 1) ? '#ffffff' : o.cl; g.fillRect(bx - 3, by - 2, 2, 1); g.fillRect(bx + 2, by - 2, 2, 1); }
+          }
+          g.globalAlpha = 1; break;
+        }
+        case 'btrap': {
+          const f = this.fighters[o.fid], R = f ? Math.round(X(9 * f.size)) + 5 : 14, w = Math.round(Math.sin(T * 6) * 1.5);
+          g.globalAlpha = 0.22; fillDisc(g, x, y, R + w, o.cl); g.globalAlpha = 0.9; pixRing(g, x, y, R + w, o.color, 1);
+          g.fillStyle = '#ffffff'; g.fillRect(x - Math.round(R * 0.5), y - Math.round(R * 0.55), 4, 2); g.fillRect(x - Math.round(R * 0.6), y - Math.round(R * 0.4), 2, 2);
+          g.globalAlpha = 1; break;
+        }
+        case 'grab': {
+          const R = X(o.r);
+          if (!o.trig) {
+            const p = clamp(o.age / o.fuse, 0, 1);
+            dashRing(g, x, y, R, (Math.floor(T * 16) & 1) ? '#ffffff' : o.color, T * 5);
+            for (let k = 0; k < 5; k++) { const hh = Math.round(p * 6), fx2 = Math.round(x - R * 0.6 + k * R * 0.3); g.fillStyle = o.dk; g.fillRect(fx2 - 1, y - hh, 3, hh); }
+          } else {
+            const p = clamp((o.age - o.fuse) / 0.5, 0, 1), up = Math.round(Math.min(1, p * 4) * R * 1.6), cl = Math.min(1, p * 3), fade = p > 0.7 ? (1 - p) / 0.3 : 1, aw = Math.round(R * 0.35), pw = Math.round(R * 0.8), py = y - up, ph = Math.round(R * 0.5);
+            g.globalAlpha = fade;
+            g.fillStyle = o.dk; g.fillRect(x - aw, py, aw * 2, up); g.fillStyle = o.color; g.fillRect(x - aw + 2, py, aw * 2 - 4, up);
+            g.fillStyle = o.dk; g.fillRect(x - pw - 1, py - ph - 1, pw * 2 + 2, ph + 2); g.fillStyle = o.color; g.fillRect(x - pw, py - ph, pw * 2, ph);
+            for (let k = 0; k < 4; k++) { const fx0 = x - pw + Math.round((k + 0.5) * pw / 2), lean = Math.round((x - fx0) * cl * 0.5), fl = Math.round(R * 0.7); this.line(g, fx0, py - ph, fx0 + lean, py - ph - fl, o.dk, 4); this.line(g, fx0, py - ph, fx0 + lean, py - ph - fl, o.cl, 2); }
+            g.globalAlpha = 1;
+          }
+          break;
+        }
         case 'shot': {
+          if (o.bubble) { const R = X(o.r) * 2 + 6 + Math.round(Math.sin(T * 8 + o.ph) * 1.5); g.globalAlpha = 0.25; fillDisc(g, x, y, R, o.cl); g.globalAlpha = 0.9; pixRing(g, x, y, R, o.color, 1); g.fillStyle = '#ffffff'; g.fillRect(x - Math.round(R * 0.5), y - Math.round(R * 0.5), 3, 2); g.globalAlpha = 1; drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y, 1, 0); break; }
           const big = o.roll ? 3 : o.charged ? 3 : o.r >= 3 ? 2 : 1, rows = moveRows(o.gm, T + o.ph);
           if (o.roll || o.charged) { fillEll(g, x, y + 14 + X(o.r), 8 + X(o.r), 4, 'rgba(0,0,0,0.3)'); if (o.charged) { g.globalAlpha = 0.6; fillDisc(g, x, y, 22 + Math.round(Math.sin(T * 30) * 3), o.color); fillDisc(g, x, y, 14, o.cl); g.globalAlpha = 1; } drawGlyph(g, rows, o.color, x, y, big, o.roll ? (Math.floor(T * 10) & 3) : rotOf(o.vx, o.vy)); break; }
           if (o.net) { g.globalAlpha = 0.9; for (let k = -2; k <= 2; k++) { this.line(g, x + k * 4, y - 9, x + k * 4, y + 9, '#e8e8f0', 1); this.line(g, x - 9, y + k * 4, x + 9, y + k * 4, '#e8e8f0', 1); } g.globalAlpha = 1; }
@@ -2455,6 +2696,13 @@ class Battle {
       case 'snipe': case 'gatling': case 'spiral': case 'missiles': case 'charge': case 'net': return 100;
       case 'prism': return e.len * 0.6;
       case 'gust': return e.len * 0.5;
+      case 'bite': case 'claw': return 22;
+      case 'grab': case 'lasergrid': return 110;
+      case 'stampede': case 'crack': case 'sonic': return 80;
+      case 'pillar': return 14 + e.n * e.step * 0.5;
+      case 'hop': case 'swarm': return 90;
+      case 'bubble': return 100;
+      case 'stomp': return e.r * 0.6;
     }
     return 60;
   }
@@ -2527,6 +2775,16 @@ class Battle {
         case 'skyline': return d < 22 + e.n * e.step;
         case 'gust': return d < e.len;
         case 'drain': return d < e.range;
+        case 'bite': return d < e.range + 10;
+        case 'claw': return d < e.r + 12;
+        case 'grab': return d < e.range;
+        case 'lasergrid': case 'hop': case 'swarm': return d < 200;
+        case 'stampede': return d < e.len;
+        case 'crack': return d < e.len + 10;
+        case 'pillar': return d < 20 + e.n * e.step;
+        case 'bubble': return d < 190;
+        case 'stomp': return d < e.r * (1 + (e.n - 1) * 0.35) + 6;
+        case 'sonic': return d < e.len;
       }
       return false;
     };

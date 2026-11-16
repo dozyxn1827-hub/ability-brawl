@@ -540,7 +540,7 @@ const ALT = {
 for (const k in ALT) for (const sl in ALT[k]) STYLES[k][sl] = [].concat(STYLES[k][sl], ALT[k][sl]);
 const THEME_STYLE = { fire: 'bomber', ice: 'trickster', elec: 'beamer', water: 'artillery', wind: 'speedster', earth: 'tank', plant: 'healer', stink: 'polluter', poison: 'polluter', holy: 'beamer', dark: 'assassin', space: 'gravity', time: 'trickster', sound: 'idol', love: 'healer', sleep: 'lazy', metal: 'gunner', tech: 'engineer', food: 'glutton', sweet: 'artillery', animal: 'summoner', bug: 'summoner', money: 'artillery', gross: 'polluter', ghost: 'assassin', magic: 'trickster', nag: 'nagger', gravity: 'gravity', speed: 'speedster', power: 'brawler', ball: 'gunner', ki: 'beamer' };
 /** 글의 의도를 보고 전투 유형 점수를 매긴다 (높은 순) */
-function rankStyles(text, keys, said) {
+function rankStyles(text, keys, said, famStyle) {
   const sc = {};
   for (const k in STYLES) {
     const S = STYLES[k];
@@ -550,6 +550,7 @@ function rankStyles(text, keys, said) {
     if (keys.some((x) => S.keys.includes(x))) v += 1.5;
     if (keys[0] && THEME_STYLE[keys[0]] === k) v += 2;
     for (const m of said) if (S.mech.includes(m)) v += 2;
+    if (famStyle === k) v += 5;
     sc[k] = v;
   }
   return Object.keys(sc).sort((a, b) => sc[b] - sc[a]).map((k) => [k, sc[k]]);
@@ -574,6 +575,61 @@ const FUN = {
   titlePre: ['', '', '전설의 ', '동네 ', '자칭 ', '전직 ', '프로 '],
 };
 
+/* ----- 단어 사전(027-words-*.js) 찾기: 긴 단어 먼저, 겹치면 긴 쪽 ----- */
+let WF_RE = null;
+const WF_PJ = '(?:들|떼|무리)?(?:이|가|을|를|은|는|의|에|에서|에게|에게서|한테|한테서|로|으로|와|과|도|만|랑|이랑|처럼|같이|같은|보다|까지|부터|마다|이다|이야|이나|나|이든|든|이라도|라도|에는|에도|으로는|로는|으로도|로도)?(?![가-힣])';
+const WF_BAD = new Set(['검은', '별로', '새로', '종이']);
+const ELEM = new Set(['fire', 'ice', 'elec', 'water', 'wind', 'earth', 'poison', 'holy', 'dark', 'stink', 'space', 'time', 'sound', 'plant', 'magic', 'gravity']);
+function wfFind(text) {
+  if (!WF_RE) WF_RE = WF_LIST.map(([w, k]) => {
+    const ww = w.replace(/^!/, ''), strict = w[0] === '!' || Array.from(ww).length === 1, esc = ww.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return [new RegExp(strict ? `(?<![가-힣])${esc}${WF_PJ}` : esc, 'gi'), k, ww];
+  }).sort((a, b) => b[2].length - a[2].length);
+  const t = String(text || ''), hits = [];
+  for (const [re, k, w] of WF_RE) {
+    re.lastIndex = 0;
+    for (const m of t.matchAll(re)) {
+      const at = m.index, end = at + w.length;
+      if (WF_BAD.has(t.substr(at, 2))) continue;
+      if (w === '개' && /(\d|한|두|세|네|몇|열|여러|다섯|여섯|일곱|여덟|아홉|스무|백|천)\s*$/.test(t.slice(Math.max(0, at - 4), at))) continue;
+      if (hits.some((h) => at < h.at + h.word.length && h.at < end)) continue;
+      hits.push({ at, word: t.substr(at, w.length), key: WF[k].th, fam: k, ov: {} });
+      break;
+    }
+  }
+  return hits.sort((a, b) => a.at - b.at);
+}
+const KNUM = { 한: 1, 하나: 1, 두: 2, 둘: 2, 세: 3, 셋: 3, 네: 4, 넷: 4, 다섯: 5, 여섯: 6, 일곱: 7, 여덟: 8, 아홉: 9, 열: 10, 스무: 20, 백: 100, 천: 1000, 만: 10000 };
+/** 글의 크기·개수·거리·속도·범위 말을 기술 수치에 반영한다 */
+function tuneFx(fx, o, s) {
+  const mul = (e, ks, k) => { for (const q of ks) if (typeof e[q] === 'number') e[q] *= k; };
+  for (const e of fx) {
+    if (o.big) { mul(e, ['r', 'size', 'w', 'len'], 1.35); if (e.dmg) e.dmg *= 1.1; }
+    if (o.small) { mul(e, ['r', 'size', 'w'], 0.75); mul(e, ['speed'], 1.12); if (e.n && ['shot', 'stampede', 'missiles', 'top', 'clone', 'lob', 'storm', 'spiral', 'gatling'].includes(e.t)) e.n += 2; }
+    if (o.far) { mul(e, ['range', 'len', 'dist', 'off'], 1.3); mul(e, ['speed'], 1.2); if (e.t === 'shot' && e.life) e.life *= 1.3; }
+    if (o.near) { mul(e, ['range', 'len', 'dist'], 0.85); if (e.dmg) e.dmg *= 1.08; }
+    if (o.fast) { mul(e, ['speed'], 1.3); mul(e, ['delay'], 0.7); }
+    if (o.slowm) { mul(e, ['speed'], 0.75); if (e.dmg) e.dmg *= 1.12; }
+    if (o.long) mul(e, ['dur', 'life'], 1.4);
+    if (o.wide) {
+      if (e.t === 'swing') e.arc = 360;
+      if (['cone', 'gust', 'sonic'].includes(e.t)) e.arc = (e.arc || 60) * 1.7;
+      if (e.t === 'shot' && s !== 'basic' && e.from !== 'sky' && e.from !== 'ground') { e.from = 'around'; e.n = Math.max(e.n || 1, 6); }
+      if (e.at === 'front') e.at = 'self';
+    }
+    if (o.line && e.t === 'shot') e.spread = 0;
+    if (o.times > 1) {
+      const T = o.times;
+      if (['thrust', 'stomp', 'hop', 'wave', 'sonic', 'pillar', 'skyline', 'cross', 'lob', 'missiles', 'clone', 'top'].includes(e.t)) e.n = Math.max(e.n || 1, T);
+      if (e.t === 'swing') e.n = Math.max(e.n || 1, Math.min(4, T));
+      if (e.t === 'flurry' || e.t === 'cone' || e.t === 'beam' || e.t === 'prism' || e.t === 'drain') e.ticks = Math.max(e.ticks || 3, T);
+      if (e.t === 'shot' && s !== 'basic') e.n = Math.max(e.n || 1, Math.min(8, T));
+      if (e.t === 'gatling') e.n = Math.max(e.n || 6, T * 2);
+    }
+  }
+  return fx;
+}
+
 /** 글 하나로 설계서 원본(검증 전)을 조립한다 */
 function composeRaw(ability, sides, noDraw) {
   const text = String(ability || '').trim();
@@ -585,16 +641,36 @@ function composeRaw(ability, sides, noDraw) {
     const m = text.match(re);
     if (m) found.push({ at: m.index, word: m[0], key, ov: ov || {} });
   }
+  const famHits = wfFind(text);
+  for (let i = found.length - 1; i >= 0; i--) { const f = found[i]; if (famHits.some((h) => f.at < h.at + h.word.length && h.at < f.at + f.word.length)) found.splice(i, 1); }
+  found.push(...famHits);
   found.sort((a, b) => a.at - b.at);
   const themes = [];
-  for (const f of found) if (!themes.some((t) => t.key === f.key && t.word === f.word)) themes.push(f);
+  for (const f of found) { const j = themes.findIndex((t) => t.key === f.key && t.word === f.word); if (j < 0) themes.push(f); else if (f.fam && !themes[j].fam) themes[j] = f; }
   if (!themes.length) themes.push({ word: '', key: 'ki', ov: {} });
+  // 단어 사전에 있는 소재가 있으면 그게 주인공 (첫 번째로)
+  const fi = themes.findIndex((t) => t.fam);
+  if (fi > 0) themes.unshift(themes.splice(fi, 1)[0]);
+  const F1 = themes[0].fam ? WF[themes[0].fam] : null;
+  // 원소(불·얼음·전기…)가 따로 있으면 단어 사전 기술에 그 색과 효과를 입힌다 ("불을 쓰는 고양이")
+  const elemF = themes.find((t) => !t.fam && ELEM.has(t.key));
   const T = (f) => Object.assign({}, THEME[f.key], f.ov);
-  const t1 = themes[0], t2 = themes[1] || themes[0], t3 = themes[2] || t2;
   // 2) 이름에 쓸 말: 글에 나온 명사를 그대로
   const nouns = nounsOf(text);
-  const nm = (f, i) => cut((f.word && nouns.find((w) => w.includes(f.word))) || f.word || nouns[i] || nouns[0] || '기', 5);
+  const nm = (f, i) => {
+    let w = (f.word && nouns.find((x) => x.includes(f.word))) || f.word || nouns[i] || nouns[0] || '기';
+    if (f.fam && /(떼|들|군단|무리|떼거리)$/.test(w) && w.replace(/(떼|들|군단|무리|떼거리)$/, '')) w = w.replace(/(떼|들|군단|무리|떼거리)$/, '');
+    return cut(w, 5);
+  };
   const realNoun = (f) => f.word && nouns.some((w) => w === f.word || w.startsWith(f.word));
+  // 단어 사전 주인공이 있으면: 다른 사전 단어나 진짜 명사만 기술 칸을 나눠 갖고, 원소는 색·효과로만 섞인다
+  const t1 = themes[0];
+  const sec = F1 ? themes.filter((t, i) => i > 0 && (t.fam || (!ELEM.has(t.key) && realNoun(t)))) : themes.slice(1);
+  const t2 = sec[0] || t1, t3 = sec[1] || t2;
+  // 부작용이 원소를 금지하면("불을 못 쓴다") 원소를 섞지 않는다 — 그냥 고양이가 된다
+  const NEGW = /못\s?[가-힣]|안\s?(나|된|돼|써|쓰)|봉인|금지|쓸 수 없|사라|잃|없어/;
+  const elemBan = elemF && (sides || []).some((x) => NEGW.test(String(x.text || '')) && themesInText(String(x.text || '')).some((h) => !h.fam && h.key === elemF.key));
+  const elemUse = elemBan ? null : elemF;
   const n1 = nm(t1, 0), n2 = t2 !== t1 && realNoun(t2) ? nm(t2, 1) : n1, n3 = t3 !== t1 && realNoun(t3) ? nm(t3, 2) : n2;
   // 3) 행동 찾기
   const mechs = [];
@@ -603,16 +679,29 @@ function composeRaw(ability, sides, noDraw) {
   const said = mechs.map((m) => m.k);
   let st = null;
   for (const [re, k] of STATUS_WORDS) if (re.test(text)) { st = k; break; }
-  const nm1 = text.match(/(\d+)\s*(개|마리|발|명|번)/);
+  const CNT = '(개|마리|발|명|번|방|줄|대|송이|알|장|갈래|겹|방향|연발|연타|연속)';
+  const nm1 = text.match(new RegExp('(\\d+)\\s*' + CNT)), km = text.match(new RegExp('(한|하나|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉|열|스무|백|천|만)\\s*' + CNT));
+  const cnt = nm1 ? +nm1[1] : km ? KNUM[km[1]] : 0, cword = nm1 ? nm1[2] : km ? km[2] : '';
+  const isTimes = /번|연타|연속|연발/.test(cword);
   const o = {
     pow: 0.65 * (/엄청|거대|최강|무한|최고|강력|세게|완전|미친|전설|궁극|세상에서 가장/.test(text) ? 1.25 : /약한|작은|쓸모없|조금|살짝|별로|하찮|소심/.test(text) ? 0.7 : 1),
-    n: nm1 ? clamp(+nm1[1], 1, 8) : /여러|많은|떼|군단|무리|잔뜩|수많/.test(text) ? 4 : 1,
+    n: cnt && !isTimes ? clamp(cnt, 1, 8) : /여러|많은|떼|군단|무리|잔뜩|수많/.test(text) ? 4 : 1,
+    times: cnt && isTimes ? clamp(cnt, 2, 10) : /연타|난타|마구 때|다다다|연발|무한 연속/.test(text) ? 4 : 0,
+    big: /거대|초거대|집채|산만 한|산만한|빌딩만|하늘을 덮|대왕|자이언트|메가|기가|초대형|엄청 큰|엄청나게 큰|커다란|커지/.test(text),
+    small: /작은|미니|꼬마|쪼꼬미|조그만|손톱만|콩알만|작아지/.test(text),
+    far: /멀리|원거리|장거리|저격|맵 끝|끝까지 날|하늘 끝|멀리서|화면 끝/.test(text),
+    near: /가까이|근거리|코앞|근접|붙어서|맨손|몸으로/.test(text),
+    fast: /빠른|빠르게|빨리|광속|순식간|초고속|재빨|번개처럼|눈 깜짝|쏜살/.test(text),
+    slowm: /느린|느리게|느릿|천천히|슬로우|굼뜬/.test(text),
+    wide: /사방|모든 방향|360|빙 둘러|전체 공격|온 사방|원형으로|둥글게|맵 전체|주변 전부|주변 모두/.test(text),
+    long: /오래|영원히|끝없|지속|오랫동안|한참/.test(text),
+    line: /일직선|직선|한 줄로|일렬/.test(text),
     homing: /따라가|추적|유도|쫓아가/.test(text), bounce: /튕기|튕겨|통통/.test(text), pierce: /관통|꿰뚫|뚫고/.test(text),
     ret: /부메랑|돌아온|되돌아/.test(text), split: /분열|쪼개|갈라|나뉘/.test(text), wall: /벽|성벽|담장/.test(text),
   };
   // 4) 글의 의도 → 전투 유형 (가장 잘 맞는 유형이 중심, 두 번째 유형이 능력 3을 맡는다)
   const keys = themes.map((f) => f.key).filter((k, i, a) => a.indexOf(k) === i);
-  const ranks = rankStyles(text, keys, said);
+  const ranks = rankStyles(text, keys, said, F1 && F1.style);
   const sA = ranks[0][0], sB = ranks[1] && ranks[1][1] >= 3 ? ranks[1][0] : sA, sC = ranks[2] && ranks[2][1] >= 5 ? ranks[2][0] : sA;
   const SA = STYLES[sA];
   const kitOf = { basic: SA, s1: sC !== sA && sC !== sB ? STYLES[sC] : SA, s2: STYLES[sB], ult: SA };
@@ -622,9 +711,12 @@ function composeRaw(ability, sides, noDraw) {
   const quote = (text.match(/["'“‘「]([^"'”’」]{1,10})["'”’」]/) || [])[1];
   const short = (pool, n, max) => { for (let i = 0; i < 6; i++) { const v = fmtN(pk(pool), n); if (Array.from(v).length <= max) return v; } return cut(`${n}!`, max); };
   for (const s of SLOTS) {
-    const K0 = kitOf[s][s], K = Array.isArray(K0) ? pk(K0) : K0, [th, n] = plan[s], tt = T(th);
-    const S = st || tt.st;
-    let fx = K.fx(o.pow, S, o).filter(Boolean);
+    const [th, n] = plan[s], fam = th.fam ? WF[th.fam] : null, fk = fam && fam.moves[s];
+    const K0 = fk || kitOf[s][s], K = Array.isArray(K0) ? pk(K0) : K0;
+    const mix = fam && elemUse && !ELEM.has(fam.th) ? T(elemUse) : null;
+    const tt = mix ? Object.assign({}, T(th), { vfx: mix.vfx, shape: mix.shape, c: mix.c, sfx: mix.sfx, st: mix.st }) : T(th);
+    const S = st || (mix && mix.st) || (fam && fam.st) || tt.st;
+    let fx = tuneFx(K.fx(o.pow, S, o).filter(Boolean), o, s);
     for (const e of fx) if (e.t === 'shot') {
       if (o.homing) e.homing = Math.max(e.homing || 0, 0.5);
       if (o.bounce) e.bounce = Math.max(e.bounce || 0, 2);
@@ -636,38 +728,43 @@ function composeRaw(ability, sides, noDraw) {
     let name = fmtN(pk(K.name), n);
     for (let k = 0; k < 6 && name.split(n).length > 2; k++) name = fmtN(pk(K.name), n);
     if (name.split(n).length > 2) name = name.replace(n + ' ', '');
-    if (s === 'ult' && Array.from(name).length <= 8 && R() < 0.7) name = `${pk(FUN.ultPre)} ${name}`;
+    if (o.big && !/거대/.test(name) && s !== 'basic' && Array.from(name).length <= 9) name = (s === 'ult' ? '초거대 ' : '거대 ') + name;
+    else if (o.times > 1 && s === 's1' && Array.from(name).length <= 8) name = `${name} ${o.times}연타`;
+    else if (s === 'ult' && Array.from(name).length <= 8 && R() < 0.7) name = `${pk(FUN.ultPre)} ${name}`;
     const pic = pixFor(n) || pixFor(th.word) || (s !== 'basic' ? null : pixFor(text));
     moves[s] = {
       name: cut(name, 12), desc: cut(fmtN(pk(K.desc), n), 44),
       say: s === 'basic' ? '' : s === 'ult' ? (quote || short(FUN.ultSay, n, 10)) : short(FUN.say, n, 10),
-      cd: { basic: 0.55, s1: 1.9, s2: 2.7, ult: 7.5 }[s] * (K.m === 'heal' || K.m === 'big' || K.m === 'turret' ? 1.25 : 1),
+      cd: { basic: 0.55, s1: 1.9, s2: 2.7, ult: 7.5 }[s] * (K.m === 'heal' || K.m === 'big' || K.m === 'turret' ? 1.25 : 1) * (o.fast ? 0.85 : o.slowm ? 1.12 : 1),
       color: pic ? pic.color : s === 'ult' || s === 's2' ? tt.c[1] : tt.c[0], vfx: tt.vfx, shape: tt.shape, pix: pic ? pic.pix : undefined,
       sfx: { kind: tt.sfx, pitch: { basic: 1.25, s1: 1, s2: 1.1, ult: 0.75 }[s], len: { basic: 0.7, s1: 1, s2: 0.9, ult: 1.5 }[s] },
-      fx, _k: th.key, _m: K.m, _w: th.word,
+      fx, _k: fam ? 'f:' + th.fam : th.key, _m: K.m, _w: th.word, _f: th.fam || undefined,
     };
   }
   // 6) 겉모습·능력치·특성: 유형과 글에서
   const L = T(t1);
   const look = { skin: pk(['#f2c79b', '#e8b48a', '#c98a5e', '#f6d8b8', '#8a5a3a']), hair: L.hair, body: L.body, accent: L.c[0], head: L.head, outfit: 'plain', weapon: SA.weapon || 'none', aura: L.aura };
+  if (F1 && F1.look) Object.assign(look, F1.look);
+  if (elemUse && F1 && !ELEM.has(F1.th)) { const E = T(elemUse); look.aura = E.aura; look.accent = E.c[0]; }
   const W = [[/칼|검(?!은)/, 'sword'], [/지팡이|마법|마술/, 'staff'], [/요술봉|마녀/, 'wand'], [/총|대포/, 'gun'], [/활|화살/, 'bow'], [/망치|해머|프라이팬/, 'hammer'], [/낫|저승/, 'scythe'], [/책|공부|숙제|사전/, 'book'], [/수정구|구슬/, 'orb'], [/방패/, 'shield'], [/단검|암살|닌자/, 'dagger'], [/도끼/, 'axe'], [/창(?!문)/, 'spear']];
   for (const [re, w] of W) if (re.test(text)) { look.weapon = w; break; }
   const HD = [[/왕|여왕|부자|황제/, 'crown'], [/천사/, 'halo'], [/악마/, 'horns'], [/고양이|토끼|여우|강아지|햄스터/, 'ears'], [/로봇|기계|ai|AI/, 'robot'], [/닌자|도둑|복면|암살/, 'mask'], [/기사|군인|전사/, 'helmet'], [/마법사|마녀|마술/, 'hat'], [/대머리/, 'bald']];
   for (const [re, hd] of HD) if (re.test(text)) { look.head = hd; break; }
   const OF = { tank: 'armor', healer: 'robe', trickster: 'robe', nagger: 'suit', idol: 'dress', speedster: 'stripes', engineer: 'stripes', polluter: 'spots', gunner: 'suit' };
-  look.outfit = OF[sA] || 'plain';
+  if (!(F1 && F1.look && F1.look.outfit)) look.outfit = OF[sA] || 'plain';
   if (/마법|마녀|요술|주문/.test(text)) look.outfit = 'robe'; else if (/기사|갑옷|전사|군인/.test(text)) look.outfit = 'armor'; else if (/회사|출근|야근|사장|보고서/.test(text)) look.outfit = 'suit'; else if (/공주|드레스|여왕/.test(text)) look.outfit = 'dress'; else if (/죄수|줄무늬|얼룩말/.test(text)) look.outfit = 'stripes'; else if (/점박|무당벌레|달마시안/.test(text)) look.outfit = 'spots';
   const base = Object.assign({ hp: 100, speed: 1, size: 1 }, SA.stats);
+  if (F1 && F1.stats) { base.hp += F1.stats.hp || 0; base.speed *= F1.stats.speed || 1; if (F1.stats.size) base.size = F1.stats.size; }
   const stats = {
     hp: base.hp + (/단단|튼튼|거대|철벽|탱크|뚱뚱/.test(text) ? 15 : 0) - (/약한|작은|하찮/.test(text) ? 15 : 0),
     speed: base.speed * (/빠르|빨라|스피드|번개처럼|날쌘/.test(text) ? 1.12 : /느리|느린|거북|굼뜬/.test(text) ? 0.88 : 1),
     size: /거대|거인|큰 몸/.test(text) ? 1.25 : /작은 몸|꼬마|작아/.test(text) ? 0.85 : base.size,
   };
   const PS = [[/회복|재생|치유|불사/, 'regen'], [/가시|선인장|고슴도치/, 'thorns'], [/흡혈|뱀파이어|빨아/, 'lifesteal'], [/단단|강철|철벽|갑옷/, 'armor'], [/분노|화가|빡/, 'rage'], [/부활|좀비|불사조/, 'revive'], [/빠르|날쌘|바람/, 'swift'], [/운|럭키|행운|도박/, 'crit'], [/피하|회피|닌자|미끌/, 'dodge']];
-  let pkey = SA.passive;
+  let pkey = (F1 && F1.passive) || SA.passive;
   for (const [re, k] of PS) if (re.test(text)) { pkey = k; break; }
   const passive = pkey ? { k: pkey, desc: cut(`${n1} ${PASSIVE_KO[pkey]}`, 30) } : null;
-  const title = cut(`${pk(FUN.titlePre)}${n1} ${pk(SA.title)}`, 14);
+  const title = F1 && F1.title && R() < 0.75 ? cut(pk(F1.title.split('|')), 14) : cut(`${pk(FUN.titlePre)}${n1} ${pk(SA.title)}`, 14);
   const lines = { intro: short(FUN.intro, n1, 14), ko: short(FUN.ko, n1, 14), win: short(FUN.win, n1, 22) };
   const style = sA;
   const raw = { title, concept: cut(text, 50) || '정체불명의 능력', look, stats, moves, passive, lines, style };
@@ -678,6 +775,7 @@ function composeRaw(ability, sides, noDraw) {
 function themesInText(t) {
   const out = [];
   for (const [re, key] of LEX) { const m = String(t || '').match(re); if (m) out.push({ key, word: m[0], at: m.index }); }
+  for (const h of wfFind(t)) if (!out.some((o) => o.at < h.at + h.word.length && h.at < o.at + o.word.length)) out.push(h);
   return out.sort((a, b) => a.at - b.at);
 }
 /* ----- 부작용 읽기: 맞는 말을 전부 찾아 겹친다 (최대 3개) ----- */
@@ -696,8 +794,9 @@ function smartDrawback(side, ctx) {
     const slot = SL.find(([re]) => re.test(t));
     // 부작용 글에 나온 소재(사전으로 같은 주제까지) + 행동
     const keys = new Set(), words = [];
-    for (const f of ctx.themes) if (f.word && t.includes(f.word)) { keys.add(f.key); words.push(f.word); }
-    for (const [re, key] of LEX) { const m = t.match(re); if (m && ctx.themes.some((f) => f.key === key)) { keys.add(key); words.push(m[0]); } }
+    for (const f of ctx.themes) if (f.word && t.includes(f.word)) { keys.add(f.fam ? 'f:' + f.fam : f.key); words.push(f.word); }
+    for (const [re, key] of LEX) { const m = t.match(re); if (m && ctx.themes.some((f) => !f.fam && f.key === key)) { keys.add(key); words.push(m[0]); } }
+    for (const h of wfFind(t)) if (ctx.themes.some((f) => f.fam === h.fam)) { keys.add('f:' + h.fam); words.push(h.word); }
     const mechHit = MECH.filter(([re]) => re.test(t.replace(/못\s?쓴|안\s?쓴/g, ''))).map(([, k]) => k);
     let slots = [];
     if (slot) slots = [slot[1]];
@@ -706,7 +805,7 @@ function smartDrawback(side, ctx) {
       if (!slots.length) slots = SLOTS.filter((s) => mechHit.includes(ctx.moves[s]._m));
       if (has(/능력|기술|스킬|모든|전부|아무것도|다 못|하나도|모두/) && !slot) slots = SLOTS.slice();
       // 능력 글의 핵심 단어를 짚었는데 주제가 하나뿐이면 전부 해당
-      if (!slots.length && keys.size && new Set(ctx.themes.map((f) => f.key)).size === 1) slots = SLOTS.slice();
+      if (!slots.length && keys.size && new Set(ctx.themes.map((f) => (f.fam ? 'f:' + f.fam : f.key))).size === 1) slots = SLOTS.slice();
     }
     if (slots.length) {
       // "불 대신 물이 나온다", "불이 물로 바뀐다": 바뀐 소재로 다시 만든다
@@ -738,7 +837,7 @@ function smartDrawback(side, ctx) {
       || t.match(/([가-힣]{1,6}?)(?:이|가|은|는|을|를)\s*([가-힣]{1,6}?)(?:으로|로)\s*(?:바뀐|바뀜|바뀌|변한|변함|변해|대체|둔갑)/);
     if (sw && !STOP.has(sw[2])) {
       const from = sw[1], to = sw[2], ft = themesInText(from)[0];
-      let slots = SLOTS.filter((s) => (ft && ctx.moves[s]._k === ft.key) || (ctx.moves[s]._w && (from.includes(ctx.moves[s]._w) || ctx.moves[s]._w.includes(from))));
+      let slots = SLOTS.filter((s) => (ft && (ctx.moves[s]._k === ft.key || (ft.fam && ctx.moves[s]._k === 'f:' + ft.fam))) || (ctx.moves[s]._w && (from.includes(ctx.moves[s]._w) || ctx.moves[s]._w.includes(from))));
       if (!slots.length) slots = SLOTS.slice();
       const altRaw = composeRaw(ctx.text.includes(from) ? ctx.text.split(from).join(to) : `${to} ${ctx.text}`, [], true), alt = altRaw.moves;
       add({ t: 'replace', moves: Object.fromEntries(slots.map((s) => [s, alt[s]])) });
