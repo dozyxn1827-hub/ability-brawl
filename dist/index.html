@@ -471,8 +471,9 @@ const onMatch = (on, slot) => on === 'skills' || on === 'any' || on === slot;
 const FIGHTER_COLORS = ['#ff4d6d', '#3fb8ff', '#ffcf3a', '#5be37a'];
 
 const HARD_ST = ['stun', 'freeze', 'dance', 'sleep', 'air'];
-const MOVE_MODES = ['reverse', 'slide', 'drunk', 'nostop', 'backward', 'hop', 'spin'];
-const MOVE_KO = { reverse: '방향키가 반대로', slide: '빙판처럼 미끄러짐', drunk: '비틀비틀 걸음', nostop: '멈출 수 없음', backward: '뒷걸음질로만 걸음', hop: '깡총깡총 뛰어다님', spin: '뱅글뱅글 돌며 걸음' };
+const MOVE_MODES = ['reverse', 'slide', 'drunk', 'nostop', 'backward', 'hop', 'spin', 'left', 'right', 'side', 'vertical'];
+const MOVE_KO = { reverse: '방향키가 반대로', slide: '빙판처럼 미끄러짐', drunk: '비틀비틀 걸음', nostop: '멈출 수 없음', backward: '뒷걸음질로만 걸음', hop: '깡총깡총 뛰어다님', spin: '뱅글뱅글 돌며 걸음', left: '왼쪽으로만 움직일 수 있음', right: '오른쪽으로만 움직일 수 있음', side: '옆으로만 움직일 수 있음', vertical: '위아래로만 움직일 수 있음' };
+const ACT_POSES = ['gas', 'sneeze', 'hiccup', 'poop', 'cry', 'laugh', 'sing', 'yawn', 'coin', 'heart', 'bow', 'snap', 'eat', 'sweat', 'zzz', 'star', 'fall', 'shout', 'word'];
 const VISION_KO = { dark: '앞이 거의 안 보임', flip: '화면이 뒤집힘', mirror: '화면 좌우가 바뀜', shake: '화면이 계속 흔들림', tiny: '화면이 엄청 멀어짐', zoom: '화면이 코앞만 보임' };
 
 /* ===== 능력 설계서: 검증기 · 기본 해석기 · AI 프롬프트 (탑뷰) ===== */
@@ -721,14 +722,21 @@ function sanMove(m, slot, look, keep) {
 /* ----- 부작용: 글자 그대로, 병맛 있게 ----- */
 function sanSelfSt(st, maxD) {
   if (!st || typeof st !== 'object') return null;
-  const k = oneOf(st.k === 'float' ? 'slip' : st.k, DEBUFFS, null);
+  const k = oneOf(st.k === 'float' ? 'slip' : st.k, DEBUFFS.concat(['tiny']), null);
   if (!k) return null;
   return { k, d: r1(num(st.d, 0.3, maxD, Math.min(1.5, maxD))) };
 }
 const IF_MAP = { air: 'moving', ground: 'still' };
 const IFS = ['always', 'moving', 'still', 'lowhp', 'highhp', 'near', 'far'];
 /** 부작용 하나. look·replace는 설계서를 직접 바꾸고, 나머지는 엔진이 실행한다 */
+/** 부작용 효과 하나 검사. 쓸 때 효과에는 nth(N번째마다)·hit(맞을 때) 같은 덧붙임이 붙을 수 있다 */
 function sanDfx(d) {
+  const r = sanDfx0(d);
+  if (!r || !d) return r;
+  if (r.on && d.nth && ['selfst', 'selfdmg', 'stack', 'recoil', 'tele', 'aidfoe', 'act', 'shout', 'backfire'].includes(r.t)) { const n = Math.round(num(d.nth, 1, 10, 3)); if (n > 1) r.nth = n; }
+  return r;
+}
+function sanDfx0(d) {
   if (!d || typeof d !== 'object') return null;
   const on = oneOf(d.on === 'any' ? 'skills' : d.on, ON_SET, 'skills');
   switch (d.t) {
@@ -740,12 +748,12 @@ function sanDfx(d) {
       for (const s of SLOTS) if (M[s]) { moves[s] = typeof M[s] === 'object' ? M[s] : 1; n++; }
       return n ? { t: 'replace', moves } : null;
     }
-    case 'selfdmg': return { t: 'selfdmg', on, amt: r1(num(d.amt, 1, 40, 8)) };
+    case 'selfdmg': return d.pct ? { t: 'selfdmg', on, amt: 0, pct: Math.round(num(d.pct, 5, 90, 50)) } : { t: 'selfdmg', on, amt: r1(num(d.amt, 1, 40, 8)) };
     case 'backfire': return { t: 'backfire', on, pct: Math.round(num(d.pct, 10, 100, 50)) };
     case 'selfst': { const st = sanSelfSt(d.st, 5); return st ? { t: 'selfst', on, st } : null; }
-    case 'stat': return { t: 'stat', stat: oneOf(d.stat === 'jump' ? 'speed' : d.stat, ['hp', 'speed', 'size', 'dmg', 'taken'], 'taken'), pct: Math.round(num(d.pct, 10, d.stat === 'size' || d.stat === 'taken' ? 200 : 80, 30)) };
+    case 'stat': { const k = oneOf(d.stat === 'jump' ? 'speed' : d.stat, ['hp', 'speed', 'size', 'dmg', 'taken'], 'taken'); return { t: 'stat', stat: k, pct: Math.round(k === 'size' ? num(d.pct, -60, 200, 30) || 30 : num(d.pct, 10, k === 'taken' ? 300 : 80, 30)) }; }
     case 'mul': return { t: 'mul', on, pct: Math.round(num(d.pct, 10, 95, 50)) };
-    case 'cd': return { t: 'cd', on, pct: Math.round(num(d.pct, 30, 400, 100)) };
+    case 'cd': return d.min ? { t: 'cd', on, pct: 0, min: r1(num(d.min, 1, 20, 5)) } : { t: 'cd', on, pct: Math.round(num(d.pct, 30, 400, 100)) };
     case 'tick': { const st = sanSelfSt(d.st, 4); return st ? { t: 'tick', every: Math.round(num(d.every, 3, 20, 8)), st } : null; }
     case 'recoil': return { t: 'recoil', on, force: num(d.force, 3, 14, 7) };
     case 'fail': return { t: 'fail', on, chance: Math.round(num(d.chance, 10, 100, 40)), back: oneOf(d.back, ['fizzle', 'selfhit', 'stun'], 'fizzle') };
@@ -759,14 +767,38 @@ function sanDfx(d) {
     }
     case 'drain': return { t: 'drain', amt: r1(num(d.amt, 0.5, 6, 1.5)), if: oneOf(IF_MAP[d.if] || d.if, IFS, 'always') };
     case 'windup': return { t: 'windup', on, time: r1(num(d.time, 0.2, 3, 0.8)) };
-    case 'uses': return { t: 'uses', on, n: Math.round(num(d.n, 0, 6, 3)) };
+    case 'uses': return { t: 'uses', on, n: Math.round(num(d.n, 0, 20, 3)) };
     case 'aidfoe': return { t: 'aidfoe', on, k: oneOf(d.k, ['haste', 'power', 'regen', 'shield', 'giant', 'invuln'], 'haste'), d: r1(num(d.d, 1, 5, 2)) };
-    case 'stack': return { t: 'stack', on, stat: oneOf(d.stat, ['size', 'slow', 'taken'], 'size'), pct: Math.round(num(d.pct, 3, 25, 8)) };
+    case 'stack': { const k = oneOf(d.stat, ['size', 'slow', 'taken'], 'size'); const r = { t: 'stack', on, stat: k, pct: Math.round(num(d.pct, k === 'size' ? -25 : 3, 25, 8)) || 8 }; if (d.hit) { r.hit = true; delete r.on; } return r; }
     case 'tele': return { t: 'tele', on };
     case 'move': return { t: 'move', mode: oneOf(d.mode, MOVE_MODES, 'reverse') };
     case 'vision': return { t: 'vision', mode: oneOf(d.mode, Object.keys(VISION_KO), 'dark') };
     case 'shout': { const text = str(d.text, 16, ''); return text ? { t: 'shout', on, text } : null; }
-    case 'pest': return { t: 'pest', every: Math.round(num(d.every, 3, 20, 7)), dmg: r1(num(d.dmg, 0, 8, 3)), name: str(d.name, 8, '귀찮은 것'), color: col(d.color, '#ffe14a'), pix: sanPix(d.pix), st: sanSelfSt(d.st, 2) };
+    case 'pest': return { t: 'pest', on: d.on && ON_SET.includes(d.on) ? d.on : undefined, every: Math.round(num(d.every, 3, 20, 7)), dmg: r1(num(d.dmg, 0, 8, 3)), name: str(d.name, 8, '귀찮은 것'), color: col(d.color, '#ffe14a'), pix: sanPix(d.pix), st: sanSelfSt(d.st, 2) };
+    case 'act': {
+      // 글에 쓴 행동을 정말로 한다: 말풍선 + 멈춤(또는 상태이상) + 그 행동의 연출
+      const r = { t: 'act', text: str(d.text, 16, ''), pose: oneOf(d.pose, ACT_POSES, 'sweat'), d: r1(num(d.d, 0, 4, 0.8)), chance: Math.round(num(d.chance, 10, 100, 100)) };
+      const st = sanSelfSt(d.st, 4); if (st) r.st = st;
+      if (d.fire) r.fire = true;
+      const w = str(d.word, 8, ''); if (w) r.word = w;
+      const wh = str(d.what, 14, ''); if (wh && wh !== r.text) r.what = wh;
+      if (d.push) r.push = true;
+      if (d.on && ON_SET.includes(d.on)) r.on = d.on;
+      else if (d.hit) r.hit = true;
+      else if (d.bump) r.bump = true;
+      else if (d.if && IFS.includes(IF_MAP[d.if] || d.if) && d.if !== 'always') r.if = IF_MAP[d.if] || d.if;
+      else r.every = Math.round(num(d.every, 2, 30, 9));
+      if (!r.text) r.text = '앗!';
+      return r;
+    }
+    case 'aim': return { t: 'aim', on, deg: Math.round(num(d.deg, 10, 90, 40)), chance: Math.round(num(d.chance, 10, 100, 60)) };
+    case 'range': return { t: 'range', on, pct: Math.round(num(d.pct, 15, 80, 50)) };
+    case 'ramp': return { t: 'ramp', stat: oneOf(d.stat, ['dmg', 'speed', 'size'], 'dmg'), by: oneOf(d.by, ['time', 'hp'], 'time'), pct: Math.round(num(d.pct, d.stat === 'size' ? -60 : 10, 80, 50)) || 50, why: str(d.why, 10, '') };
+    case 'flee': return { t: 'flee', if: oneOf(IF_MAP[d.if] || d.if, IFS, 'near') };
+    case 'weakto': {
+      const V = Object.keys(VFX_KO), vfx = (Array.isArray(d.vfx) ? d.vfx : [d.vfx]).filter((v) => V.includes(v)).slice(0, 4);
+      return vfx.length ? { t: 'weakto', vfx, pct: Math.round(num(d.pct, 20, 300, 100)), name: str(d.name, 8, VFX_KO[vfx[0]]) } : null;
+    }
     case 'look': {
       const L = {};
       if (HEADS.includes(d.head)) L.head = d.head;
@@ -787,17 +819,18 @@ const IF_KO = {
 /** 부작용이 게임에서 정확히 어떻게 작동하는지 한 줄로 */
 function dfxText(f) {
   const on = ON_KO[f.on] || '';
+  const use = (x) => (x.nth ? `${on} ${x.nth}번 쓸 때마다` : `${on} 쓸 때마다`);
   switch (f.t) {
     case 'lock': return `${on} 봉인 (아예 못 씀)`;
     case 'replace': return Object.keys(f.moves).map((s) => SLOT_KO[s]).join('·') + '이(가) 다른 기술로 바뀜';
-    case 'selfdmg': return `${on} 쓸 때마다 체력 -${f.amt}`;
-    case 'backfire': return `${on} 위력의 ${f.pct}%만큼 자기도 다침`;
-    case 'selfst': return `${on} 쓰고 나면 ${ST_KO[f.st.k]} ${f.st.d}초`;
-    case 'stat': return { hp: `최대 체력 -${f.pct}%`, speed: `이동 속도 -${f.pct}%`, size: `몸집 +${f.pct}%`, dmg: `모든 위력 -${f.pct}%`, taken: `받는 피해 +${f.pct}%` }[f.stat];
+    case 'selfdmg': return `${use(f)} 체력 ${f.pct ? f.pct + '% 잃음' : '-' + f.amt}`;
+    case 'backfire': return `${use(f)} 위력의 ${f.pct}%만큼 자기도 다침`;
+    case 'selfst': return `${f.nth ? `${on} ${f.nth}번 쓰면` : `${on} 쓰고 나면`} ${ST_KO[f.st.k] || '작아짐'} ${f.st.d}초`;
+    case 'stat': return { hp: `최대 체력 -${f.pct}%`, speed: `이동 속도 -${f.pct}%`, size: f.pct < 0 ? `몸집 ${f.pct}%` : `몸집 +${f.pct}%`, dmg: `모든 위력 -${f.pct}%`, taken: `받는 피해 +${f.pct}%` }[f.stat];
     case 'mul': return `${on} 위력 -${f.pct}%`;
-    case 'cd': return `${on} 재사용 시간 +${f.pct}%`;
+    case 'cd': return f.min ? `${on} ${f.min}초에 한 번만` : `${on} 재사용 시간 +${f.pct}%`;
     case 'tick': return `${f.every}초마다 저절로 ${ST_KO[f.st.k]} ${f.st.d}초`;
-    case 'recoil': return `${on} 쓸 때마다 반대쪽으로 날아감`;
+    case 'recoil': return `${use(f)} 반대쪽으로 날아감`;
     case 'fail': return f.chance >= 100 ? `${on} 무조건 실패` : `${on} ${f.chance}% 확률로 ` + { fizzle: '불발', selfhit: '자폭 (체력 -12)', stun: '실패하고 기절' }[f.back];
     case 'reverse': return `${on} ${f.chance >= 100 ? '항상' : f.chance + '% 확률로'} 반대 방향으로 나감`;
     case 'healfoe': return `${on} 맞은 적이 ${f.chance >= 100 ? '오히려' : f.chance + '% 확률로'} 회복함`;
@@ -808,13 +841,23 @@ function dfxText(f) {
     case 'windup': return `${on} 쓰기 전 ${f.time}초 멈춰서 준비`;
     case 'uses': return f.n === 0 ? `${on} 봉인 (아예 못 씀)` : `${on} 한 판에 ${f.n}번씩만`;
     case 'aidfoe': return `${on} 쓸 때마다 가장 가까운 적에게 ${ST_KO[f.k]} ${f.d}초`;
-    case 'stack': return `${on} 쓸 때마다 ` + { size: `몸집 +${f.pct}%`, slow: `이동 속도 -${f.pct}%`, taken: `받는 피해 +${f.pct}%` }[f.stat] + ' (누적)';
+    case 'stack': return `${f.hit ? '맞을 때마다' : use(f)} ` + { size: f.pct < 0 ? `몸집 ${f.pct}%` : `몸집 +${f.pct}%`, slow: `이동 속도 -${f.pct}%`, taken: `받는 피해 +${f.pct}%` }[f.stat] + ' (누적)';
     case 'tele': return `${on} 쓰고 나면 아무 데로나 튕겨감`;
     case 'move': return MOVE_KO[f.mode];
     case 'vision': return VISION_KO[f.mode] + ' (내 화면)';
-    case 'shout': return `${on} 쓸 때마다 “${f.text}” 외침`;
-    case 'pest': return `${f.every}초마다 ${josa(f.name, '이', '가')} 쫓아와 괴롭힘`;
-    case 'look': return '겉모습이 바뀜';
+    case 'shout': return `${use(f)} “${f.text}” 외침`;
+    case 'act': {
+      const when = f.on ? use(f) : f.hit ? '맞을 때마다' : f.bump ? '벽에 부딪히면' : f.if ? `${IF_KO[f.if]} 순간` : `${f.every}초마다`;
+      const what = f.st ? ` → ${ST_KO[f.st.k] || '작아짐'} ${f.st.d}초` : f.d > 0 ? ` (${f.d}초 멈춤)` : '';
+      return `${f.chance < 100 ? f.chance + '% 확률로 ' : ''}${when} ${f.what ? `‘${f.what}’ ` : ''}“${f.text}”${what}${f.fire ? ' + 능력이 저절로 나감' : ''}${f.push ? ' + 튕겨 날아감' : ''}`;
+    }
+    case 'aim': return `${on} ${f.chance >= 100 ? '항상' : f.chance + '% 확률로'} ±${f.deg}° 빗나감`;
+    case 'range': return `${on} 사거리 -${f.pct}%`;
+    case 'ramp': return `${f.why || (f.by === 'hp' ? '체력이 줄수록' : '시간이 지날수록')} ` + { dmg: `위력이 줄어듦 (최대 -${f.pct}%)`, speed: `느려짐 (최대 -${f.pct}%)`, size: f.pct < 0 ? `작아짐 (최대 ${f.pct}%)` : `커짐 (최대 +${f.pct}%)` }[f.stat];
+    case 'flee': return `${f.if === 'always' ? '항상' : IF_KO[f.if] + ' 때'} 저절로 도망침`;
+    case 'weakto': return `${f.name} 공격에 맞으면 피해 +${f.pct}%`;
+    case 'pest': return `${f.on ? use(f) : f.every + '초마다'} ${josa(f.name, '이', '가')} 나타나 쫓아옴${f.st ? ` (닿으면 ${ST_KO[f.st.k]})` : ''}`;
+    case 'look': return f.look && f.look.head === 'bald' ? '대머리가 됨' : f.look && f.look.hair && !f.look.body ? '머리 색이 바뀜' : '겉모습이 바뀜';
   }
   return '';
 }
@@ -827,55 +870,10 @@ const PATHETIC = {
 };
 /** 글자만 보고 부작용을 추측 (AI가 없거나 실패했을 때) */
 function guessDrawback(text) {
-  const t = text || '';
-  const has = (re) => re.test(t);
-  const q = t.match(/["'“‘「]([^"'”’」]{1,16})["'”’」]/);
-  const say = q ? q[1] : '';
-  const n = (t.match(/[0-6]/) || [3])[0] | 0;
-  let fx;
-  if (has(/못\s?(쓴|씀|써|한다|함)|안\s?나(온|와)|사용\s?(불가|금지)|봉인|쓸 수 없|금지/)) fx = { t: 'replace', moves: PATHETIC };
-  else if (has(/외친|외쳐|소리친|말한|말해야|노래/) && say) fx = { t: 'shout', on: 'skills', text: say };
-  else if (has(/횟수|번만|번밖|번 밖|한정/)) fx = { t: 'uses', on: 'skills', n };
-  else if (has(/(적|상대|남).*(회복|치료|체력이 찬|낫)/)) fx = { t: 'healfoe', on: 'skills', chance: 100 };
-  else if (has(/(반대|뒤|거꾸로).*(나간|날아|쏜|발사)|엉뚱한 방향/)) fx = { t: 'reverse', on: 'skills', chance: 100 };
-  else if (has(/랜덤|무작위|아무거나 나|엉뚱한 (기술|능력)/)) fx = { t: 'random', on: 'skills', chance: 60 };
-  else if (has(/앞이 안|눈이 안|시야|어두|장님|눈을 감/)) fx = { t: 'vision', mode: 'dark' };
-  else if (has(/화면이 뒤집|세상이 뒤집|거꾸로 보/)) fx = { t: 'vision', mode: 'flip' };
-  else if (has(/어지|흔들/)) fx = { t: 'vision', mode: 'shake' };
-  else if (has(/벌|모기|파리|비둘기|강아지|고양이|쫓아|따라다/)) fx = { t: 'pest', every: 6, dmg: 3, name: (t.match(/(벌|모기|파리|비둘기|강아지|고양이)/) || ['', '무언가'])[1] };
-  else if (has(/춤/)) fx = { t: 'tick', every: 7, st: { k: 'dance', d: 1.5 } };
-  else if (has(/잠|졸/)) fx = { t: 'tick', every: 8, st: { k: 'sleep', d: 2 } };
-  else if (has(/대머리|머리가 빠/)) fx = { t: 'look', look: { head: 'bald' } };
-  else if (has(/반대로 (움직|걸)|방향이 반대|조작이 반대/)) fx = { t: 'move', mode: 'reverse' };
-  else if (has(/미끄/)) fx = { t: 'move', mode: 'slide' };
-  else if (has(/비틀|취한|술/)) fx = { t: 'move', mode: 'drunk' };
-  else if (has(/멈출 수 없|계속 (달|뛰|걸)/)) fx = { t: 'move', mode: 'nostop' };
-  else if (has(/뒷걸음|문워크/)) fx = { t: 'move', mode: 'backward' };
-  else if (has(/깡총|토끼|뛰어다/)) fx = { t: 'move', mode: 'hop' };
-  else if (has(/실패|확률|불발|가끔 안/)) fx = { t: 'fail', on: 'skills', chance: 40, back: has(/자기|자신|본인|맞|터/) ? 'selfhit' : has(/기절|멈/) ? 'stun' : 'fizzle' };
-  else if (has(/(계속|서서히|시간이).*(줄|깎|닳)/)) fx = { t: 'drain', amt: 2, if: 'always' };
-  else if (has(/나도 (아프|다치)|같이 맞|자기도/)) fx = { t: 'backfire', on: 'skills', pct: 60 };
-  else if (has(/체력|피가|hp|생명|목숨|아프|다친|다쳐|수명/i)) fx = { t: 'selfdmg', on: 'skills', amt: 10 };
-  else if (has(/기절|멈칫|재채기|굳|마비|딸꾹/)) fx = has(/주기|가끔|때때로|초마다|갑자기/) ? { t: 'tick', every: 6, st: { k: 'stun', d: 1.5 } } : { t: 'selfst', on: 'skills', st: { k: 'stun', d: 1.2 } };
-  else if (has(/느려|느림|둔해|굼|거북/)) fx = { t: 'stack', on: 'skills', stat: 'slow', pct: 10 };
-  else if (has(/커지|커진|뚱뚱|살이|거대/)) fx = { t: 'stack', on: 'skills', stat: 'size', pct: 15 };
-  else if (has(/작아|줄어/)) fx = { t: 'selfst', on: 'skills', st: { k: 'morph', d: 2 } };
-  else if (has(/헷갈|조작|뒤바|어지/)) fx = { t: 'selfst', on: 'skills', st: { k: 'confuse', d: 3 } };
-  else if (has(/순간이동|텔레포트|엉뚱한 곳|아무 데|어딘가/)) fx = { t: 'tele', on: 'skills' };
-  else if (has(/날아|밀려|반동|튕|넘어|뒤로/)) fx = { t: 'recoil', on: 'skills', force: 10 };
-  else if (has(/쿨|재사용|오래 기다|대기/)) fx = { t: 'cd', on: 'skills', pct: 150 };
-  else if (has(/모아|충전|준비|기다려야|주문|외쳐야/)) fx = { t: 'windup', on: 'skills', time: 1.2 };
-  else if (has(/(상대|적|남).*(강해|빨라|커|좋아)/)) fx = { t: 'aidfoe', on: 'skills', k: 'haste', d: 3 };
-  else if (has(/약해|힘이 빠|위력/)) fx = { t: 'mul', on: 'skills', pct: 60 };
-  else if (has(/방어|맞으면|받는 피해|종이|유리|약골/)) fx = { t: 'stat', stat: 'taken', pct: 60 };
-  else if (has(/불|화상|뜨거|타/)) fx = { t: 'selfst', on: 'skills', st: { k: 'burn', d: 3 } };
-  else {
-    let hsh = 0;
-    for (const ch of t) hsh = (hsh * 31 + ch.codePointAt(0)) >>> 0;
-    fx = [{ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } }, { t: 'move', mode: 'drunk' }, { t: 'reverse', on: 'skills', chance: 40 }, { t: 'tick', every: 8, st: { k: 'sleep', d: 1.5 } }][hsh % 4];
-  }
-  fx = sanDfx(fx);
-  return { how: dfxText(fx), say, fx };
+  // AI 답이 잘못됐을 때도 부작용 글을 글자 그대로 읽는다
+  const r = smartDrawback(text, null);
+  const fx = sanDfx(r.fx) || sanDfx({ t: 'act', every: 9, text: cut(text, 14) || '앗!', d: 1 });
+  return { how: r.how, say: r.say, fx, more: (r.more || []).map(sanDfx).filter(Boolean) };
 }
 
 /** 원본(AI 또는 기본 해석기) → 엔진이 믿고 쓸 수 있는 설계서. 부작용의 replace·look을 여기서 적용 */
@@ -908,7 +906,7 @@ function sanSpec(raw, sides, ai, keep) {
       by: str(s.by, 12, '?'), text: str(s.text, 90, ''),
       how: fx === (g && g.fx) ? g.how : str(d.how, 60, dfxText(fx)),
       say: str(fx === (g && g.fx) ? g.say : d.say, 16, ''),
-      fx, more: extra,
+      fx, more: g ? g.more.slice(0, 2) : extra,
     };
   });
   // 바꿔치기·겉모습 부작용을 설계서에 그대로 적용
@@ -1193,6 +1191,10 @@ ${sideList}
   · 능력 전체가 막히면 replace로 네 기술을 모두 "능력을 못 쓰는 채로 버둥대는 병맛 기술"로 바꾼다(라이터만 딸깍대기, 연기만 나오기, 성냥 던지기, 뜨거운 척하기 등). 바뀐 기술에서 원래 능력의 효과(예: 진짜 불)가 나오면 안 된다. 바뀐 기술은 아주 약해도 되지만, 버둥대는 모습이 웃기고 소리도 처량하게(sfx).
 - 부작용이 능력을 다른 것으로 바꾸면(예: "불 대신 물이 나온다") replace로 그 기술들을 바뀐 모습으로 다시 만든다. 이름·pix·vfx·색·sfx까지 바뀐 모습으로.
 - 부작용이 방향을 바꾸면 reverse, 적을 도와주면 healfoe·aidfoe, 엉뚱한 기술이 나가면 random, 걸음이 이상해지면 move, 화면이 이상해지면 vision, 무언가 쫓아오면 pest, 무슨 말을 해야 하면 shout, 겉모습이 바뀌면 look을 쓴다.
+- 부작용 문장을 [언제]와 [무엇]으로 나눠 읽고 둘 다 그대로 지킨다. 숫자(2배, 절반, 3초 동안, 5번, 10초마다)와 조건(~하면, ~할 때마다, ~초마다, 맞으면, 가만히 있으면, 체력이 낮으면)을 바꾸지 않는다. 글에 없는 효과를 덧붙이지 않는다.
+  · 예: "능력을 쓰면 3초 동안 못 움직인다" → {"t":"selfst","on":"skills","st":{"k":"root","d":3}} / "물에 약하다" → {"t":"weakto","vfx":["water"],"pct":100,"name":"물"} / "체력이 50밖에 없다" → {"t":"stat","stat":"hp","pct":50} / "3번 쓰면 기절한다" → {"t":"selfst","on":"skills","nth":3,"st":{"k":"stun","d":1.2}} / "가만히 있으면 체력이 준다" → {"t":"drain","amt":1.5,"if":"still"} / "체력이 낮으면 능력을 못 쓴다" → {"t":"when","if":"lowhp","st":"silence"} / "시간이 지날수록 약해진다" → {"t":"ramp","stat":"dmg","by":"time","pct":50}
+- 부작용이 어떤 행동(방귀, 울기, 똥, 재채기, 딸꾹질, 노래, 웃기, 넘어지기, 잠들기 등)을 말하면 act로 캐릭터가 정말 그 행동을 하게 한다. 말풍선(text)에 그 행동 소리를, pose에 맞는 연출을 넣는다. 예: "똥을 싼다" → {"t":"act","every":10,"text":"뿌지직!","pose":"poop","d":1.4} / "맞으면 운다" → {"t":"act","hit":true,"text":"으앙~","pose":"cry","d":1.2} / "재채기를 하면 능력이 나간다" → {"t":"act","every":8,"text":"에취!!","pose":"sneeze","d":0.6,"fire":true}
+- 게임에 없는 조건("비가 오면", "밤이 되면")은 몇 초마다 그 조건이 일어난 것으로 친다(act의 every + text에 그 조건). 예: "비가 오면 능력을 못 쓴다" → {"t":"act","every":11,"text":"비가 온다!","st":{"k":"silence","d":3}}
 - 부작용 하나가 여러 효과를 뜻하면 fx에 대표 효과를, more에 나머지 효과(최대 2개)를 넣는다.
 - how에는 게임에서 실제로 벌어지는 일을 웃기게 쓰고, say에는 그 부작용이 터질 때 캐릭터가 하는 말을 쓴다.
 - 피해 예산(체력 100 기준, 기술 한 번의 총 피해): basic 6~12, s1 12~22, s2 15~28, ult 30~50. 강한 효과일수록 cd를 길게.
@@ -1273,7 +1275,7 @@ DFX:
  {"t":"random","on":ON,"chance":10~100} 누른 기술 대신 자기 기술 중 아무거나 나감
  {"t":"fail","on":ON,"chance":10~100,"back":"fizzle|selfhit|stun"} 확률적으로 실패(100이면 항상 실패)
  {"t":"backfire","on":ON,"pct":10~100} 기술 위력의 pct%만큼 자기도 다침
- {"t":"selfdmg","on":ON,"amt":1~40} 쓸 때마다 체력 소모
+ {"t":"selfdmg","on":ON,"amt":1~40} 쓸 때마다 체력 소모 (또는 "pct":5~90 현재 체력의 그만큼, "체력이 절반이 된다"면 pct 50)
  {"t":"selfst","on":ON,"st":{"k":DEBUFF,"d":0.3~5}} 쓰고 나면 자신에게 상태이상
  {"t":"tick","every":3~20,"st":{"k":DEBUFF,"d":0.3~4}} 주기적으로 저절로 상태이상(갑자기 춤추기, 잠들기 등)
  {"t":"when","if":"moving|still|lowhp|highhp|near|far","st":DEBUFF} 조건인 동안 계속 상태이상
@@ -1292,7 +1294,14 @@ DFX:
  {"t":"uses","on":ON,"n":0~6} 한 판 사용 횟수 제한(0이면 못 씀)
  {"t":"aidfoe","on":ON,"k":"haste|power|regen|shield|giant|invuln","d":1~5} 쓸 때마다 가장 가까운 적이 강해짐
  {"t":"stack","on":ON,"stat":"size|slow|taken","pct":3~25} 쓸수록 불이익이 쌓임
- {"t":"tele","on":ON} 쓰고 나면 아무 데로나 튕겨감`;
+ {"t":"tele","on":ON} 쓰고 나면 아무 데로나 튕겨감
+ {"t":"act","text":"말풍선(16자 이내)","pose":"gas|sneeze|hiccup|poop|cry|laugh|sing|yawn|coin|heart|bow|snap|eat|sweat|zzz|star|fall|shout|word","d":0~4,"st"?:{"k":DEBUFF,"d":0.3~4},"fire"?:true,"push"?:true, 언제: "on":ON | "every":2~30 | "hit":true | "if":"moving|still|lowhp|highhp|near|far" | "bump":true} 부작용에 쓴 행동을 정말로 함. on 쓸 때, every 몇 초마다, hit 맞을 때, if 그 조건이 되는 순간, bump 벽에 부딪힐 때. d초 동안 멈추거나 st 상태이상. fire 능력이 저절로 나감, push 튕겨 날아감
+ {"t":"aim","on":ON,"deg":10~90,"chance":10~100} 조준이 빗나감
+ {"t":"range","on":ON,"pct":15~80} 사거리가 짧아짐
+ {"t":"ramp","stat":"dmg|speed|size","by":"time|hp","pct":10~80} 시간이 지날수록(time)·체력이 줄수록(hp) 점점 약해짐·느려짐·커짐(size는 -60이면 작아짐)
+ {"t":"flee","if":"near|lowhp|always"} 그 조건이면 저절로 도망침
+ {"t":"weakto","vfx":[VFX,...],"pct":20~300,"name":"물"} 그 종류(vfx)의 공격에 맞으면 피해 증가
+덧붙임: selfst·selfdmg·stack·recoil·tele·aidfoe·act·shout에 "nth":2~10을 넣으면 N번 쓸 때마다만. stack에 "hit":true면 맞을 때마다. cd에 "min":1~20이면 그 초에 한 번만. stat size의 pct는 -60(작아짐)~200. uses n은 0~20. move에 left|right|side|vertical(그 방향으로만 움직임)도 있다. pest에 "on":ON을 넣으면 그 기술을 쓸 때 나타난다.`;
 }
 
 /** 한 명의 설계서 만들기. sample이 없거나 실패하면 기본 해석기. */
@@ -2112,7 +2121,9 @@ function smartDrawback(side, ctx) {
   const SL = [[/궁극기|궁|필살기/, 'ult'], [/능력\s?1|첫\s?번째|기본/, 'basic'], [/능력\s?2|두\s?번째/, 's1'], [/능력\s?3|세\s?번째/, 's2']];
   // "~을 못 쓴다": 글자 그대로. 그 소재·행동이 들어간 기술은 정말로 그 소재가 안 나오는 기술로 바뀐다
   const NEG = /못\s?[가-힣]|안\s?(나(온|와|옴)|된|돼|써|쓰|생|통|먹)|사용\s?(불가|금지)|봉인|쓸 수 없|금지|할 수 없|사라(진|져|짐)|잃(는|어|었|음)|없어(진|져|짐)|빼앗|뺏|막힌|막혀/;
-  if (ctx && has(NEG) && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못|못 자|못 걷|못 뛰|못 피/)) {
+  const [dCond] = dSplit(t), DW = dWhen(t, dCond);
+  const condOnly = !!(DW.if || DW.hit || DW.every || DW.gate || DW.bump || DW.byAct || DW.time || DW.hpr);
+  if (ctx && has(NEG) && !condOnly && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못|못 자|못 걷|못 뛰|못 피|멀리 못|멀리\s?(못|안)|못 맞|못 이기|못 참/)) {
     const slot = SL.find(([re]) => re.test(t));
     // 부작용 글에 나온 소재(사전으로 같은 주제까지) + 행동
     const keys = new Set(), words = [];
@@ -2167,60 +2178,45 @@ function smartDrawback(side, ctx) {
       customHow = `${from} 대신 ${to}: ${slots.length === 4 ? '네 기술 모두' : slots.map((s) => SLOT_KO[s]).join('·')} ${to} 기술로 바뀜`;
     }
   }
-  if (has(/외친|외쳐|소리친|말한|말해야|소리 질/) && say) add({ t: 'shout', on: 'skills', text: say });
-  if (has(/횟수|번만|번밖|번 밖|한정/)) add({ t: 'uses', on: 'skills', n: +(t.match(/[0-6]/) || [3])[0] });
-  if (has(/(적|상대|남).*(회복|치료|체력이 찬|낫|힐)/)) add({ t: 'healfoe', on: 'skills', chance: 100 });
-  if (has(/(적|상대|남).*(강해|빨라|커|좋아|세져)/)) add({ t: 'aidfoe', on: 'skills', k: has(/커/) ? 'giant' : has(/빨/) ? 'haste' : 'power', d: 3 });
-  if (has(/(반대|뒤|거꾸로).*(나간|날아|쏜|발사|나와)|엉뚱한 방향|뒤로 나/)) add({ t: 'reverse', on: 'skills', chance: 100 });
-  if (has(/랜덤|무작위|아무거나 나|엉뚱한 (기술|능력)|다른 기술/)) add({ t: 'random', on: 'skills', chance: 60 });
-  if (has(/앞이 안|눈이 안|시야|어두|장님|눈을 감|안 보/)) add({ t: 'vision', mode: 'dark' });
+  const dOn = (SL.find(([re]) => re.test(t)) || [])[1] || 'skills';
+  if (has(/외친|외쳐|소리친|말한|말해야|소리 질|라고 한|이라고 한|하고 외/) && say) add({ t: 'shout', on: dOn, text: say, nth: DW.nth });
+  if (has(/(적|상대|남).*(회복|치료|체력이 찬|낫|힐|피가 찬)/)) add({ t: 'healfoe', on: dOn, chance: DW.rare ? 40 : 100 });
+  if (has(/(적|상대|남).*(강해|빨라|커|좋아|세져|신나)/)) add({ t: 'aidfoe', on: dOn, k: has(/커/) ? 'giant' : has(/빨/) ? 'haste' : 'power', d: 3 });
+  if (has(/(반대|뒤|거꾸로)\s?(방향)?.*(나간|날아|쏜|발사|나와|나감)|엉뚱한 방향|뒤로 나/)) add({ t: 'reverse', on: dOn, chance: DW.rare ? 40 : 100 });
+  if (has(/랜덤|무작위|아무거나 나|엉뚱한 (기술|능력)|다른 기술|다른 능력이 나/)) add({ t: 'random', on: dOn, chance: DW.rare ? 40 : 60 });
+  if (has(/앞이 (잘\s?)?안|눈이 안|시야|어두|장님|눈을 감|안 보(여|인|임)|앞을 못 봐|앞을 못 본/)) add({ t: 'vision', mode: 'dark' });
   else if (has(/화면이 뒤집|세상이 뒤집|거꾸로 보|뒤집혀 보/)) add({ t: 'vision', mode: 'flip' });
-  else if (has(/멀미|어지|흔들|술에 취/)) add({ t: 'vision', mode: 'shake' });
-  const PEST = t.match(/(벌|모기|파리|비둘기|강아지|고양이|닭|오리|거위|엄마|선생님|경찰|좀비|귀신|바퀴벌레|까마귀|팬|기자|빚쟁이)/);
-  const chaser = t.match(/([가-힣]{1,6}?)(?:이|가|들이|들)?\s*(?:계속\s*|자꾸\s*|하루 종일\s*)?(?:쫓아|따라다|따라온|따라와|달려들|달려든)/);
-  if (PEST || chaser) add({ t: 'pest', every: 6, dmg: 3, name: chaser && !STOP.has(chaser[1]) ? chaser[1] : PEST ? PEST[1] : '무언가', color: '#ffe14a' });
-  if (has(/춤/)) add({ t: 'tick', every: 7, st: { k: 'dance', d: 1.5 } });
-  if (has(/잠|졸|하품/)) add({ t: 'tick', every: 8, st: { k: 'sleep', d: 2 } });
-  if (has(/방귀|뿡|트림|꺽/) && !say) add({ t: 'shout', on: 'skills', text: has(/트림|꺽/) ? '꺼억~' : pick(['뿌웅~', '뿡!', '뿌지직']) });
-  if (has(/재채기|딸꾹|기침/)) add({ t: 'tick', every: 6, st: { k: 'stun', d: 1 } });
-  if (has(/대머리|머리가 빠/)) add({ t: 'look', head: 'bald' });
+  else if (has(/좌우가 바뀌어 보|거울처럼/)) add({ t: 'vision', mode: 'mirror' });
+  else if (has(/멀미|흔들려 보|화면이 흔들|술에 취/)) add({ t: 'vision', mode: 'shake' });
+  // 글에 나온 말 그대로: [언제] + [무엇]
+  literalDrawback(t, ctx, add, say, out);
+  const PEST = t.match(/(벌|모기|파리|비둘기|강아지|고양이|닭|오리|거위|엄마|아빠|선생님|경찰|좀비|귀신|바퀴벌레|까마귀|팬|기자|빚쟁이|할머니|선배|형|누나|동생|개)(?:가|이|들이|떼가|한테|에게)/);
+  const chaser = t.match(/([가-힣]{1,6}?)(?:이|가|들이|들)?\s*(?:계속\s*|자꾸\s*|하루 종일\s*)?(?:쫓아|따라다|따라온|따라와|달려들|달려든|나타나|찾아와|찾아온)/);
+  if ((PEST && has(/쫓아|따라|달려들|나타|찾아|혼난|혼나|잔소리|괴롭|물어|쏘|공격|때린|(?<![가-힣])온다|와서|와요|등장/)) || chaser) {
+    const nm = chaser && !STOP.has(chaser[1]) ? chaser[1] : PEST ? PEST[1] : '무언가', pic = pixFor(nm);
+    add({ t: 'pest', every: DW.every || (DW.often ? 5 : 7), on: DW.skill ? dOn : undefined, dmg: has(/혼난|혼나|잔소리/) ? 1 : 3, name: nm, color: pic ? pic.color : '#ffe14a', pix: pic ? pic.pix : undefined, st: has(/혼난|혼나|잔소리/) ? { k: 'stun', d: 0.6 } : undefined });
+  }
+  if (has(/대머리|머리가 (빠|다 빠|없)/)) add({ t: 'look', head: 'bald' });
   if (has(/분홍|핑크/)) add({ t: 'look', body: '#ff9ad0', hair: '#ff7ab0' });
   if (has(/초록|녹색/)) add({ t: 'look', body: '#4fbf5f', skin: '#a8e08a' });
-  if (has(/반대로 (움직|걸)|방향이 반대|조작이 반대|좌우가 바뀌/)) add({ t: 'move', mode: 'reverse' });
-  else if (has(/미끄/)) add({ t: 'move', mode: 'slide' });
-  else if (has(/비틀|취한|술/)) add({ t: 'move', mode: 'drunk' });
-  else if (has(/멈출 수 없|계속 (달|뛰|걸)|못 멈/)) add({ t: 'move', mode: 'nostop' });
-  else if (has(/뒷걸음|문워크|뒤로 걷/)) add({ t: 'move', mode: 'backward' });
-  else if (has(/깡총|토끼|뛰어다|점프/)) add({ t: 'move', mode: 'hop' });
-  if (has(/실패|확률|불발|가끔 안|삑사리/)) add({ t: 'fail', on: 'skills', chance: 40, back: has(/자기|자신|본인|맞|터/) ? 'selfhit' : has(/기절|멈/) ? 'stun' : 'fizzle' });
-  if (has(/(계속|서서히|시간이|가만히).*(줄|깎|닳|빠)/)) add({ t: 'drain', amt: 2, if: has(/가만히/) ? 'still' : has(/움직/) ? 'moving' : 'always' });
-  if (has(/나도 (아프|다치)|같이 맞|자기도|나까지/)) add({ t: 'backfire', on: 'skills', pct: 60 });
-  else if (has(/체력|피가|hp|생명|목숨|아프|다친|다쳐|수명|피곤/i)) add({ t: 'selfdmg', on: 'skills', amt: 10 });
-  if (has(/기절|멈칫|굳|마비/)) add({ t: 'selfst', on: 'skills', st: { k: 'stun', d: 1.2 } });
-  if (has(/느려|느림|둔해|굼|거북/)) add({ t: 'stack', on: 'skills', stat: 'slow', pct: 10 });
-  if (has(/커지|커진|뚱뚱|살이|거대/)) add({ t: 'stack', on: 'skills', stat: 'size', pct: 15 });
-  if (has(/작아|줄어|개구리|돼지가|변신/)) add({ t: 'selfst', on: 'skills', st: { k: 'morph', d: 2 } });
-  if (has(/헷갈|조작|뒤바/)) add({ t: 'selfst', on: 'skills', st: { k: 'confuse', d: 3 } });
-  if (has(/순간이동|텔레포트|엉뚱한 곳|아무 데|어딘가/)) add({ t: 'tele', on: 'skills' });
-  if (has(/날아가|밀려|반동|튕|넘어|뒤로 날/)) add({ t: 'recoil', on: 'skills', force: 10 });
-  if (has(/쿨|재사용|오래 기다|대기|느긋/)) add({ t: 'cd', on: 'skills', pct: 150 });
-  if (has(/모아|충전|준비|기다려야|주문을|외워야|뜸/)) add({ t: 'windup', on: 'skills', time: 1.2 });
-  if (has(/약해|힘이 빠|위력|약하다|약함/)) add({ t: 'mul', on: 'skills', pct: 60 });
-  if (has(/방어|맞으면|받는 피해|종이|유리|약골|맷집/)) add({ t: 'stat', stat: 'taken', pct: 60 });
-  if (has(/(내가|나도|자기|본인|손이|몸이|나를).*(탄다|타 버|불붙|화상|뜨거)/) || (has(/불|화상|뜨거|타 버/) && !out.length)) add({ t: 'selfst', on: 'skills', st: { k: 'burn', d: 3 } });
-  if (has(/(내가|나도|자기|본인|손이|몸이|나를).*(얼어|얼린|꽁꽁)/)) add({ t: 'selfst', on: 'skills', st: { k: 'freeze', d: 1.2 } });
-  if (has(/(내가|나도|자기|본인|나를).*(감전|찌릿)/)) add({ t: 'selfst', on: 'skills', st: { k: 'stun', d: 1 } });
-  if (has(/(내가|나도|자기|본인|나를).*(중독|배탈)/)) add({ t: 'selfst', on: 'skills', st: { k: 'poison', d: 3 } });
-  if (has(/(내가|나도|자기|본인|나를).*(젖|미끄)/)) add({ t: 'selfst', on: 'skills', st: { k: 'slip', d: 2 } });
-  if (has(/(?<![가-힣])말을 못|입이 막|벙어리|침묵/)) add({ t: 'selfst', on: 'skills', st: { k: 'silence', d: 2 } });
-  if (has(/가만히 있으면|멈춰 있으면/)) add({ t: 'when', if: 'still', st: has(/잠/) ? 'sleep' : 'weak' });
-  if (has(/움직이면|걸으면|뛰면/)) add({ t: 'when', if: 'moving', st: has(/아프|체력/) ? 'burn' : 'slow' });
-  if (has(/맞으면|공격받으면|다치면/)) add({ t: 'hurtst', st: { k: has(/울/) ? 'slow' : has(/잠/) ? 'sleep' : 'stun', d: 1 }, chance: 60 });
+  const plain = !DW.skill && !DW.hit && !DW.if && !DW.every && !DW.gate && !DW.byAct;
+  if (has(/반대로 (움직|걸)|방향이 반대|조작이 반대|좌우가 바뀌|방향키가 반대|거꾸로 (걷|움직)/)) add({ t: 'move', mode: 'reverse' });
+  else if (plain && has(/미끄|빙판/)) add({ t: 'move', mode: 'slide' });
+  else if (plain && has(/비틀|취한|술에|갈지자/)) add({ t: 'move', mode: 'drunk' });
+  else if (has(/멈출 수 없|계속 (달|뛰|걸)|못 멈|멈추지 못/)) add({ t: 'move', mode: 'nostop' });
+  else if (has(/뒷걸음|문워크|뒤로 걷|뒤로만/)) add({ t: 'move', mode: 'backward' });
+  else if (plain && has(/깡총|토끼처럼|뛰어다/)) add({ t: 'move', mode: 'hop' });
+  else if (plain && has(/빙글빙글|뱅글뱅글|돌면서 걷/)) add({ t: 'move', mode: 'spin' });
+  if (has(/순간이동|텔레포트|엉뚱한 곳|아무 데로|어딘가로/)) add({ t: 'tele', on: dOn, nth: DW.nth });
+  if (has(/(조건|상황)이? ?(되면|오면)/) && DW.gate && !out.length) add({ t: 'act', every: 11, text: cut(DW.gate + '면…!', 14), pose: 'sweat', d: 1 });
+  // 그래도 아무것도 못 읽었으면: 일반적인 마이너스 효과 대신, 쓴 글 그대로 캐릭터가 한다
   if (!out.length) {
-    const h = hashText(t);
-    add([{ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } }, { t: 'move', mode: 'drunk' }, { t: 'reverse', on: 'skills', chance: 40 }, { t: 'tick', every: 8, st: { k: 'sleep', d: 1.5 } }, { t: 'fail', on: 'skills', chance: 35, back: 'fizzle' }][h % 5]);
+    const [, effTxt] = dSplit(t), pm = PIXBOOK.find(([re]) => re.test(t)), word = pm ? (t.match(pm[0]) || [''])[0] : '';
+    const A = { t: 'act', text: cut((say || effTxt || t).replace(/[.!~]+$/, ''), 14), pose: word ? 'word' : 'sweat', word, d: 1 };
+    if (DW.skill) Object.assign(A, { on: dOn, nth: DW.nth }); else if (DW.hit) A.hit = true; else if (DW.if) A.if = DW.if; else if (DW.bump) A.bump = true; else A.every = DW.every || (DW.often ? 6 : 9);
+    add(A);
   }
-  if (has(/가끔|때때로|종종|어쩌다|확률|랜덤하게|간혹/)) for (const x of out) if (x.chance != null) x.chance = 40;
+  if (has(/가끔|때때로|종종|어쩌다|확률|랜덤하게|간혹/) && !/\d+\s*(%|퍼센트|프로)|번\s*(중|에)/.test(t)) for (const x of out) if (x.chance != null && x.t !== 'aim') x.chance = 40;
   if (ctx && ctx.moves) {
     const COND = [[/숨으면|숨을 때|은신하면/, ['invis']], [/던지면|던질 때|쏘면|쏠 때|발사하면/, ['shot', 'lob', 'hook', 'rain']], [/휘두르면|벨 때|베면|때리면|칠 때/, ['swing', 'dash']], [/날면|날 때|날아오르면/, ['fly']], [/먹으면|먹을 때|마시면/, ['heal', 'big']], [/부르면|소환하면|부를 때/, ['summon', 'orbit', 'turret']], [/터뜨리면|터질 때|폭발하면/, ['boom', 'lob', 'wave']], [/돌진하면|달려들면|박치기하면/, ['dash']], [/순간이동하면|사라지면/, ['blink', 'invis']], [/뿜으면|광선을 쏘면|뿌리면|노래하면|소리 지르면/, ['beam', 'cone', 'chain']], [/구르면|내려찍으면|발을 구르면/, ['wave']], [/막으면|버티면|반격하면/, ['counter', 'shield', 'reflect']]];
     const c = COND.find(([re]) => re.test(t));
@@ -2228,9 +2224,9 @@ function smartDrawback(side, ctx) {
     if (slot) for (const x of out) if (x.on === 'skills') x.on = slot;
   }
   const clean = out.map((x) => [x, sanDfx(x)]).filter(([, c]) => c);
-  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } });
+  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'act', every: 9, text: cut(t, 14) || '앗!', pose: 'sweat', d: 1 });
   const f = fx, more = clean.slice(1).map(([, c]) => c), rawMore = clean.slice(1).map(([x]) => x);
-  return { how: (customHow ? [customHow].concat(more.filter((x) => !['look', 'replace', 'lock'].includes(x.t)).map(dfxText)) : [f].concat(more).map(dfxText)).join(' + ').slice(0, 60), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: clean.length ? clean[0][0] : f, more: rawMore };
+  return { how: (customHow ? [customHow].concat(more.filter((x) => !['look', 'replace', 'lock'].includes(x.t)).map(dfxText)) : [f].concat(more).filter((x) => x.t !== 'look' || clean.length === 1).map(dfxText)).join(' + ').slice(0, 70), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: clean.length ? clean[0][0] : f, more: rawMore };
 }
 /** 능력을 못 쓰게 됐을 때 대신 나오는 버둥대는 기술 (능력 이름을 살려서) */
 function lameMoves(n) {
@@ -3294,6 +3290,256 @@ wfam('holiday', 'sweet', '크리스마스 산타 산타클로스 루돌프썰매
   ult: wm('skyline', (P, S) => [{ t: 'buff', k: 'fly', d: 3 }, { t: 'skyline', dmg: 12 * P, n: 10, step: 20, r: 12, st: SV(S, 'dance', 1.2) }, { t: 'storm', dmg: 5 * P, n: 8, r: 56 }], '{n} 대축제|선물 폭격', '썰매가 날며 선물 폭탄을 일렬로 떨어뜨린다. 폭죽까지'),
 }, { st: 'dance', style: 'artillery', passive: 'regen', title: '파티 주최자|선물 배달부', look: { head: 'hat', body: '#d02a2a' } });
 
+/* ===== 부작용 글자 그대로 읽기: [언제] + [무엇을] =====
+   "능력을 쓰면 3초 동안 못 움직인다" → 언제: 능력을 쓸 때 / 무엇: 3초 동안 멈춤
+   "물에 약하다" → 물 공격에 맞으면 피해 2배 / "똥을 싼다" → 몇 초마다 정말로 멈춰서 똥을 싼다
+   알 수 없는 글도 일반적인 마이너스 효과로 바꾸지 않고, 그 글 그대로 캐릭터가 하게 만든다. */
+const DKN = { 한: 1, 하나: 1, 두: 2, 둘: 2, 세: 3, 셋: 3, 네: 4, 넷: 4, 다섯: 5, 여섯: 6, 일곱: 7, 여덟: 8, 아홉: 9, 열: 10, 스무: 20 };
+const DNR = '(\\d+(?:\\.\\d+)?|한|하나|두|둘|세|셋|네|넷|다섯|여섯|일곱|여덟|아홉|열|스무)';
+const dnum = (s) => (s == null ? NaN : /^\d/.test(s) ? parseFloat(s) : DKN[s] || NaN);
+
+/* 행동: [글, 연출, 말풍선, 멈추는 시간, 따로 언제를 안 쓰면 언제 하는지(skills: 능력 쓸 때, 숫자: 그 초마다)] */
+const D_ACT = [
+  [/재채기|에취|엣취/, 'sneeze', ['에-에-에취!!', '에취!!'], 0.6, 8],
+  [/딸꾹/, 'hiccup', ['딸꾹!', '히끅!'], 0.4, 6],
+  [/방귀|뿡|뿌웅|뽀옹|가스를/, 'gas', ['뿌웅~', '뿡!', '뿌지직', '부우웅~'], 0.6, 8],
+  [/트림|꺼억/, 'gas', ['꺼억~', '끄어억'], 0.5, 8],
+  [/똥|응가|설사|화장실|볼일/, 'poop', ['뿌지직!', '으으… 급해!', '화장실!!'], 1.4, 10],
+  [/(?<![가-힣])(운다|울어|울음|우는|울고|울보|울면서)|눈물|엉엉|훌쩍|징징/, 'cry', ['으앙~', '엉엉엉', '훌쩍…'], 1.2, 9],
+  [/웃는다|웃어|웃음|웃고|빵 터|ㅋㅋ|깔깔|낄낄/, 'laugh', ['ㅋㅋㅋㅋ', '푸하하하', '깔깔깔'], 1, 9],
+  [/노래|랄라|흥얼|열창|떼창/, 'sing', ['♪ 랄라라~', '♬ 도레미~', '♪ 라라랄라'], 0.6, 'skills'],
+  [/소리를 지|소리 질|비명|꽥|소리친|고함|괴성/, 'shout', ['으아아악!!', '꺄아아악!', '우와아아!'], 0.4, 'skills'],
+  [/하품/, 'yawn', ['하아아암~'], 0.8, 9],
+  [/코를 파|코딱지|후비/, 'sweat', ['후비적…'], 0.8, 9],
+  [/돈을 (잃|흘|떨어|쓴|뿌)|돈이 (떨어|빠|새|나간)|지갑|돈을 (낸|내야)/, 'coin', ['내 돈!!', '앗 돈이…', '텅장…'], 0.6, 10],
+  [/사랑|하트|고백|반해|뽀뽀|윙크|사랑해/, 'heart', ['사랑해~', '♥ 반했어'], 0.8, 10],
+  [/기도|절을|인사를|사과를|사과한/, 'bow', ['꾸벅', '죄송합니다!'], 0.8, 10],
+  [/셀카|사진을/, 'snap', ['찰칵!', '셀카 타임~'], 0.8, 10],
+  [/먹는다|먹어야|먹어|간식을|밥을 먹|군것질/, 'eat', ['냠냠', '쩝쩝', '한 입만…'], 1, 10],
+  [/춤을? ?(춘|추|춰)|춤/, 'star', ['둠칫둠칫', '덩실덩실'], 0, 8],
+];
+/* 상태: [글, 상태이상, 기본 시간, 말풍선, 연출] */
+const D_ST = [
+  [/잠들|잠든|잠이 들|잠을 자|잔다|졸(?!업)|졸려|코를 골|쿨쿨|꾸벅|자 버/, 'sleep', 2, ['쿨쿨…', 'Zzz…'], 'zzz'],
+  [/넘어지|넘어진|넘어져|자빠|꽈당|미끄러져 넘/, 'stun', 1, ['꽈당!', '으악!'], 'fall'],
+  [/기절|쓰러|어지러|어질|멍때|멍해|정신을 잃/, 'stun', 1.2, ['어질어질…', '@_@'], 'star'],
+  [/얼어|(?<![가-힣])언다|얼음이 된|굳어|굳는|굳은|돌이 되|석화|꽁꽁/, 'freeze', 1.2, ['꽁꽁…', '굳었다!'], 'sweat'],
+  [/감전|찌릿|전기가 (통|오)/, 'stun', 1, ['찌리릿!'], 'star'],
+  [/춤/, 'dance', 1.5, ['둠칫둠칫', '몸이 멋대로!'], 'star'],
+  [/못 움직|움직일 수 없|움직이지 못|못 걷고|멈춘|멈춰|멈춤|제자리|발이 묶|꼼짝/, 'root', 1.5, ['으앗, 발이!', '못 움직여!'], 'sweat'],
+  [/헷갈|혼란|방향을 잃|정신이 없|어디로 가/, 'confuse', 2.5, ['여긴 어디?', '헷갈려!'], 'star'],
+  [/미끄러/, 'slip', 2, ['미끌!'], 'sweat'],
+  [/불타|불붙|불이 붙|(?<![가-힣])탄다|타 버|화상|뜨거워/, 'burn', 3, ['앗 뜨거!'], 'sweat'],
+  [/중독|배탈|배가 아프|배 아프|토한|토를|구토|속이 안 좋|독에 걸/, 'poison', 3, ['우웩…', '배야…'], 'gas'],
+  [/개구리가 된|개구리로|돼지가 된|돼지로|닭이 된|변신한|[가-힣]+(?:으로|로) 변(?:한|해|함|신)/, 'morph', 2, ['개굴?', '이게 뭐야!'], 'star'],
+  [/침묵|조용해/, 'silence', 2, ['…!'], 'sweat'],
+  [/몸이 무거|무거워/, 'heavy', 2, ['무거워…'], 'sweat'],
+  [/작아/, 'tiny', 3, ['작아진다!'], 'sweat'],
+  [/느려|느린|느리|굼떠|느릿/, 'slow', 2, ['헉헉…'], 'sweat'],
+  [/약해|힘이 빠|기운이 없|약하|힘이 없/, 'weak', 2, ['힘이 빠져…'], 'sweat'],
+];
+const D_HARD = new Set(['sleep', 'stun', 'freeze', 'dance', 'root', 'morph']);
+/* 원소 단어 → 그 원소 공격(vfx) */
+const D_ELEM = [[/물|비(?!행|밀|싸|빔)|파도|바다|강물|홍수|물총/, ['water'], '물'], [/불|화염|불꽃|용암/, ['fire'], '불'], [/얼음|눈(?!물|이|을|빛)|추위|겨울/, ['ice'], '얼음'], [/전기|번개|벼락|감전/, ['electric'], '전기'],
+  [/독|가스|냄새/, ['poison'], '독'], [/빛|햇빛|햇살|태양|성스러/, ['holy'], '빛'], [/어둠|그림자/, ['shadow', 'void'], '어둠'], [/바람|태풍/, ['wind'], '바람'], [/돌|흙|땅|바위/, ['earth'], '돌'],
+  [/소리|노래|음악|잔소리/, ['sound'], '소리'], [/쇠|칼|총|금속/, ['metal'], '쇠붙이'], [/마법|주문/, ['arcane'], '마법'], [/식물|나무|꽃/, ['nature'], '식물'], [/기계|로봇|전자/, ['tech'], '기계'], [/사탕|단것|과자|초콜릿/, ['candy'], '단것']];
+
+/** 설명에 쓸 짧은 행동 글 ("똥을 싼다" → "똥을 쌈") */
+function dWhat(s) { return cut(String(s || '').replace(/[.!~,]+$/, '').replace(/^.*?(초\s*마다|때마다|쓰면|맞으면)\s*/, '').replace(/\s*(하면|면|때마다|때|면서)$/, '').replace(/(을|를)$/, '').trim(), 12); }
+/** 문장을 [조건 부분, 결과 부분]으로 자른다 */
+function dSplit(t) {
+  const re = /(면|때마다|(?<![가-힣])때|수록|마다|면서|는데|더니|자마자)(?=[\s,.!]|$)/g;
+  let last = -1, m;
+  while ((m = re.exec(t))) last = m.index + m[0].length;
+  return last < 0 ? ['', t] : [t.slice(0, last), t.slice(last).trim() || t];
+}
+
+/** 언제 일어나는지 */
+function dWhen(t, cond) {
+  const W = {};
+  const has = (re) => re.test(cond || '');
+  let m;
+  const SKILL = /(쓰면|쓸\s?때|쓰고\s?나면|쓴\s?(뒤|후|다음)|사용하면|사용할\s?때|사용\s?후|발동하면|발동할\s?때|공격하면|공격할\s?때|때리면|때릴\s?때|쏘면|쏠\s?때|던지면|던질\s?때|휘두르면|휘두를\s?때|누르면|공격마다|맞히면|명중하면|맞추면|기술마다|능력마다|스킬마다|(능력|스킬|기술|공격|궁극기|필살기)(을|를)?\s?(쓸|할|쏠|부릴)\s?때마다)/;
+  if ((m = (cond || '').match(new RegExp(DNR + '\\s*번(?:\\s*이상)?\\s*(?:연속으로\\s*)?(?:쓰면|쓸\\s*때마다|쓰고\\s*나면|사용하면|공격하면|때리면|쏘면|맞히면|던지면|누르면)')))) { W.skill = true; const n = dnum(m[1]); if (n > 1) W.nth = n; }
+  else if (has(SKILL)) W.skill = true;
+  else if (has(/(맞으면|맞을\s?때|맞을때|공격(을)?\s?받으면|공격\s?당하면|얻어맞으면|피격|다치면|다칠\s?때|(데미지|대미지|피해)(를)?\s?(입|받)으면|한\s?대\s?맞으면)/)) W.hit = true;
+  if ((m = t.match(new RegExp(DNR + '\\s*초\\s*(?:마다|에\\s*한\\s*번씩|간격|씩마다)')))) W.every = clamp(dnum(m[1]), 2, 30);
+  else if ((m = t.match(new RegExp(DNR + '\\s*분\\s*마다')))) W.every = 30;
+  if (has(/가만히\s?(있|서)|멈춰\s?(있|서)|서\s?있으면|안 움직이면|움직이지 않으면|쉬면/)) W.if = 'still';
+  else if (has(/움직이면|움직일\s?때|걸으면|걸을\s?때|뛰면|달리면|이동하면|이동할\s?때|걸어 다니면/)) W.if = 'moving';
+  else if (has(/(체력|피|hp)[이가]?\s?(낮|적|반|절반|얼마\s?안|\d+\s?%?\s?이하|바닥|없|조금|별로)[가-힣\s]*(면|때)|죽을\s?(때가|것 같으)|죽어가면|위험하면|거의 죽/i)) W.if = 'lowhp';
+  else if (has(/(체력|피)[이가]?\s?(많|높|가득|꽉|넉넉)[가-힣\s]*(면|때)/)) W.if = 'highhp';
+  else if (has(/(적|상대|남|다른 사람|누가|누군가|사람|친구)(한테|에게|이랑|랑|과|와|[이가을를])?\s?(가까이|근처|옆|코앞|가까워)|(가까이|근처|옆에|붙어|가까워)\s?(가면|오면|있으면|있을\s?때|붙으면|지면)|붙으면|마주치면|만나면|보면/)) W.if = 'near';
+  else if (has(/(멀리|멀어|떨어져)\s?(있으면|지면|가면)/)) W.if = 'far';
+  if (has(/벽에\s?(부딪|박|닿|부딫|쾅)|벽에 (머리|몸)/)) W.bump = true;
+  if (has(/시간이\s?(지날|갈|흐를)수록|갈수록|오래\s?(싸울|있을|버틸)수록|싸울수록|점점/) || /점점|갈수록|시간이 지날수록/.test(t)) W.time = true;
+  if (has(/(체력|피)[이가]?\s?(줄|낮아|떨어|깎|닳)[가-힣]*수록|다칠수록|맞을수록|약해질수록/)) W.hpr = true;
+  if (/배가?\s?고프|배고프|배고파|굶/.test(t)) { W.time = true; W.why = '배가 고파질수록'; }
+  // 조건 부분에 저절로 하는 행동이 있으면("재채기를 하면") 그 행동이 몇 초마다 일어나고 그때 결과가 생긴다
+  if (cond && !W.skill && !W.hit && !W.if && !W.bump && !W.time && !W.hpr) {
+    const a = D_ACT.find(([re]) => re.test(cond));
+    if (a) { W.byAct = a; W.every = W.every || (typeof a[4] === 'number' ? a[4] : 8); }
+    else if (!W.every && /[가-힣]/.test(cond)) W.gate = cut(cond.replace(/\s*(면|때마다|때|마다|면서|는데)$/, '').trim(), 10);
+  }
+  if (/가끔|때때로|종종|간혹|어쩌다|가끔씩|랜덤하게|무작위로|이따금/.test(t)) W.rare = true;
+  if (/자꾸|계속|수시로|주기적|툭하면|시도\s?때도|맨날|항상|틈만 나면|쉴 새 없이|매번/.test(t)) W.often = true;
+  return W;
+}
+
+/** 부작용 글 → 효과 목록 (글에 나온 그대로) */
+function literalDrawback(t, ctx, add, say, out) {
+  const blocked = () => (out || []).some((x) => x.t === 'replace' || x.t === 'lock');
+  const has = (re) => re.test(t);
+  const [cond, eff] = dSplit(t);
+  const W = dWhen(t, cond);
+  const E = (re) => re.test(eff);
+  const big = /엄청|매우|너무|완전|진짜|아주|겁나|무지|되게|심하게|미친 듯이|많이|훨씬|극도로/.test(t), small = /조금|살짝|약간|(?<![가-힣])좀|약하게/.test(t);
+  const K = big ? 1.6 : small ? 0.55 : 1;
+  const secM = t.match(/(\d+(?:\.\d+)?)\s*초\s*(?:동안|간|씩|정도)/), sec = secM ? clamp(+secM[1], 0.3, 4) : 0;
+  const pctM = t.match(/(\d+)\s*(%|퍼센트|프로)/), pct = pctM ? clamp(+pctM[1], 5, 95) : 0;
+  const half = /절반|(?<![가-힣])반(?!대|복|사|응|짝|드시|칙|성|항|갑|찬|죽|창|지|팔|바지|쪽짜리 아)|1\/2/.test(t);
+  const timesM = t.match(new RegExp(DNR + '\\s*배')), times = timesM ? clamp(dnum(timesM[1]), 1.2, 4) : 0;
+  const slotM = [[/궁극기|궁(?![가-힣])|필살기/, 'ult'], [/능력\s?1|첫\s?번째 (능력|기술)|기본\s?공격|평타|기본기/, 'basic'], [/능력\s?2|두\s?번째 (능력|기술)/, 's1'], [/능력\s?3|세\s?번째 (능력|기술)/, 's2']].find(([re]) => re.test(t));
+  const on = slotM ? slotM[1] : 'skills';
+  const nth = W.nth || undefined;
+  const chance = W.rare ? 40 : 100;
+  const pctOr = (def) => Math.round(pct || (half ? 50 : times ? (1 - 1 / times) * 100 : def * K));
+  // 상태이상·행동을 "언제"에 맞게 붙인다
+  const place = (st, act) => {
+    const A = { t: 'act', text: act.text, pose: act.pose, d: act.d, word: act.word, what: act.what };
+    if (st) A.st = st;
+    if (act.fire) A.fire = true;
+    if (W.skill || (!W.hit && !W.every && !W.if && !W.bump && !W.gate && act.def === 'skills')) {
+      return add(Object.assign(A, { on, nth, chance: W.rare ? 40 : 100 }));
+    }
+    if (W.hit) return add(Object.assign(A, { hit: true, chance: W.rare ? 40 : 100 }));
+    if (W.bump) return add(Object.assign(A, { bump: true }));
+    if (W.if) {
+      // 가벼운 상태는 조건인 동안 계속, 크게 묶는 상태는 그 순간 한 번
+      if (st && !D_HARD.has(st.k) && st.k !== 'tiny' && !act.forceAct) return add({ t: 'when', if: W.if, st: st.k });
+      return add(Object.assign(A, { if: W.if }));
+    }
+    if (W.gate) return add(Object.assign(A, { every: W.every || 11, text: cut(`${W.gate}면…!`, 14) }));
+    return add(Object.assign(A, { every: W.every || (W.often ? 6 : W.rare ? 12 : typeof act.def === 'number' ? act.def : 9) }));
+  };
+
+  // ── 숫자·능력치로 분명히 말한 것 ──
+  // 원소에 약함: "물에 약하다", "물을 맞으면 2배로 아프다"
+  const elemPart = (t.match(/([가-힣]{1,6}?)(?:에|에게|한테)\s*(?:약하|약해|약함|취약|쥐약)/) || t.match(/([가-힣]{1,6}?)(?:을|를|에)\s*맞으면/) || [])[1];
+  const EL = elemPart && !/^(적|상대|공격|남|사람|친구|아무|누구|모든|총알)$/.test(elemPart) && D_ELEM.find(([re]) => re.test(elemPart));
+  if (EL) add({ t: 'weakto', vfx: EL[1], pct: Math.round(times ? (times - 1) * 100 : 100 * K), name: elemPart });
+  // 체력
+  const hpN = t.match(/(?:체력|피|hp|HP|목숨|생명력)[이가은는]?\s*(\d+)\s*(?:밖에|뿐|만 ?있|이다|이야|짜리|으로|로|에서)/);
+  const hpLoss = /(체력|피|목숨|생명)[이가을를]?\s*(\d+\s*)?(씩\s*)?(줄|준|깎|닳|빠|감소|떨어|잃|소모|사라|날아)|(체력|피)[이가]?\s*(반|절반)\s*(이|으로|만)?\s*(된|줄|깎|날)|피를 (흘|토)|다친다|다쳐|(?<!배가 |배 )아프다|(?<!배가 |배 )아파|상처/;
+  if ((W.skill || W.byAct) && E(hpLoss)) {
+    const nm = eff.match(/(\d+)\s*(?:씩\s*)?(?:줄|준|깎|닳|빠|감소|떨어|잃|소모)/);
+    if (W.byAct) { /* 행동 + 체력: 아래 행동에서 처리 */ } else add(half || pct ? { t: 'selfdmg', on, pct: pct || 50, nth } : { t: 'selfdmg', on, amt: nm ? clamp(+nm[1], 1, 40) : Math.round(10 * K), nth });
+  } else if ((W.if || W.time || W.often || W.every) && !W.hit && E(/(체력|피)[이가]?\s*(계속|서서히|조금씩|점점|자꾸)?\s*(줄|준|깎|닳|빠|감소|떨어|사라)/)) {
+    add({ t: 'drain', amt: r1(1.5 * K), if: W.if || 'always' });
+  } else if (!W.hit && !W.if && (hpN || E(/(체력|피|목숨|생명력)[이가은는]?\s*(적|낮|약하|약해|조금|얼마\s?없|반|절반|별로 없|부족)|허약|약골|유리\s?몸|종이\s?몸|몸이 약|병약|저질\s?체력|저체력/))) {
+    add({ t: 'stat', stat: 'hp', pct: hpN ? clamp(100 - +hpN[1], 10, 80) : pctOr(35) });
+  }
+  // 받는 피해
+  if (!EL && (E(new RegExp(DNR + '\\s*배(로)?\\s*(더\\s*)?(아프|다치|피해|데미지|대미지|받|깎|세게)')) && (W.hit || has(/맞으면|받는|피해|데미지|대미지/)) || E(/더 아프|더 많이 다치|아픔을 (많이|두 배)|맷집이 (약|없)|방어력이?\s?(약|낮|없|0|반)|방어를? 못|물렁/))) {
+    add({ t: 'stat', stat: 'taken', pct: times ? Math.round((times - 1) * 100) : pctOr(60) });
+  }
+  // 공격력
+  const dmgW = /(공격력|힘|위력|파워|데미지|대미지|공격|능력|기술|스킬)[이가은는]?\s*(이\s)?(약|낮|반|절반|줄|떨어|약해|약하|별로|쎄지 않|세지 않|안 아프|하나도 안 아|간지럽)/;
+  if (W.time || W.hpr) {
+    if (E(/약해|힘이 빠|위력|공격력|힘이 없|약하/)) add({ t: 'ramp', stat: 'dmg', by: W.hpr ? 'hp' : 'time', pct: pctOr(50), why: W.why });
+    if (E(/느려|느리|굼떠|지쳐|헉헉/)) add({ t: 'ramp', stat: 'speed', by: W.hpr ? 'hp' : 'time', pct: pctOr(50), why: W.why });
+    if (E(/작아|줄어들|쪼그라/)) add({ t: 'ramp', stat: 'size', by: W.hpr ? 'hp' : 'time', pct: -Math.min(60, pctOr(45)), why: W.why });
+    if (E(/커지|커진|커져|뚱뚱|살이/)) add({ t: 'ramp', stat: 'size', by: W.hpr ? 'hp' : 'time', pct: Math.min(80, pctOr(60)), why: W.why });
+  } else if (!W.skill && !W.hit && !W.if && !W.every && !W.gate && E(dmgW)) {
+    add(on !== 'skills' ? { t: 'mul', on, pct: Math.min(95, pctOr(40)) } : { t: 'stat', stat: 'dmg', pct: Math.min(80, pctOr(40)) });
+  }
+  // 이동 속도
+  const spdW = /(속도|발|이동|걸음|달리기|움직임)[이가은는]?\s*(이\s)?(엄청\s|너무\s|진짜\s)?(느|느려|느림|반|절반|굼)|느림보|굼벵이|거북이(처럼|같이)|발이 느|느리다|느려진다|느리게 (걷|움직|다)|느릿느릿/;
+  if (!W.time && !W.hpr) {
+    if (E(/못 걷|걸을 수 없|걷지 못|다리가 (없|하나|부러)|외다리|깨금발|한 발로/)) { add({ t: 'move', mode: 'hop' }); add({ t: 'stat', stat: 'speed', pct: 25 }); }
+    else if (E(/못 뛴|못 달|뛸 수 없|달릴 수 없|뛰지 못|달리지 못|못 뛰어/)) add({ t: 'stat', stat: 'speed', pct: pctOr(35) });
+    else if (E(spdW) && W.skill) add({ t: 'stack', on, stat: 'slow', pct: Math.round(10 * K), nth });
+    else if (E(spdW) && !W.hit && !W.if && !W.every && !W.gate && !W.byAct) add({ t: 'stat', stat: 'speed', pct: Math.min(80, pctOr(30)) });
+  }
+  // 몸집 ("적이 커진다"처럼 적 얘기면 빼고)
+  const foeSubj = /(적|상대|남|다른 사람|상대방)[이가은는도]?\s?(더\s)?(커|작아|빨라|강해|세져)/.test(eff);
+  if (!W.time && !W.hpr && !foeSubj) {
+    if (E(/커지|커진|커져|뚱뚱해|살이 (찐|찌)|거대해|부풀/)) {
+      if (W.skill) add({ t: 'stack', on, stat: 'size', pct: Math.round(15 * K), nth });
+      else if (W.hit) add({ t: 'stack', hit: true, stat: 'size', pct: Math.round(12 * K) });
+      else if (!W.if && !W.every && !W.gate) add({ t: 'stat', stat: 'size', pct: Math.round(pct || (times ? (times - 1) * 100 : 40 * K)) });
+    } else if (E(/작아|줄어들|쪼그라|난쟁이|키가 작|꼬마가/)) {
+      if (W.skill) add({ t: 'stack', on, stat: 'size', pct: -Math.round(12 * K), nth });
+      else if (W.hit) add({ t: 'stack', hit: true, stat: 'size', pct: -Math.round(10 * K) });
+      else if (!W.if && !W.every && !W.gate) add({ t: 'stat', stat: 'size', pct: -Math.min(60, pctOr(35)) });
+    }
+  }
+  // 늙는다
+  if (E(/늙|할머니가 된|할아버지가 된|노인/)) { add({ t: 'look', hair: '#e0e0e8' }); add(W.skill ? { t: 'stack', on, stat: 'slow', pct: 8, nth } : { t: 'stat', stat: 'speed', pct: 20 }); }
+  // 재사용 시간·횟수·늦게 나감
+  const onceM = t.match(new RegExp(DNR + '\\s*초\\s*에\\s*(?:한\\s*번|1번)(?:만|밖에|씩)?'));
+  if (onceM) add({ t: 'cd', on, min: clamp(dnum(onceM[1]), 1, 20) });
+  else if (has(/쿨|쿨타임|재사용|대기\s?시간|딜레이가 길|오래 기다려야|다시 쓰려면/)) add({ t: 'cd', on, pct: times ? Math.round((times - 1) * 100) : pct || Math.round(100 * K) });
+  const usesM = t.match(new RegExp(DNR + '\\s*(?:번|발|개|회|방)\\s*(?:만|밖에|뿐|까지만)(?!\\s*(?:쓰면|맞으면))'));
+  if (usesM && !W.nth && !onceM) add({ t: 'uses', on, n: clamp(dnum(usesM[1]), 1, 20) });
+  else if (has(/하루에 한 번|평생 한 번|딱 한 번/)) add({ t: 'uses', on, n: 1 });
+  const lateM = t.match(new RegExp(DNR + '\\s*초\\s*(?:늦게|뒤에|후에|있다가|지나야|기다려야|걸려|나중에)'));
+  if (lateM) add({ t: 'windup', on, time: clamp(dnum(lateM[1]), 0.2, 3) });
+  else if (has(/늦게 (나|발|써|쏴)|천천히 나|느리게 나|딜레이|모아야|기를 모|준비해야|주문을 외|외워야|뜸을 들|시간이 걸/)) add({ t: 'windup', on, time: r1(1 * K) });
+  // 실패: "2번 중 1번", "가끔 실패"
+  const ofM = t.match(new RegExp(DNR + '\\s*번\\s*(?:중|에)\\s*' + DNR + '\\s*번'));
+  if (ofM && E(/실패|안 나|불발|안 돼|안 된|헛/)) add({ t: 'fail', on, chance: clamp(Math.round(dnum(ofM[2]) / dnum(ofM[1]) * 100), 10, 100), back: 'fizzle' });
+  else if (E(/실패|불발|안 나가|안 나온|안 나와|삑사리|헛손질|작동을? 안|안 써질|발동이 안/) && !E(/못 쓴|못 써/) && !blocked()) add({ t: 'fail', on, chance: W.rare ? 40 : pct || (W.often ? 60 : 40), back: E(/기절|멈/) ? 'stun' : 'fizzle' });
+  // 자기를 공격
+  if (E(/자기\s?자신을?\s?(공격|때리|때린|쏘|쏜|맞|다치)|자기를?\s?(공격|때리|때린|쏘)|나를 (공격|때리|쏘|맞)|자기한테|자신한테|나한테 (맞|쏘|날아|돌아)|스스로를?\s?(때|공격|다치)|자폭|제 발등/)) {
+    add(W.rare ? { t: 'fail', on, chance: 40, back: 'selfhit' } : { t: 'backfire', on, pct: pctOr(50) });
+  } else if (E(/나도 (아프|다치|맞)|같이 맞|자기도 (아프|다치|맞)|나까지/)) add({ t: 'backfire', on, pct: pctOr(60) });
+  // 빗나감·사거리
+  if (E(/빗나|안 맞(는|아|고)|명중률|조준이?\s?(안|못|엉|이상|흔들)|헛방|엉뚱한 (데|곳)로 (날|나|쏘)|못 맞히|못 맞춘|못 맞혀|겨냥을 못/)) add({ t: 'aim', on, deg: Math.round(clamp(40 * K, 15, 80)), chance: W.rare ? 40 : /다 |전부|항상|무조건|하나도/.test(t) ? 100 : 70 });
+  if (E(/멀리\s?(못|안)|사거리|팔이 짧|짧게 (나|날)|가까이서만|코앞까지만|가까운 (적|데|곳)만|멀리 있는 (적|사람|애)[은을]?\s?(못|안)|멀리 못 (가|날)|짧아/)) add({ t: 'range', on, pct: Math.round(clamp(50 * K, 20, 75)) });
+  // 조건이 있는 "못 쓴다": 그 조건일 때만 능력이 막힌다 (체력이 낮으면, 비가 오면…)
+  const blockW = /(능력|스킬|기술|공격|마법|궁극기)?[을를이가]?\s*(못 쓴|못 써|못 한|안 나|안 써|봉인|쓸 수 없|사용 불가|사용할 수 없|막힌|막혀)/;
+  if ((W.if || W.hit || W.every || W.gate || W.bump) && E(blockW)) {
+    if (W.if) add({ t: 'when', if: W.if, st: 'silence' });
+    else add({ t: 'act', text: W.gate ? cut(`${W.gate}면…!`, 14) : '능력이 안 나와!', pose: 'sweat', d: 0, st: { k: 'silence', d: sec || 3 }, hit: W.hit || undefined, bump: W.bump || undefined, every: W.hit || W.bump ? undefined : W.every || 11 });
+  }
+  // 반동
+  if (E(/(내가|나도|몸이|자기가)?\s?(날아가|날아간|밀려|튕겨|뒤로 날|반동)/)) add(W.hit || W.bump || W.every || W.if ? { t: 'act', text: '으아아~', pose: 'shout', d: 0, push: true, hit: W.hit || undefined, bump: W.bump || undefined, if: W.if, every: W.hit || W.bump || W.if ? undefined : W.every } : { t: 'recoil', on, force: Math.round(clamp(10 * K, 4, 14)), nth });
+  // 도망·무서움
+  const fearM = t.match(/([가-힣]{1,6}?)(?:을|를|이|가)?\s*(?:무서워|겁내|무섭|싫어해|싫어한|질색|기겁)/);
+  if (fearM && !/^(적|상대|남|사람|친구|모두|다른 사람|아무|누구)$/.test(fearM[1])) add({ t: 'pest', every: W.every || 7, dmg: 0, name: fearM[1], color: (pixFor(fearM[1]) || {}).color || '#ffe14a', pix: (pixFor(fearM[1]) || {}).pix, st: { k: 'stun', d: 0.8 } });
+  else if (E(/도망|겁(이|을)?\s?(많|먹|나)|겁쟁이|무서워서|피해 다|쫄보|쫄아/) || (fearM && /적|상대|사람/.test(fearM[1]))) add({ t: 'flee', if: W.if && W.if !== 'still' && W.if !== 'moving' ? W.if : 'near' });
+  // 걸음 방향 제한
+  if (has(/왼쪽으로만/)) add({ t: 'move', mode: 'left' });
+  else if (has(/오른쪽으로만/)) add({ t: 'move', mode: 'right' });
+  else if (has(/옆으로만|게처럼 걷|게걸음|가로로만/)) add({ t: 'move', mode: 'side' });
+  else if (has(/위아래로만|앞뒤로만|세로로만/)) add({ t: 'move', mode: 'vertical' });
+  // 말을 못 한다: 기술 이름을 외치려 해도 음음음만 나온다
+  if (has(/말을 못|입이 막|벙어리|말을 할 수 없|입을 못 열|말이 안 나/)) add({ t: 'shout', on, text: pick(['음음음!', '읍읍!', '으븝…']) });
+  // 눈이 나쁨
+  if (has(/눈이 나쁘|시력이|근시|안경을 (잃|안 쓰|벗)|눈이 침침/)) { add({ t: 'vision', mode: 'zoom' }); add({ t: 'aim', on: 'skills', deg: 30, chance: 50 }); }
+
+  // ── 행동과 상태이상 ──
+  const actA = D_ACT.find(([re]) => re.test(eff)) || (W.byAct && null);
+  const stA = D_ST.find(([re]) => re.test(eff) && !(re.source.includes('느려') && (E(spdW) || W.time)) && !(re.source.includes('약해') && (E(dmgW) || W.time || W.hpr)) && !(re.source.includes('작아') && !W.if && !W.every && !W.gate && !W.byAct));
+  const qtext = say ? cut(say, 14) : '';
+  if (W.byAct) {
+    // "재채기를 하면 능력이 나간다", "딸꾹질하면 멈춘다": 그 행동이 저절로 일어나고 그 순간 결과가 생긴다
+    const a = W.byAct, fire = E(/능력이 (나|발|튀어|써)|(공격|기술|스킬)이 (나|발|튀어)|저절로 (쏘|나|공격)/);
+    const st = stA ? { k: stA[1], d: sec || stA[2] * (big ? 1.5 : 1) } : null;
+    const hurt = E(hpLoss);
+    add({ t: 'act', every: W.every, text: qtext || pick(a[2]), pose: a[1], d: st ? 0 : sec || a[3], st, fire, chance: W.rare ? 50 : 100, what: dWhat(cond) });
+    if (hurt) add({ t: 'drain', amt: 1, if: 'always' });
+  } else if (actA) {
+    const st = stA && stA[1] !== 'dance' && !(actA[1] === 'star' && stA[1] === 'dance') ? { k: stA[1], d: sec || stA[2] } : actA[1] === 'star' ? { k: 'dance', d: sec || 1.5 } : null;
+    place(st, { text: qtext || pick(actA[2]), pose: actA[1], d: st ? 0 : sec || actA[3] * (big ? 1.5 : 1), def: actA[4], forceAct: true, fire: E(/능력이 (나|발)|저절로 (쏘|나)/), what: dWhat(eff) });
+  } else if (stA && !(stA[1] === 'slow' && (W.time || W.hpr)) && !(stA[1] === 'weak' && (W.time || W.hpr))) {
+    const d = sec || r1(stA[2] * (big ? 1.5 : small ? 0.6 : 1));
+    // "느리다", "약하다"처럼 언제가 없으면 위에서 능력치로 이미 처리했다
+    if (!((stA[1] === 'slow' || stA[1] === 'weak' || stA[1] === 'heavy') && !W.skill && !W.hit && !W.if && !W.every && !W.gate && !W.bump) && !(stA[1] === 'silence' && E(blockW) && !E(/말/))) place({ k: stA[1], d }, { text: qtext || pick(stA[3]), pose: stA[4], d: 0, what: dWhat(eff) });
+  }
+}
+
 /* ===== 픽셀 그림 (고해상도: 게임 1칸 = 3x3 픽셀) ===== */
 const SW = 40, SH = 56, OX = 20, OY = 50;
 const STEEL = '#e6ecf6', STEEL_M = '#a8b2c6', STEEL_D = '#6a7390', WOOD = '#8a5a2f', WOOD_D = '#5e3a1c', INKC = '#1a1026', GOLD = '#ffd23f', GOLD_D = '#c8962a';
@@ -4063,6 +4309,13 @@ const PAT = {
   heart: ['#.#', '###', '.#.'], z: ['###', '.#.', '###'], plus: ['.#.', '###', '.#.'], x: ['#.#', '.#.', '#.#'],
   note: ['.##', '.#.', '##.'], leaf: ['.##', '##.', '#..'], ghost: ['.#.', '###', '#.#'], coin: ['.#.', '#.#', '.#.'],
 };
+/** 사거리 줄이기 부작용: 기술 효과의 거리 값만 줄인다 */
+function rangeScale(e, k) {
+  const o = Object.assign({}, e);
+  for (const q of ['range', 'len', 'dist', 'step', 'off']) if (typeof o[q] === 'number') o[q] *= k;
+  if (o.t === 'shot' && typeof o.life === 'number') o.life *= k;
+  return o;
+}
 /* 시각 스타일별 색 */
 function vfxPal(style, c) {
   switch (style) {
@@ -4135,7 +4388,7 @@ class Battle {
     for (const d of sp.drawbacks) for (const x of [d.fx].concat(d.more || [])) if (x) dbs.push({ fx: x, say: d.say, text: d.text });
     const lock = {}, rev = {}, hfoe = {}, rnds = {}, shout = {}, back = {}, mulS = { basic: 1, s1: 1, s2: 1, ult: 1 };
     let moveMode = null, vision = null;
-    const pests = [];
+    const pests = [], acts = [], aimS = {}, rangeS = { basic: 1, s1: 1, s2: 1, ult: 1 }, ramps = [], flees = [], weaks = [];
     dbs.forEach((d, i) => {
       const x = d.fx, each = (fn) => SLOTS.forEach((s) => { if (onMatch(x.on, s)) fn(s); });
       switch (x.t) {
@@ -4150,11 +4403,17 @@ class Battle {
         case 'backfire': each((s) => { back[s] = (back[s] || 0) + x.pct; }); break;
         case 'move': moveMode = x.mode; break;
         case 'vision': vision = x.mode; break;
-        case 'pest': pests.push({ i, t: x.every * (0.4 + Math.random() * 0.4) }); break;
+        case 'pest': if (!x.on) pests.push({ i, t: x.every * (0.4 + Math.random() * 0.4) }); break;
+        case 'act': acts.push({ i, t: x.every ? x.every * (0.5 + Math.random() * 0.4) : 0, cd: 0, prev: false }); break;
+        case 'aim': each((s) => { aimS[s] = { deg: x.deg, chance: x.chance }; }); break;
+        case 'range': each((s) => { rangeS[s] *= 1 - x.pct / 100; }); break;
+        case 'ramp': ramps.push(x); break;
+        case 'flee': flees.push(x); break;
+        case 'weakto': weaks.push(x); break;
       }
     });
     base.hp = Math.max(base.hp, 0.2); base.speed = Math.max(base.speed, 0.2); base.dmg = Math.max(base.dmg, 0.05);
-    base.size = Math.min(base.size, 3); base.taken = Math.min(base.taken, 3);
+    base.size = clamp(base.size, 0.45, 3); base.taken = Math.min(base.taken, 4);
     const s0 = this.map.spawns[i % this.map.spawns.length];
     const maxHp = Math.round(sp.stats.hp * base.hp * HP_SCALE);
     const m = makeCanvas(SW, SH);
@@ -4168,6 +4427,7 @@ class Battle {
       stack: { size: 0, slow: 0, taken: 0 },
       tickT: dbs.map((d) => (d.fx.t === 'tick' ? d.fx.every * (0.6 + Math.random() * 0.4) : 0)),
       dbs, lock, rev, hfoe, rnds, shout, back, mulS, moveMode, vision, pests, morph: null,
+      acts, aimS, rangeS, ramps, flees, weaks, nthC: {}, dLast: {}, stopT: 0, rampD: 1, rampS: 1, rampZ: 1,
       say: null, sayCd: 0, popCd: 0, stats: { dealt: 0, taken: 0, ko: 0 }, revived: false, actN: 0,
       size: sp.stats.size * base.size, dotT: 0, pose: 'idle', warn: false, stepT: 0, seed: Math.random() * 10,
       spr: m[0], sg: m[1], net: null, ai: null, auraT: Math.random(), gone: false,
@@ -4301,16 +4561,31 @@ class Battle {
     if (!f.alive) { f.koT += dt; f.vx *= 0.9; f.vy *= 0.9; this.moveCollide(f, dt); return; }
     const sp = f.spec, st = f.st, live = this.count <= 0 && !this.over;
     const ne = this.nearest(f), nd = ne ? Math.hypot(ne.x - f.x, ne.y - f.y) : 999;
-    let warn = false;
+    let warn = false, flee = null;
     for (let i = 0; i < f.dbs.length; i++) {
       const x = f.dbs[i].fx;
       if (x.t === 'when') { if (this.cond(f, x.if, nd)) st[x.st] = Math.max(st[x.st] || 0, 0.2); }
       else if (x.t === 'drain') { if (live && (x.if === 'always' || this.cond(f, x.if, nd)) && f.hp > 1) f.hp = Math.max(1, f.hp - x.amt * dt); }
+      else if (x.t === 'flee' && live && ne) { if (x.if === 'always' || this.cond(f, x.if, nd)) flee = ne; }
       else if (x.t === 'tick' && live) {
         f.tickT[i] -= dt;
         if (f.tickT[i] < 1.1) warn = true;
         if (f.tickT[i] <= 0) { f.tickT[i] = x.every; this.addStatus(f, x.st.k, x.st.d, 0, false); this.trig(f, f.dbs[i]); }
       }
+    }
+    // 글 그대로 행동: 몇 초마다, 조건이 되는 순간
+    if (live) for (const A of f.acts) {
+      const x = f.dbs[A.i].fx;
+      A.cd -= dt;
+      if (x.every) { A.t -= dt; if (A.t < 1) warn = true; if (A.t <= 0) { A.t = x.every; this.doAct(f, A.i); } }
+      else if (x.if) { const c = this.cond(f, x.if, nd); if (c && !A.prev && A.cd <= 0) { this.doAct(f, A.i); A.cd = 3; } A.prev = c; }
+    }
+    f.stopT -= dt;
+    // 시간·체력에 따라 점점
+    f.rampD = 1; f.rampS = 1; f.rampZ = 1;
+    for (const x of f.ramps) {
+      const k = x.by === 'hp' ? 1 - f.hp / f.maxHp : clamp((this.t - 3) / 40, 0, 1), v = x.pct / 100 * k;
+      if (x.stat === 'dmg') f.rampD *= 1 - v; else if (x.stat === 'speed') f.rampS *= 1 - v; else f.rampZ *= 1 + v;
     }
     f.warn = warn;
     f.dotT += dt;
@@ -4327,11 +4602,11 @@ class Battle {
     }
     if (!f.alive) return;
     const stunned = !!(st.stun || st.freeze || st.dance || st.sleep || st.air);
-    f.size = sp.stats.size * f.base.size * (1 + f.stack.size) * (st.giant ? 1.5 : 1) * (st.tiny ? 0.65 : 1);
+    f.size = sp.stats.size * f.base.size * (1 + f.stack.size) * f.rampZ * (st.giant ? 1.5 : 1) * (st.tiny ? 0.65 : 1);
     const spd = sp.stats.speed * f.base.speed * (st.haste ? 1.45 : 1) * (st.slow ? 0.55 : 1) * (1 - f.stack.slow) * (st.giant ? 0.85 : 1) * (st.tiny ? 1.15 : 1)
       * (st.heavy ? 0.75 : 1) * (st.fly ? 1.15 : 1) * (sp.passive && sp.passive.k === 'swift' ? 1.15 : 1) * (st.morph ? 0.75 : 1)
-      * (f.moveMode === 'hop' ? (Math.sin(this.t * 9 + f.seed) > 0 ? 1.8 : 0.1) : 1);
-    const canMove = !stunned && !st.root && !f.wind && f.hurtT <= 0 && !f.dash;
+      * (f.moveMode === 'hop' ? (Math.sin(this.t * 9 + f.seed) > 0 ? 1.8 : 0.1) : 1) * f.rampS;
+    const canMove = !stunned && !st.root && !f.wind && f.hurtT <= 0 && !f.dash && f.stopT <= 0;
     let mx = 0, my = 0;
     if (canMove) {
       mx = inp.mx || 0; my = inp.my || 0;
@@ -4339,6 +4614,8 @@ class Battle {
       const mm = f.moveMode;
       if (mm === 'reverse') { mx = -mx; my = -my; }
       if (mm === 'nostop' && Math.hypot(mx, my) < 0.15) { mx = Math.cos(f.mdir); my = Math.sin(f.mdir); }
+      if (mm === 'left') mx = Math.min(mx, 0); else if (mm === 'right') mx = Math.max(mx, 0); else if (mm === 'side') my = 0; else if (mm === 'vertical') mx = 0;
+      if (flee) { const a = Math.atan2(f.y - flee.y, f.x - flee.x); mx = Math.cos(a); my = Math.sin(a); }
       if (mm === 'drunk' && Math.hypot(mx, my) > 0.15) { const a = Math.atan2(my, mx) + Math.sin(this.t * 2.3 + f.seed) * 1.1; const l = Math.hypot(mx, my); mx = Math.cos(a) * l; my = Math.sin(a) * l; }
     }
     const ml = Math.hypot(mx, my);
@@ -4358,7 +4635,9 @@ class Battle {
       f.vx = approach(f.vx, mx * RUN * spd, acc);
       f.vy = approach(f.vy, my * RUN * spd, acc);
     }
+    const bx = f.x + f.vx * dt, by = f.y + f.vy * dt, bsp = Math.hypot(f.vx, f.vy);
     this.moveCollide(f, dt);
+    if (live && bsp > 45 && Math.hypot(f.x - bx, f.y - by) > bsp * dt * 0.5) for (const A of f.acts) { if (f.dbs[A.i].fx.bump && A.cd <= 0) { this.doAct(f, A.i); A.cd = 1.5; } }
     for (const o of this.objs) if (o.kind === 'barrier' && o.owner !== f.idx && !o.dead) this.barrierPush(f, o);
     const tg = this.nearest(f, true);
     f.aim = tg ? Math.atan2(this.bodyY(tg) - this.bodyY(f), tg.x - f.x) : f.mdir;
@@ -4504,6 +4783,7 @@ class Battle {
     let cdm = 1;
     for (const d of f.dbs) if (d.fx.t === 'cd' && onMatch(d.fx.on, slot)) cdm *= 1 + d.fx.pct / 100;
     f.cd[slot] = f.cdMax[slot] = mv.cd * cdm;
+    for (const d of f.dbs) if (d.fx.t === 'cd' && d.fx.min && onMatch(d.fx.on, slot)) f.cd[slot] = f.cdMax[slot] = Math.max(f.cd[slot], d.fx.min);
     if (f.uses[slot] !== Infinity) f.uses[slot]--;
     f.castT = slot === 'basic' ? 0.18 : 0.32;
     for (const d of f.dbs) {
@@ -4521,10 +4801,11 @@ class Battle {
     let tgt = this.nearest(f, true);
     if (tgt) f.aim = Math.atan2(this.bodyY(tgt) - this.bodyY(f), tgt.x - f.x);
     if (f.rev[slot] && Math.random() * 100 < f.rev[slot]) { f.aim += Math.PI; tgt = null; this.note(f, '반대로!', '#c5f24a', true); }
+    else if (f.aimS[slot] && Math.random() * 100 < f.aimS[slot].chance) { f.aim += (Math.random() * 2 - 1) * f.aimS[slot].deg * Math.PI / 180; tgt = null; this.note(f, '빗나감!', '#c5f24a', true); }
     f.dir = ang2dir(f.aim);
     const ca = Math.cos(f.aim), sa = Math.sin(f.aim);
     const crit = sp.passive && sp.passive.k === 'crit' && Math.random() < 0.2;
-    const mul = f.base.dmg * f.mulS[as] * (f.st.power ? 1.5 : 1) * (f.st.weak ? 0.6 : 1) * (f.st.giant ? 1.25 : 1) * (sp.passive && sp.passive.k === 'rage' && f.hp / f.maxHp <= 0.4 ? 1.35 : 1) * (crit ? 1.8 : 1);
+    const mul = f.base.dmg * f.rampD * f.mulS[as] * (f.st.power ? 1.5 : 1) * (f.st.weak ? 0.6 : 1) * (f.st.giant ? 1.25 : 1) * (sp.passive && sp.passive.k === 'rage' && f.hp / f.maxHp <= 0.4 ? 1.35 : 1) * (crit ? 1.8 : 1);
     let sw = null;
     for (const e of mv.fx) {
       if (e.t === 'blink') {
@@ -4547,18 +4828,18 @@ class Battle {
     for (const e of mv.fx) {
       if (e.t === 'leap') {
         if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
-        const [lx, ly] = this.leapTarget(f.x, f.y, tgt ? tgt.x : f.x + ca * 70, tgt ? tgt.y : f.y + sa * 70, f.aim, e.dist);
+        const [lx, ly] = this.leapTarget(f.x, f.y, tgt ? tgt.x : f.x + ca * 70, tgt ? tgt.y : f.y + sa * 70, f.aim, e.dist * f.rangeS[as]);
         const dur = 0.32 + Math.hypot(lx - f.x, ly - f.y) / 500;
         f.leap = { x0: f.x, y0: f.y, x1: lx, y1: ly, t: 0, dur, h: 22 + Math.hypot(lx - f.x, ly - f.y) * 0.2 };
         f.dash = null; f.invT = Math.max(f.invT, dur + 0.05);
       } else if (e.t === 'phantom') {
         if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
-        const t = e.dist / DASH_V;
+        const t = e.dist * f.rangeS[as] / DASH_V;
         f.dash = { vx: ca * DASH_V, vy: sa * DASH_V, t };
         f.invT = Math.max(f.invT, t + 0.08);
       } else if (e.t === 'dash') {
         if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
-        const t = e.dist / DASH_V;
+        const t = e.dist * f.rangeS[as] / DASH_V;
         f.dash = { vx: ca * DASH_V, vy: sa * DASH_V, t };
         if (e.invuln) f.invT = Math.max(f.invT, t + 0.08);
       } else if (e.t === 'buff') this.addStatus(f, e.k, e.d, e.pow || 0, false);
@@ -4566,13 +4847,25 @@ class Battle {
     }
     this.emit(act);
     this.spawnAct(act);
-    for (const d of f.dbs) {
-      const x = d.fx;
+    for (let di = 0; di < f.dbs.length; di++) {
+      const d = f.dbs[di], x = d.fx;
       if (!x.on || !onMatch(x.on, slot)) continue;
+      if (x.nth > 1) { f.nthC[di] = (f.nthC[di] || 0) + 1; if (f.nthC[di] % x.nth) continue; }
       switch (x.t) {
-        case 'selfdmg':
-          if (f.hp > 1) { this.damage(f, Math.min(x.amt, f.hp - 1), -1); this.pop(f.x, f.y - 12 * f.size, '-' + x.amt, '#c5f24a', 0.9); }
+        case 'selfdmg': {
+          const amt = x.pct ? r1(f.hp * x.pct / 100) : x.amt;
+          if (f.hp > 1 && amt > 0) { this.damage(f, Math.min(amt, f.hp - 1), -1); this.pop(f.x, f.y - 12 * f.size, '-' + amt, '#c5f24a', 0.9); }
           this.trig(f, d); break;
+        }
+        case 'act': this.doAct(f, di); break;
+        case 'pest':
+          if (this.t - (f.dLast[di] || -9) > 2.5) {
+            f.dLast[di] = this.t;
+            const an = Math.random() * 6.283, sx = clamp(f.x + Math.cos(an) * 80, 12, W - 12), sy = clamp(f.y + Math.sin(an) * 60, 16, H - 12);
+            const ev = ['q', f.idx, di, 'p' + f.idx + '.' + (++f.actN), Math.round(sx), Math.round(sy)];
+            this.emit(ev); this.spawnPest(ev);
+          }
+          break;
         case 'selfst': this.addStatus(f, x.st.k, x.st.d, 0, false); this.trig(f, d); break;
         case 'recoil': f.vx = -ca * x.force * 34; f.vy = -sa * x.force * 34; f.hurtT = Math.max(f.hurtT, 0.15); f.dash = null; this.trig(f, d); break;
         case 'tele': {
@@ -4582,7 +4875,7 @@ class Battle {
           this.vfxImpact('arcane', '#c5f24a', f.x, this.bodyY(f), 0.8);
           this.trig(f, d); break;
         }
-        case 'stack': { const cap = x.stat === 'slow' ? 0.5 : 0.8; f.stack[x.stat] = Math.min(cap, f.stack[x.stat] + x.pct / 100); this.trig(f, d); break; }
+        case 'stack': { const cap = x.stat === 'slow' ? 0.5 : 0.8; f.stack[x.stat] = clamp(f.stack[x.stat] + x.pct / 100, -0.5, cap); this.trig(f, d); break; }
         case 'aidfoe':
           { const t2 = this.nearest(f, false); if (t2) { const ev = ['b', t2.idx, ST_ALL.indexOf(x.k), x.d, x.k === 'shield' ? 20 : 4]; this.emit(ev); this.onEvent(ev); } }
           this.trig(f, d); break;
@@ -4643,6 +4936,45 @@ class Battle {
     this.solid(f, 3 * f.size, !!f.st.fly);
     this.vfxImpact(mv.vfx, mv.color, f.x, this.bodyY(f), 0.7);
   }
+  /** 부작용에 쓴 행동을 정말로 한다: 말풍선, 멈춤(또는 상태이상), 그 행동의 연출 */
+  doAct(f, i) {
+    const d = f.dbs[i], x = d && d.fx;
+    if (!x || !f.alive || (x.chance < 100 && Math.random() * 100 >= x.chance)) return;
+    const ev = ['t', f.idx, x.text || '앗!', 3, x.pose || 'sweat', x.word || ''];
+    this.emit(ev); this.onEvent(ev);
+    if (x.st) this.addStatus(f, x.st.k, x.st.d, 0, false);
+    else if (x.d > 0) { f.stopT = Math.max(f.stopT, x.d); f.vx *= 0.2; f.vy *= 0.2; f.wind = null; }
+    if (x.push) { const a = Math.random() * 6.283; f.vx = Math.cos(a) * 320; f.vy = Math.sin(a) * 320; f.hurtT = Math.max(f.hurtT, 0.3); f.dash = null; }
+    if (x.fire) { const s = ['basic', 's1', 's2'].find((q) => f.cd[q] <= 0 && !f.lock[q] && f.uses[q] > 0); if (s) this.fire(f, s); }
+  }
+  /** 행동 연출 (모든 기기에서) */
+  actFx(f, pose, word) {
+    const x = f.x, y = this.bodyY(f), up = f.y - 14 * f.size;
+    const P = (k, px, py, vx, vy, life, c, s2, ex) => this.addP(k, px, py, vx, vy, life, c, s2, ex);
+    const snd = (k, pitch, len) => this.sfx('move', 'plain', { mv: { name: 'act' + pose, sfx: { kind: k, pitch, len } }, slot: 's1' });
+    switch (pose) {
+      case 'gas': for (let k = 0; k < 10; k++) P('smoke', x + rnd(-4, 4), f.y - 2, rnd(-30, 30), rnd(-18, -2), 1, k & 1 ? '#9adf5a' : '#c8f07a', 2.6); snd('fart', 1, 1); break;
+      case 'sneeze': for (let k = 0; k < 14; k++) { const a = f.aim + rnd(-0.5, 0.5); P('px', x + Math.cos(a) * 4, y, Math.cos(a) * rnd(60, 130), Math.sin(a) * rnd(60, 130), 0.5, k & 1 ? '#ffffff' : '#c8f0ff', 1); } snd('whoosh', 1.4, 0.6); break;
+      case 'hiccup': P('pat', x, up, 0, -30, 0.6, '#ffffff', 1, { pat: 'plus' }); f.hurtT = Math.max(f.hurtT, 0.12); snd('boing', 1.6, 0.4); break;
+      case 'poop': for (let k = 0; k < 6; k++) P('px', x + rnd(-3, 3), f.y, rnd(-20, 20), rnd(-30, -5), 0.7, k & 1 ? '#7a4a1a' : '#a8682a', 2, { g: 160, vz: rnd(30, 60) }); this.decal(x, f.y + 1, 4, '#6a3a12'); snd('fart', 0.6, 1.3); break;
+      case 'cry': for (let k = 0; k < 10; k++) { const sd = k & 1 ? 1 : -1; P('px', x + sd * 3, y - 3, sd * rnd(30, 60), rnd(-10, 10), 0.7, '#7fd8ff', 1, { g: 140, vz: rnd(40, 70) }); } snd('squeak', 0.8, 1.2); break;
+      case 'laugh': for (let k = 0; k < 5; k++) P('pat', x + rnd(-8, 8), up, rnd(-20, 20), rnd(-35, -15), 0.8, '#ffe14a', 1, { pat: 'plus' }); snd('chirp', 1.3, 0.8); break;
+      case 'sing': for (let k = 0; k < 4; k++) P('pat', x + rnd(-6, 6), up, rnd(-15, 15), rnd(-30, -15), 1, ['#ff9ad0', '#7fd8ff', '#ffe14a'][k % 3], 1, { pat: 'note' }); snd('kazoo', 1.1, 0.9); break;
+      case 'shout': P('ring', x, y, 0, 0, 0.35, '#ffffff', 1, { r0: 4, r1: 22 }); this.shake = Math.max(this.shake, 1.5); snd('roar', 1.2, 0.7); break;
+      case 'yawn': case 'zzz': for (let k = 0; k < 3; k++) P('pat', x + 4 + k * 3, up - k * 4, 10, -18, 1.1, '#bcd0ff', 1, { pat: 'z' }); snd('whistle', 0.6, 1); break;
+      case 'coin': for (let k = 0; k < 8; k++) P('pat', x + rnd(-4, 4), y, rnd(-50, 50), rnd(-20, 10), 0.8, '#ffcf3a', 1, { pat: 'coin', g: 160, vz: rnd(40, 80) }); snd('chime', 1.2, 0.6); break;
+      case 'heart': for (let k = 0; k < 5; k++) P('pat', x + rnd(-6, 6), up, rnd(-15, 15), rnd(-30, -10), 1, '#ff6a9a', 1, { pat: 'heart' }); snd('chime', 1.5, 0.7); break;
+      case 'bow': case 'snap': P('flash', x, y, 0, 0, 0.12, '#ffffff', 4); snd(pose === 'snap' ? 'glitch' : 'bell', 1.2, 0.5); break;
+      case 'eat': for (let k = 0; k < 5; k++) P('px', x + rnd(-3, 3), y, rnd(-25, 25), rnd(-25, 0), 0.5, '#e8c070', 1); snd('gulp', 1, 0.8); break;
+      case 'star': case 'fall': for (let k = 0; k < 4; k++) P('pat', x + rnd(-6, 6), up + rnd(-2, 2), rnd(-25, 25), rnd(-25, -5), 0.8, '#ffe14a', 1, { pat: 'plus' }); if (pose === 'fall') for (let k = 0; k < 6; k++) P('smoke', x + rnd(-4, 4), f.y, rnd(-30, 30), rnd(-8, 0), 0.6, '#c8b8a0', 2); snd(pose === 'fall' ? 'thud' : 'boing', 1, 0.6); break;
+      case 'word': {
+        const pic = pixFor(word);
+        if (pic) for (let k = 0; k < 3; k++) P('gly', x + rnd(-8, 8), up, rnd(-30, 30), rnd(-40, -20), 1, pic.color, 1, { rows: pic.pix });
+        snd('bloop', 1, 0.7); break;
+      }
+      default: for (let k = 0; k < 4; k++) P('px', x + rnd(-5, 5), up, rnd(-25, 25), rnd(-30, -10), 0.6, '#9fe8ff', 1); snd('squeak', 1, 0.5);
+    }
+  }
   trig(f, d) {
     if (d && d.say && f.sayCd <= 0) { f.sayCd = 2.2; const ev = ['t', f.idx, d.say, 1]; this.emit(ev); this.onEvent(ev); }
   }
@@ -4688,7 +5020,9 @@ class Battle {
     const base = (i, j, kind, e) => ({ uid: `${c.idx}.${n}.${i}.${j}`, owner: c.idx, kind, dmg: e.dmg || 0, mul, st: e.st || null, kb: e.kb || 0, color: mv.color, cl: light(mv.color, 0.6), dk: dark(mv.color, 0.35), rows, gm: mv, ph: Math.random() * 3, custom: !!mv.pix, vfx: style, hit: new Map(), age: 0, rehit: 0, delay: 0, slotN: slot, tr: [] });
     const B = this.map.B;
     const cx = (v) => clamp(v, B + 2, W - B - 2), cyy = (v) => clamp(v, B + 4, H - B - 2);
-    mv.fx.forEach((e, i) => {
+    const rk = c.rangeS ? c.rangeS[slot] : 1;
+    mv.fx.forEach((e0, i) => {
+      const e = rk < 1 ? rangeScale(e0, rk) : e0;
       const R = mulberry((a[12] | 0) + i * 977);
       switch (e.t) {
         case 'dash':
@@ -5674,7 +6008,10 @@ class Battle {
       this.sendHit(o, v, 0, single ? 1 : 0, 3);
       return;
     }
-    const tm = v.base.taken * (1 + v.stack.taken) * (v.st.vuln ? 1.4 : 1) * (v.st.armor ? 0.5 : 1) * (v.spec.passive && v.spec.passive.k === 'armor' ? 0.85 : 1);
+    let wk = 1;
+    for (const x of v.weaks) if (x.vfx.includes(o.vfx)) wk *= 1 + x.pct / 100;
+    if (wk > 1 && o.dmg > 0) this.note(v, '약점!', '#ff8a5a', true);
+    const tm = wk * v.base.taken * (1 + v.stack.taken) * (v.st.vuln ? 1.4 : 1) * (v.st.armor ? 0.5 : 1) * (v.spec.passive && v.spec.passive.k === 'armor' ? 0.85 : 1);
     let dmg = o.dmg * o.mul * tm;
     if (v.st.shield && v.stPow.shield > 0 && dmg > 0) {
       const ab = Math.min(dmg, v.stPow.shield);
@@ -5700,6 +6037,8 @@ class Battle {
     if (dmg > 0 && v.st.sleep) { delete v.st.sleep; this.note(v, '깼다!', '#ffffff', true); }
     if (dmg > 0) {
       for (const d of v.dbs) if (d.fx.t === 'hurtst' && Math.random() < d.fx.chance / 100) { this.addStatus(v, d.fx.st.k, d.fx.st.d, 0, false); this.trig(v, d); }
+      for (const d of v.dbs) if (d.fx.t === 'stack' && d.fx.hit) { const x = d.fx, cap = x.stat === 'slow' ? 0.5 : 0.8; v.stack[x.stat] = clamp(v.stack[x.stat] + x.pct / 100, -0.5, cap); }
+      for (const A of v.acts) { if (v.dbs[A.i].fx.hit && A.cd <= 0) { this.doAct(v, A.i); A.cd = 1.2; } }
       if (v.spec.passive && v.spec.passive.k === 'thorns' && a && dist2(a.x, a.y, v.x, v.y) < 40 * 40) { const ev = ['r', a.idx, 3, 2]; this.emit(ev); this.onEvent(ev); }
     }
     this.sendHit(o, v, dmg, single ? 1 : 0, 0);
@@ -5834,7 +6173,7 @@ class Battle {
         if (f && f.owned && k && BUFFS.includes(k)) this.addStatus(f, k, clamp(+ev[3] || 1, 0.5, 4), clamp(+ev[4] || 0, 0, 30), false);
         break;
       }
-      case 't': { const f = this.fighters[ev[1] | 0]; if (f) { f.say = { text: str(String(ev[2]), 16, ''), t: ev[3] === 2 ? 1.8 : 1.6, side: ev[3] !== 2, shout: ev[3] === 2 }; if (ev[3] === 2) Voice.say(f.say.text, f.seed / 10); } break; }
+      case 't': { const f = this.fighters[ev[1] | 0]; if (f) { f.say = { text: str(String(ev[2]), 16, ''), t: ev[3] === 2 ? 1.8 : ev[3] === 3 ? 1.9 : 1.6, side: ev[3] !== 2 && ev[3] !== 3, shout: ev[3] === 2 || ev[3] === 3 }; if (ev[3] === 2) Voice.say(f.say.text, f.seed / 10); if (ev[3] === 3) this.actFx(f, String(ev[4] || ''), String(ev[5] || '')); } break; }
       case 'q': { const f = this.fighters[ev[1] | 0]; if (f && !f.owned) this.spawnPest(ev); break; }
       case 'p': { const f = this.fighters[ev[1] | 0]; if (f) this.pop(f.x, f.y - 14 * f.size, str(String(ev[2]), 10, ''), col(ev[3], '#ffffff'), 0.8, 0.85); break; }
     }
@@ -6392,6 +6731,7 @@ class Battle {
           g.globalAlpha = 1;
           break;
         }
+        case 'gly': g.globalAlpha = Math.min(1, a * 2); drawGlyph(g, p.rows, p.c, x, y, 1, 0); g.globalAlpha = 1; break;
         case 'smoke': g.globalAlpha = a * 0.6; fillDisc(g, x, y, X(p.s * (1.6 - a * 0.6) * 0.8), p.c); g.globalAlpha = a * 0.3; fillDisc(g, x - 1, y - 1, X(p.s * (1.6 - a * 0.6) * 0.45), light(p.c, 0.3)); g.globalAlpha = 1; break;
         case 'ring': g.globalAlpha = Math.min(1, a * 1.5); pixRing(g, x, y, X(lerp(p.r1, p.r0, a)), p.c, p.r1 > 8 ? 2 : 1); g.globalAlpha = 1; break;
         case 'flash': {

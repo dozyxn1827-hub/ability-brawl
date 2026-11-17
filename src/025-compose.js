@@ -790,7 +790,9 @@ function smartDrawback(side, ctx) {
   const SL = [[/궁극기|궁|필살기/, 'ult'], [/능력\s?1|첫\s?번째|기본/, 'basic'], [/능력\s?2|두\s?번째/, 's1'], [/능력\s?3|세\s?번째/, 's2']];
   // "~을 못 쓴다": 글자 그대로. 그 소재·행동이 들어간 기술은 정말로 그 소재가 안 나오는 기술로 바뀐다
   const NEG = /못\s?[가-힣]|안\s?(나(온|와|옴)|된|돼|써|쓰|생|통|먹)|사용\s?(불가|금지)|봉인|쓸 수 없|금지|할 수 없|사라(진|져|짐)|잃(는|어|었|음)|없어(진|져|짐)|빼앗|뺏|막힌|막혀/;
-  if (ctx && has(NEG) && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못|못 자|못 걷|못 뛰|못 피/)) {
+  const [dCond] = dSplit(t), DW = dWhen(t, dCond);
+  const condOnly = !!(DW.if || DW.hit || DW.every || DW.gate || DW.bump || DW.byAct || DW.time || DW.hpr);
+  if (ctx && has(NEG) && !condOnly && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못|못 자|못 걷|못 뛰|못 피|멀리 못|멀리\s?(못|안)|못 맞|못 이기|못 참/)) {
     const slot = SL.find(([re]) => re.test(t));
     // 부작용 글에 나온 소재(사전으로 같은 주제까지) + 행동
     const keys = new Set(), words = [];
@@ -845,60 +847,45 @@ function smartDrawback(side, ctx) {
       customHow = `${from} 대신 ${to}: ${slots.length === 4 ? '네 기술 모두' : slots.map((s) => SLOT_KO[s]).join('·')} ${to} 기술로 바뀜`;
     }
   }
-  if (has(/외친|외쳐|소리친|말한|말해야|소리 질/) && say) add({ t: 'shout', on: 'skills', text: say });
-  if (has(/횟수|번만|번밖|번 밖|한정/)) add({ t: 'uses', on: 'skills', n: +(t.match(/[0-6]/) || [3])[0] });
-  if (has(/(적|상대|남).*(회복|치료|체력이 찬|낫|힐)/)) add({ t: 'healfoe', on: 'skills', chance: 100 });
-  if (has(/(적|상대|남).*(강해|빨라|커|좋아|세져)/)) add({ t: 'aidfoe', on: 'skills', k: has(/커/) ? 'giant' : has(/빨/) ? 'haste' : 'power', d: 3 });
-  if (has(/(반대|뒤|거꾸로).*(나간|날아|쏜|발사|나와)|엉뚱한 방향|뒤로 나/)) add({ t: 'reverse', on: 'skills', chance: 100 });
-  if (has(/랜덤|무작위|아무거나 나|엉뚱한 (기술|능력)|다른 기술/)) add({ t: 'random', on: 'skills', chance: 60 });
-  if (has(/앞이 안|눈이 안|시야|어두|장님|눈을 감|안 보/)) add({ t: 'vision', mode: 'dark' });
+  const dOn = (SL.find(([re]) => re.test(t)) || [])[1] || 'skills';
+  if (has(/외친|외쳐|소리친|말한|말해야|소리 질|라고 한|이라고 한|하고 외/) && say) add({ t: 'shout', on: dOn, text: say, nth: DW.nth });
+  if (has(/(적|상대|남).*(회복|치료|체력이 찬|낫|힐|피가 찬)/)) add({ t: 'healfoe', on: dOn, chance: DW.rare ? 40 : 100 });
+  if (has(/(적|상대|남).*(강해|빨라|커|좋아|세져|신나)/)) add({ t: 'aidfoe', on: dOn, k: has(/커/) ? 'giant' : has(/빨/) ? 'haste' : 'power', d: 3 });
+  if (has(/(반대|뒤|거꾸로)\s?(방향)?.*(나간|날아|쏜|발사|나와|나감)|엉뚱한 방향|뒤로 나/)) add({ t: 'reverse', on: dOn, chance: DW.rare ? 40 : 100 });
+  if (has(/랜덤|무작위|아무거나 나|엉뚱한 (기술|능력)|다른 기술|다른 능력이 나/)) add({ t: 'random', on: dOn, chance: DW.rare ? 40 : 60 });
+  if (has(/앞이 (잘\s?)?안|눈이 안|시야|어두|장님|눈을 감|안 보(여|인|임)|앞을 못 봐|앞을 못 본/)) add({ t: 'vision', mode: 'dark' });
   else if (has(/화면이 뒤집|세상이 뒤집|거꾸로 보|뒤집혀 보/)) add({ t: 'vision', mode: 'flip' });
-  else if (has(/멀미|어지|흔들|술에 취/)) add({ t: 'vision', mode: 'shake' });
-  const PEST = t.match(/(벌|모기|파리|비둘기|강아지|고양이|닭|오리|거위|엄마|선생님|경찰|좀비|귀신|바퀴벌레|까마귀|팬|기자|빚쟁이)/);
-  const chaser = t.match(/([가-힣]{1,6}?)(?:이|가|들이|들)?\s*(?:계속\s*|자꾸\s*|하루 종일\s*)?(?:쫓아|따라다|따라온|따라와|달려들|달려든)/);
-  if (PEST || chaser) add({ t: 'pest', every: 6, dmg: 3, name: chaser && !STOP.has(chaser[1]) ? chaser[1] : PEST ? PEST[1] : '무언가', color: '#ffe14a' });
-  if (has(/춤/)) add({ t: 'tick', every: 7, st: { k: 'dance', d: 1.5 } });
-  if (has(/잠|졸|하품/)) add({ t: 'tick', every: 8, st: { k: 'sleep', d: 2 } });
-  if (has(/방귀|뿡|트림|꺽/) && !say) add({ t: 'shout', on: 'skills', text: has(/트림|꺽/) ? '꺼억~' : pick(['뿌웅~', '뿡!', '뿌지직']) });
-  if (has(/재채기|딸꾹|기침/)) add({ t: 'tick', every: 6, st: { k: 'stun', d: 1 } });
-  if (has(/대머리|머리가 빠/)) add({ t: 'look', head: 'bald' });
+  else if (has(/좌우가 바뀌어 보|거울처럼/)) add({ t: 'vision', mode: 'mirror' });
+  else if (has(/멀미|흔들려 보|화면이 흔들|술에 취/)) add({ t: 'vision', mode: 'shake' });
+  // 글에 나온 말 그대로: [언제] + [무엇]
+  literalDrawback(t, ctx, add, say, out);
+  const PEST = t.match(/(벌|모기|파리|비둘기|강아지|고양이|닭|오리|거위|엄마|아빠|선생님|경찰|좀비|귀신|바퀴벌레|까마귀|팬|기자|빚쟁이|할머니|선배|형|누나|동생|개)(?:가|이|들이|떼가|한테|에게)/);
+  const chaser = t.match(/([가-힣]{1,6}?)(?:이|가|들이|들)?\s*(?:계속\s*|자꾸\s*|하루 종일\s*)?(?:쫓아|따라다|따라온|따라와|달려들|달려든|나타나|찾아와|찾아온)/);
+  if ((PEST && has(/쫓아|따라|달려들|나타|찾아|혼난|혼나|잔소리|괴롭|물어|쏘|공격|때린|(?<![가-힣])온다|와서|와요|등장/)) || chaser) {
+    const nm = chaser && !STOP.has(chaser[1]) ? chaser[1] : PEST ? PEST[1] : '무언가', pic = pixFor(nm);
+    add({ t: 'pest', every: DW.every || (DW.often ? 5 : 7), on: DW.skill ? dOn : undefined, dmg: has(/혼난|혼나|잔소리/) ? 1 : 3, name: nm, color: pic ? pic.color : '#ffe14a', pix: pic ? pic.pix : undefined, st: has(/혼난|혼나|잔소리/) ? { k: 'stun', d: 0.6 } : undefined });
+  }
+  if (has(/대머리|머리가 (빠|다 빠|없)/)) add({ t: 'look', head: 'bald' });
   if (has(/분홍|핑크/)) add({ t: 'look', body: '#ff9ad0', hair: '#ff7ab0' });
   if (has(/초록|녹색/)) add({ t: 'look', body: '#4fbf5f', skin: '#a8e08a' });
-  if (has(/반대로 (움직|걸)|방향이 반대|조작이 반대|좌우가 바뀌/)) add({ t: 'move', mode: 'reverse' });
-  else if (has(/미끄/)) add({ t: 'move', mode: 'slide' });
-  else if (has(/비틀|취한|술/)) add({ t: 'move', mode: 'drunk' });
-  else if (has(/멈출 수 없|계속 (달|뛰|걸)|못 멈/)) add({ t: 'move', mode: 'nostop' });
-  else if (has(/뒷걸음|문워크|뒤로 걷/)) add({ t: 'move', mode: 'backward' });
-  else if (has(/깡총|토끼|뛰어다|점프/)) add({ t: 'move', mode: 'hop' });
-  if (has(/실패|확률|불발|가끔 안|삑사리/)) add({ t: 'fail', on: 'skills', chance: 40, back: has(/자기|자신|본인|맞|터/) ? 'selfhit' : has(/기절|멈/) ? 'stun' : 'fizzle' });
-  if (has(/(계속|서서히|시간이|가만히).*(줄|깎|닳|빠)/)) add({ t: 'drain', amt: 2, if: has(/가만히/) ? 'still' : has(/움직/) ? 'moving' : 'always' });
-  if (has(/나도 (아프|다치)|같이 맞|자기도|나까지/)) add({ t: 'backfire', on: 'skills', pct: 60 });
-  else if (has(/체력|피가|hp|생명|목숨|아프|다친|다쳐|수명|피곤/i)) add({ t: 'selfdmg', on: 'skills', amt: 10 });
-  if (has(/기절|멈칫|굳|마비/)) add({ t: 'selfst', on: 'skills', st: { k: 'stun', d: 1.2 } });
-  if (has(/느려|느림|둔해|굼|거북/)) add({ t: 'stack', on: 'skills', stat: 'slow', pct: 10 });
-  if (has(/커지|커진|뚱뚱|살이|거대/)) add({ t: 'stack', on: 'skills', stat: 'size', pct: 15 });
-  if (has(/작아|줄어|개구리|돼지가|변신/)) add({ t: 'selfst', on: 'skills', st: { k: 'morph', d: 2 } });
-  if (has(/헷갈|조작|뒤바/)) add({ t: 'selfst', on: 'skills', st: { k: 'confuse', d: 3 } });
-  if (has(/순간이동|텔레포트|엉뚱한 곳|아무 데|어딘가/)) add({ t: 'tele', on: 'skills' });
-  if (has(/날아가|밀려|반동|튕|넘어|뒤로 날/)) add({ t: 'recoil', on: 'skills', force: 10 });
-  if (has(/쿨|재사용|오래 기다|대기|느긋/)) add({ t: 'cd', on: 'skills', pct: 150 });
-  if (has(/모아|충전|준비|기다려야|주문을|외워야|뜸/)) add({ t: 'windup', on: 'skills', time: 1.2 });
-  if (has(/약해|힘이 빠|위력|약하다|약함/)) add({ t: 'mul', on: 'skills', pct: 60 });
-  if (has(/방어|맞으면|받는 피해|종이|유리|약골|맷집/)) add({ t: 'stat', stat: 'taken', pct: 60 });
-  if (has(/(내가|나도|자기|본인|손이|몸이|나를).*(탄다|타 버|불붙|화상|뜨거)/) || (has(/불|화상|뜨거|타 버/) && !out.length)) add({ t: 'selfst', on: 'skills', st: { k: 'burn', d: 3 } });
-  if (has(/(내가|나도|자기|본인|손이|몸이|나를).*(얼어|얼린|꽁꽁)/)) add({ t: 'selfst', on: 'skills', st: { k: 'freeze', d: 1.2 } });
-  if (has(/(내가|나도|자기|본인|나를).*(감전|찌릿)/)) add({ t: 'selfst', on: 'skills', st: { k: 'stun', d: 1 } });
-  if (has(/(내가|나도|자기|본인|나를).*(중독|배탈)/)) add({ t: 'selfst', on: 'skills', st: { k: 'poison', d: 3 } });
-  if (has(/(내가|나도|자기|본인|나를).*(젖|미끄)/)) add({ t: 'selfst', on: 'skills', st: { k: 'slip', d: 2 } });
-  if (has(/(?<![가-힣])말을 못|입이 막|벙어리|침묵/)) add({ t: 'selfst', on: 'skills', st: { k: 'silence', d: 2 } });
-  if (has(/가만히 있으면|멈춰 있으면/)) add({ t: 'when', if: 'still', st: has(/잠/) ? 'sleep' : 'weak' });
-  if (has(/움직이면|걸으면|뛰면/)) add({ t: 'when', if: 'moving', st: has(/아프|체력/) ? 'burn' : 'slow' });
-  if (has(/맞으면|공격받으면|다치면/)) add({ t: 'hurtst', st: { k: has(/울/) ? 'slow' : has(/잠/) ? 'sleep' : 'stun', d: 1 }, chance: 60 });
+  const plain = !DW.skill && !DW.hit && !DW.if && !DW.every && !DW.gate && !DW.byAct;
+  if (has(/반대로 (움직|걸)|방향이 반대|조작이 반대|좌우가 바뀌|방향키가 반대|거꾸로 (걷|움직)/)) add({ t: 'move', mode: 'reverse' });
+  else if (plain && has(/미끄|빙판/)) add({ t: 'move', mode: 'slide' });
+  else if (plain && has(/비틀|취한|술에|갈지자/)) add({ t: 'move', mode: 'drunk' });
+  else if (has(/멈출 수 없|계속 (달|뛰|걸)|못 멈|멈추지 못/)) add({ t: 'move', mode: 'nostop' });
+  else if (has(/뒷걸음|문워크|뒤로 걷|뒤로만/)) add({ t: 'move', mode: 'backward' });
+  else if (plain && has(/깡총|토끼처럼|뛰어다/)) add({ t: 'move', mode: 'hop' });
+  else if (plain && has(/빙글빙글|뱅글뱅글|돌면서 걷/)) add({ t: 'move', mode: 'spin' });
+  if (has(/순간이동|텔레포트|엉뚱한 곳|아무 데로|어딘가로/)) add({ t: 'tele', on: dOn, nth: DW.nth });
+  if (has(/(조건|상황)이? ?(되면|오면)/) && DW.gate && !out.length) add({ t: 'act', every: 11, text: cut(DW.gate + '면…!', 14), pose: 'sweat', d: 1 });
+  // 그래도 아무것도 못 읽었으면: 일반적인 마이너스 효과 대신, 쓴 글 그대로 캐릭터가 한다
   if (!out.length) {
-    const h = hashText(t);
-    add([{ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } }, { t: 'move', mode: 'drunk' }, { t: 'reverse', on: 'skills', chance: 40 }, { t: 'tick', every: 8, st: { k: 'sleep', d: 1.5 } }, { t: 'fail', on: 'skills', chance: 35, back: 'fizzle' }][h % 5]);
+    const [, effTxt] = dSplit(t), pm = PIXBOOK.find(([re]) => re.test(t)), word = pm ? (t.match(pm[0]) || [''])[0] : '';
+    const A = { t: 'act', text: cut((say || effTxt || t).replace(/[.!~]+$/, ''), 14), pose: word ? 'word' : 'sweat', word, d: 1 };
+    if (DW.skill) Object.assign(A, { on: dOn, nth: DW.nth }); else if (DW.hit) A.hit = true; else if (DW.if) A.if = DW.if; else if (DW.bump) A.bump = true; else A.every = DW.every || (DW.often ? 6 : 9);
+    add(A);
   }
-  if (has(/가끔|때때로|종종|어쩌다|확률|랜덤하게|간혹/)) for (const x of out) if (x.chance != null) x.chance = 40;
+  if (has(/가끔|때때로|종종|어쩌다|확률|랜덤하게|간혹/) && !/\d+\s*(%|퍼센트|프로)|번\s*(중|에)/.test(t)) for (const x of out) if (x.chance != null && x.t !== 'aim') x.chance = 40;
   if (ctx && ctx.moves) {
     const COND = [[/숨으면|숨을 때|은신하면/, ['invis']], [/던지면|던질 때|쏘면|쏠 때|발사하면/, ['shot', 'lob', 'hook', 'rain']], [/휘두르면|벨 때|베면|때리면|칠 때/, ['swing', 'dash']], [/날면|날 때|날아오르면/, ['fly']], [/먹으면|먹을 때|마시면/, ['heal', 'big']], [/부르면|소환하면|부를 때/, ['summon', 'orbit', 'turret']], [/터뜨리면|터질 때|폭발하면/, ['boom', 'lob', 'wave']], [/돌진하면|달려들면|박치기하면/, ['dash']], [/순간이동하면|사라지면/, ['blink', 'invis']], [/뿜으면|광선을 쏘면|뿌리면|노래하면|소리 지르면/, ['beam', 'cone', 'chain']], [/구르면|내려찍으면|발을 구르면/, ['wave']], [/막으면|버티면|반격하면/, ['counter', 'shield', 'reflect']]];
     const c = COND.find(([re]) => re.test(t));
@@ -906,9 +893,9 @@ function smartDrawback(side, ctx) {
     if (slot) for (const x of out) if (x.on === 'skills') x.on = slot;
   }
   const clean = out.map((x) => [x, sanDfx(x)]).filter(([, c]) => c);
-  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'selfst', on: 'skills', st: { k: 'dance', d: 1 } });
+  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'act', every: 9, text: cut(t, 14) || '앗!', pose: 'sweat', d: 1 });
   const f = fx, more = clean.slice(1).map(([, c]) => c), rawMore = clean.slice(1).map(([x]) => x);
-  return { how: (customHow ? [customHow].concat(more.filter((x) => !['look', 'replace', 'lock'].includes(x.t)).map(dfxText)) : [f].concat(more).map(dfxText)).join(' + ').slice(0, 60), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: clean.length ? clean[0][0] : f, more: rawMore };
+  return { how: (customHow ? [customHow].concat(more.filter((x) => !['look', 'replace', 'lock'].includes(x.t)).map(dfxText)) : [f].concat(more).filter((x) => x.t !== 'look' || clean.length === 1).map(dfxText)).join(' + ').slice(0, 70), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: clean.length ? clean[0][0] : f, more: rawMore };
 }
 /** 능력을 못 쓰게 됐을 때 대신 나오는 버둥대는 기술 (능력 이름을 살려서) */
 function lameMoves(n) {
