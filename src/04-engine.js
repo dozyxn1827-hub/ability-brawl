@@ -49,9 +49,37 @@ const PAT = {
 /** 사거리 줄이기 부작용: 기술 효과의 거리 값만 줄인다 */
 function rangeScale(e, k) {
   const o = Object.assign({}, e);
+  if (o.t === 'pattern') { o.size *= k; return o; }
   for (const q of ['range', 'len', 'dist', 'step', 'off']) if (typeof o[q] === 'number') o[q] *= k;
   if (o.t === 'shot' && typeof o.life === 'number') o.life *= k;
   return o;
+}
+/** 모양 폭격: 모양별 점 [x, y, 순서] (크기 1 기준, y는 아래쪽이 +) */
+function patPts(shape, n, R) {
+  const P = [], ring = (k, r, o, a0) => { for (let j = 0; j < k; j++) { const a = (a0 || 0) + j / k * Math.PI * 2; P.push([Math.cos(a) * r, Math.sin(a) * r, o]); } };
+  switch (shape) {
+    case 'ring': ring(n, 1, 0, -Math.PI / 2); break;
+    case 'double': ring(Math.max(4, n - 2), 0.5, 0, 0); ring(n, 1, 1, 0.3); break;
+    case 'star': P.push([0, 0, 0]); for (let j = 0; j < 10; j++) { const a = -Math.PI / 2 + j * Math.PI / 5, r = j & 1 ? 0.42 : 1; P.push([Math.cos(a) * r, Math.sin(a) * r, 1 + (j & 1 ? 0 : 1)]); } break;
+    case 'cross': P.push([0, 0, 0]); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { P.push([dx * 0.5, dy * 0.5, 1]); P.push([dx, dy, 2]); } break;
+    case 'x': P.push([0, 0, 0]); for (const [dx, dy] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) { P.push([dx * 0.38, dy * 0.38, 1]); P.push([dx * 0.75, dy * 0.75, 2]); } break;
+    case 'grid': for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) P.push([a, b, 0]); break;
+    case 'checker': for (let a = 0; a < 4; a++) for (let b = 0; b < 4; b++) P.push([(a - 1.5) * 0.6, (b - 1.5) * 0.6, (a + b) & 1]); break;
+    case 'heart': for (let j = 0; j < 12; j++) { const t = j / 12 * Math.PI * 2; P.push([16 * Math.pow(Math.sin(t), 3) / 16, -(13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / 16, j < 6 ? j : 12 - j]); } break;
+    case 'square': for (const [a, b] of [[-1, -1], [0, -1], [1, -1], [1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0]]) P.push([a, b, 0]); break;
+    case 'triangle': { const V = [[1, 0], [-0.6, -0.85], [-0.6, 0.85]]; V.forEach((v, j) => { const w = V[(j + 1) % 3]; P.push([v[0], v[1], 0]); P.push([(v[0] + w[0]) / 2, (v[1] + w[1]) / 2, 1]); }); break; }
+    case 'spiral': for (let j = 0; j < Math.max(8, n + 4); j++) { const a = j * 0.85, r = 0.2 + j / (n + 4) * 0.9; P.push([Math.cos(a) * r, Math.sin(a) * r, j]); } break;
+    case 'line': for (let j = 0; j < n; j++) P.push([0.15 + j / Math.max(1, n - 1) * 0.85, 0, j]); break;
+    case 'zigzag': for (let j = 0; j < n; j++) P.push([0.12 + j / Math.max(1, n - 1) * 0.88, j & 1 ? 0.22 : -0.22, j]); break;
+    case 'arrow': P.push([1, 0, 0]); for (let j = 1; j <= 3; j++) { P.push([1 - j * 0.22, j * 0.17, j]); P.push([1 - j * 0.22, -j * 0.17, j]); } P.push([0.55, 0, 1]); P.push([0.2, 0, 2]); break;
+    case 'random': for (let j = 0; j < n; j++) { const a = R() * Math.PI * 2, r = Math.sqrt(R()); P.push([Math.cos(a) * r, Math.sin(a) * r, j]); } break;
+    case 'flower': P.push([0, 0, 0]); ring(6, 0.55, 1, 0); ring(6, 1, 2, Math.PI / 6); break;
+    case 'smile': P.push([-0.42, -0.45, 0]); P.push([0.42, -0.45, 0]); for (let j = 0; j < 7; j++) { const a = Math.PI * (0.15 + j / 6 * 0.7); P.push([Math.cos(a) * 0.75, Math.sin(a) * 0.7 + 0.05, 1 + Math.abs(j - 3)]); } break;
+    case 'wave': for (let c = 0; c < 5; c++) for (let r = -1; r <= 1; r++) P.push([-1 + c * 0.5, r * 0.6, c]); break;
+    case 'kk': for (const sx of [-0.55, 0.55]) { const o = sx > 0 ? 3 : 0; for (const [a, b, q] of [[-0.45, -0.8, 0], [-0.1, -0.8, 0], [0.25, -0.8, 0], [0.25, -0.25, 1], [0.2, 0.3, 2], [0.05, 0.85, 3], [-0.4, -0.05, 1], [-0.05, -0.05, 1]]) P.push([sx + a * 0.95, b, o + q]); } break;
+    case 'hex': P.push([0, 0, 0]); ring(6, 1, 0, Math.PI / 6); break;
+  }
+  return P;
 }
 /* 시각 스타일별 색 */
 function vfxPal(style, c) {
@@ -164,7 +192,7 @@ class Battle {
       stack: { size: 0, slow: 0, taken: 0 },
       tickT: dbs.map((d) => (d.fx.t === 'tick' ? d.fx.every * (0.6 + Math.random() * 0.4) : 0)),
       dbs, lock, rev, hfoe, rnds, shout, back, mulS, moveMode, vision, pests, morph: null,
-      acts, aimS, rangeS, ramps, flees, weaks, nthC: {}, dLast: {}, stopT: 0, rampD: 1, rampS: 1, rampZ: 1,
+      acts, aimS, rangeS, ramps, flees, weaks, nthC: {}, dLast: {}, stopT: 0, rampD: 1, rampS: 1, rampZ: 1, stillT: 0, moveT: 0, lastSkT: 0,
       say: null, sayCd: 0, popCd: 0, stats: { dealt: 0, taken: 0, ko: 0 }, revived: false, actN: 0,
       size: sp.stats.size * base.size, dotT: 0, pose: 'idle', warn: false, stepT: 0, seed: Math.random() * 10,
       spr: m[0], sg: m[1], net: null, ai: null, auraT: Math.random(), gone: false,
@@ -267,17 +295,48 @@ class Battle {
     }
   }
 
-  cond(f, c, nd) {
-    const sp = Math.hypot(f.vx, f.vy);
+  cond(f, c, nd, n) {
+    const sp = Math.hypot(f.vx, f.vy), hr = f.hp / f.maxHp, B = this.map.B, bt = this.t - 3;
+    const foes = () => this.fighters.filter((o) => o !== f && o.alive);
     switch (c) {
-      case 'moving': return sp > 20;
-      case 'still': return sp < 8;
-      case 'lowhp': return f.hp / f.maxHp <= 0.4;
-      case 'highhp': return f.hp / f.maxHp >= 0.7;
-      case 'near': return nd < 50;
+      case 'always': return true;
+      case 'moving': return n ? f.moveT >= n : sp > 20;
+      case 'still': return n ? f.stillT >= n : sp < 8;
+      case 'lowhp': return hr <= (n || 40) / 100;
+      case 'highhp': return hr >= (n || 70) / 100;
+      case 'fullhp': return hr >= 0.99;
+      case 'near': return nd < (n ? n * 10 : 50);
       case 'far': return nd > 130;
+      case 'edge': return f.x < B + 34 || f.x > W - B - 34 || f.y < B + 30 || f.y > H - B - 26;
+      case 'center': return Math.hypot(f.x - W / 2, (f.y - H / 2) * 1.2) < 70;
+      case 'crowd': return foes().filter((o) => dist2(o.x, o.y, f.x, f.y) < 120 * 120).length >= (n || 2);
+      case 'alone': return !foes().some((o) => dist2(o.x, o.y, f.x, f.y) < 170 * 170);
+      case 'foelow': case 'foehigh': { const e = this.nearest(f); if (!e) return false; const r = e.hp / e.maxHp; return c === 'foelow' ? r <= (n || 40) / 100 : r >= 0.7; }
+      case 'debuffed': for (const k in f.st) if (DEBUFFS.includes(k)) return true; return false;
+      case 'buffed': for (const k in f.st) if (BUFFS.includes(k)) return true; return false;
+      case 'idle': return this.t - (f.lastSkT || 0) >= (n || 3);
+      case 'busy': return f.cd.s1 > 0 && f.cd.s2 > 0 && f.cd.ult > 0;
+      case 'ready': return f.cd.ult <= 0 && f.uses.ult > 0 && !f.lock.ult;
+      case 'early': return bt < (n || 10);
+      case 'late': return bt > (n || 30);
+      case 'onzone': return this.objs.some((o) => o.kind === 'zone' && !o.dead && !(o.delay > 0) && dist2(o.x, o.y, f.x, f.y) <= o.r * o.r);
+      case 'dashing': return !!f.dash || f.castT > 0.2;
+      case 'casting': return f.castT > 0 || this.t - (f.lastSkT || -9) < 0.35;
+      case 'lead': case 'behind': { const L = foes(); if (!L.length) return false; return c === 'lead' ? L.every((o) => o.hp / o.maxHp < hr) : L.every((o) => o.hp / o.maxHp > hr); }
     }
     return false;
+  }
+  /** 글 그대로 행동: 어떤 일이 생겼을 때 (이 기기에서 움직이는 선수만) */
+  dEv(f, ev) {
+    if (!f || !f.owned || !f.alive || !f.acts.length || this.count > 0 || this.over) return;
+    for (const A of f.acts) {
+      const x = f.dbs[A.i].fx;
+      if (x.ev !== ev) continue;
+      if (x.nth) { A.k = (A.k || 0) + 1; if (A.k % x.nth) continue; }
+      if (A.cd > 0) continue;
+      A.cd = ev === 'heal' || ev === 'buff' ? 1.5 : 0.7;
+      this.doAct(f, A.i);
+    }
   }
   nearest(f, forAI) {
     let best = null, bd = 1e9;
@@ -299,11 +358,12 @@ class Battle {
     const sp = f.spec, st = f.st, live = this.count <= 0 && !this.over;
     const ne = this.nearest(f), nd = ne ? Math.hypot(ne.x - f.x, ne.y - f.y) : 999;
     let warn = false, flee = null;
+    { const fs = Math.hypot(f.vx, f.vy); if (fs < 8) { f.stillT += dt; f.moveT = 0; } else if (fs > 20) { f.moveT += dt; f.stillT = 0; } }
     for (let i = 0; i < f.dbs.length; i++) {
       const x = f.dbs[i].fx;
-      if (x.t === 'when') { if (this.cond(f, x.if, nd)) st[x.st] = Math.max(st[x.st] || 0, 0.2); }
-      else if (x.t === 'drain') { if (live && (x.if === 'always' || this.cond(f, x.if, nd)) && f.hp > 1) f.hp = Math.max(1, f.hp - x.amt * dt); }
-      else if (x.t === 'flee' && live && ne) { if (x.if === 'always' || this.cond(f, x.if, nd)) flee = ne; }
+      if (x.t === 'when') { if (this.cond(f, x.if, nd, x.n)) st[x.st] = Math.max(st[x.st] || 0, 0.2); }
+      else if (x.t === 'drain') { if (live && (x.if === 'always' || this.cond(f, x.if, nd, x.n)) && f.hp > 1) f.hp = Math.max(1, f.hp - x.amt * dt); }
+      else if (x.t === 'flee' && live && ne) { if (x.if === 'always' || this.cond(f, x.if, nd, x.n)) flee = ne; }
       else if (x.t === 'tick' && live) {
         f.tickT[i] -= dt;
         if (f.tickT[i] < 1.1) warn = true;
@@ -315,7 +375,7 @@ class Battle {
       const x = f.dbs[A.i].fx;
       A.cd -= dt;
       if (x.every) { A.t -= dt; if (A.t < 1) warn = true; if (A.t <= 0) { A.t = x.every; this.doAct(f, A.i); } }
-      else if (x.if) { const c = this.cond(f, x.if, nd); if (c && !A.prev && A.cd <= 0) { this.doAct(f, A.i); A.cd = 3; } A.prev = c; }
+      else if (x.if) { const c = this.cond(f, x.if, nd, x.n); if (c && !A.prev && A.cd <= 0) { this.doAct(f, A.i); A.cd = 3; } A.prev = c; }
     }
     f.stopT -= dt;
     // 시간·체력에 따라 점점
@@ -538,7 +598,7 @@ class Battle {
     let tgt = this.nearest(f, true);
     if (tgt) f.aim = Math.atan2(this.bodyY(tgt) - this.bodyY(f), tgt.x - f.x);
     if (f.rev[slot] && Math.random() * 100 < f.rev[slot]) { f.aim += Math.PI; tgt = null; this.note(f, '반대로!', '#c5f24a', true); }
-    else if (f.aimS[slot] && Math.random() * 100 < f.aimS[slot].chance) { f.aim += (Math.random() * 2 - 1) * f.aimS[slot].deg * Math.PI / 180; tgt = null; this.note(f, '빗나감!', '#c5f24a', true); }
+    else if (f.aimS[slot] && Math.random() * 100 < f.aimS[slot].chance) { f.aim += (Math.random() * 2 - 1) * f.aimS[slot].deg * Math.PI / 180; tgt = null; this.dEv(f, 'miss'); this.note(f, '빗나감!', '#c5f24a', true); }
     f.dir = ang2dir(f.aim);
     const ca = Math.cos(f.aim), sa = Math.sin(f.aim);
     const crit = sp.passive && sp.passive.k === 'crit' && Math.random() < 0.2;
@@ -681,6 +741,7 @@ class Battle {
     this.emit(ev); this.onEvent(ev);
     if (x.st) this.addStatus(f, x.st.k, x.st.d, 0, false);
     else if (x.d > 0) { f.stopT = Math.max(f.stopT, x.d); f.vx *= 0.2; f.vy *= 0.2; f.wind = null; }
+    if (x.hp && f.hp > 1) { this.damage(f, Math.min(x.hp, f.hp - 1), -1); this.pop(f.x, f.y - 12 * f.size, '-' + x.hp, '#c5f24a', 0.9); }
     if (x.push) { const a = Math.random() * 6.283; f.vx = Math.cos(a) * 320; f.vy = Math.sin(a) * 320; f.hurtT = Math.max(f.hurtT, 0.3); f.dash = null; }
     if (x.fire) { const s = ['basic', 's1', 's2'].find((q) => f.cd[q] <= 0 && !f.lock[q] && f.uses[q] > 0); if (s) this.fire(f, s); }
   }
@@ -754,6 +815,10 @@ class Battle {
     for (let i = 0; i < (slot === 'basic' ? 6 : slot === 'ult' ? 24 : 12); i++) this.vfxTrail(style, mv.color, x + ca * 5, cy + sa * 5, ca * 40, sa * 40, 1);
     if (mv.say && slot !== 'basic' && (slot !== 's1' || (a[12] & 1))) c.say = { text: mv.say, t: 1.3, cast: true };
     if (crit) this.pop(x, y - 20 * sz, '치명타!', '#ffcf3a', 0.8, 1.1);
+    c.lastSkT = this.t;
+    if (crit && c.owned) this.dEv(c, 'crit');
+    if (c.owned && mv.fx.some((q) => q.t === 'dash' || q.t === 'blink' || q.t === 'leap' || q.t === 'phantom')) this.dEv(c, 'dash');
+    if (slot !== 'basic') for (const g of this.fighters) if (g !== c && g.owned && g.alive && dist2(g.x, g.y, x, y) < 150 * 150) this.dEv(g, 'foeskill');
     const base = (i, j, kind, e) => ({ uid: `${c.idx}.${n}.${i}.${j}`, owner: c.idx, kind, dmg: e.dmg || 0, mul, st: e.st || null, kb: e.kb || 0, color: mv.color, cl: light(mv.color, 0.6), dk: dark(mv.color, 0.35), rows, gm: mv, ph: Math.random() * 3, custom: !!mv.pix, vfx: style, hit: new Map(), age: 0, rehit: 0, delay: 0, slotN: slot, tr: [] });
     const B = this.map.B;
     const cx = (v) => clamp(v, B + 2, W - B - 2), cyy = (v) => clamp(v, B + 4, H - B - 2);
@@ -770,6 +835,13 @@ class Battle {
           for (let j = 0; j < e.n; j++) {
             const o = base(i, j, 'shot', e);
             Object.assign(o, { r: e.size, homing: e.homing, pierce: e.pierce, bounce: e.bounce, life: e.ret ? e.life * 1.7 : e.life, boom: e.boom, ret: e.ret, retT: e.life * 0.45, split: e.split, spin: e.ret });
+            if (e.path && e.path !== 'line' || e.end && e.end !== 'none' || e.drop || e.aura || e.grow || e.pull) {
+              Object.assign(o, { path: e.path || 'line', turn: e.turn || 1, end: e.end || 'none', n2: e.n2 || 6, drop: e.drop || 0, dropk: e.dropk || 'blast', aura: e.aura || 0, grow: e.grow || 0, pull: e.pull || 0, v0: e.speed, sd: R(), hph: j & 1 ? Math.PI : 0, r0: e.size, dropT: 0, dropN: 0 });
+              if (e.aura > 0) { o.pierce = true; o.rehit = 0.4; }
+              if (e.path === 'curve') { o.turn = (j & 1 ? -1 : 1) * (e.turn || 1); const th = 0.55 + 0.3 * (j >> 1), L = clamp(Math.hypot(tx - x, ty - cy), 50, 220); o.cw = o.turn * 2 * e.speed * Math.sin(th) / L; o.cT = 2 * th / Math.abs(o.cw); o.cA = -o.turn * th; }
+              if (e.path === 'orbit') { o.orbA = j / e.n * Math.PI * 2; o.delay = 0; }
+              if (e.path === 'spiral' && e.n > 1 && !e.spread) o.spA = j / e.n * Math.PI * 2;
+            }
             if (e.from === 'sky') {
               Object.assign(o, { kind: 'drop', x: cx(tx + (R() - 0.5) * (16 + e.n * 9)), y: cyy(ty + (R() - 0.5) * (12 + e.n * 7)), delay: j * 0.08, fall: 0.42, r: Math.max(5, e.size * 2 + 3), life: 0.8 });
             } else if (e.from === 'ground') {
@@ -779,13 +851,32 @@ class Battle {
               const an = (j / e.n) * Math.PI * 2 + ang;
               Object.assign(o, { x, y: cy, vx: Math.cos(an) * e.speed, vy: Math.sin(an) * e.speed });
             } else {
-              const an = ang + (e.n > 1 ? ((j / (e.n - 1)) - 0.5) * e.spread * Math.PI / 180 : 0);
+              const an = o.spA != null ? ang + o.spA : o.cA != null ? ang + o.cA : ang + (e.n > 1 ? ((j / (e.n - 1)) - 0.5) * e.spread * Math.PI / 180 : 0);
               Object.assign(o, { x: x + ca * 5, y: cy + sa * 5, vx: Math.cos(an) * e.speed, vy: Math.sin(an) * e.speed });
-              if (e.n > 1 && e.spread === 0) o.delay = j * 0.07;
+              if (e.n > 1 && e.spread === 0 && o.spA == null && o.cA == null && e.path !== 'orbit' && e.path !== 'helix') o.delay = j * 0.07;
             }
             this.objs.push(o);
           }
           break;
+        case 'pattern': {
+          const pts = patPts(e.shape, e.n, R), sz = e.size, hm = new Map();
+          if (e.at === 'target' && !pts.some(([qx, qy]) => Math.abs(qx) < 0.12 && Math.abs(qy) < 0.12)) pts.push([0, 0, 0]);
+          const turn = ['line', 'zigzag', 'arrow', 'wave', 'triangle'].includes(e.shape);
+          const ox = e.at === 'self' ? x : e.at === 'front' ? x + ca * sz * 0.9 : tx, oy = e.at === 'self' ? y : e.at === 'front' ? y + sa * sz * 0.9 : ty;
+          pts.forEach(([px0, py0, ord], j) => {
+            let qx = px0 * sz, qy = py0 * sz;
+            if (turn) { const q = qx * ca - qy * sa; qy = qx * sa + qy * ca; qx = q; }
+            const wx = cx(ox + qx), wy = cyy(oy + qy * 0.8), d0 = (e.kind === 'blast' ? 0 : e.delay) + ord * e.step;
+            const o = base(i, j, e.kind, e);
+            if (e.kind === 'blast') Object.assign(o, { x: wx, y: wy, r: e.r, delay: ord * e.step, delay0: Math.max(0.2, e.delay), life: Math.max(0.2, e.delay) + 0.4, trig: false });
+            else if (e.kind === 'pillar') Object.assign(o, { x: wx, y: wy, r: e.r, delay: d0, life: 0.55, max: 0.55, trig: false });
+            else if (e.kind === 'spike') Object.assign(o, { x: wx, y: wy, r: Math.max(4, e.r * 0.8), delay: d0, life: 0.34, big: e.r >= 8 });
+            else Object.assign(o, { x: wx, y: wy, r: e.r, delay: d0, fall: 0.42, fall0: 0.42, life: 0.8 });
+            o.hit = hm; o.rehit = 0.35; o.qs = j > 0;
+            this.objs.push(o);
+          });
+          break;
+        }
         case 'beam': {
           const o = base(i, 0, 'beam', e);
           Object.assign(o, { follow: c, ang, ang0: ang, sweep: (e.sweep || 0) * Math.PI / 180, len: e.len, w: e.w, life: e.dur, dur: e.dur, rehit: e.dur / e.ticks - 0.001, both: e.both });
@@ -1259,6 +1350,105 @@ class Battle {
           x: o.x, y: o.y, vx: Math.cos(an) * 170, vy: Math.sin(an) * 170, r: 1, homing: 0, pierce: false, bounce: 0, life: 0.45, boom: 0, child: true });
       }
     }
+    if (o.kind === 'shot' && !o.child) {
+      if (o.end && o.end !== 'none') this.shotEnd(o, victim);
+      if (!o.landed && !o.hit.size && victim == null) { const ow = this.fighters[o.owner]; if (ow && ow.owned) this.dEv(ow, 'miss'); }
+    }
+  }
+  /** 투사체에서 나오는 작은 것들 (모든 기기에서 같은 이름) */
+  kid(o, suf, kind, ex) {
+    return Object.assign({ uid: o.uid + suf, owner: o.owner, kind, dmg: o.dmg, mul: o.mul, st: o.st, kb: o.kb || 0, color: o.color, cl: o.cl, dk: o.dk, rows: o.rows, gm: o.gm, ph: Math.random() * 3, custom: o.custom, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0, delay: 0, slotN: o.slotN, tr: [] }, ex);
+  }
+  /** 새 움직임: 휘기·나선·공전·멈췄다 돌진… (1을 돌려주면 자리를 직접 정한 것) */
+  shotPath(o, ow, dt) {
+    const a = o.age, sp = Math.hypot(o.vx, o.vy) || 1;
+    const rot = (w) => { const c = Math.cos(w * dt), s = Math.sin(w * dt), vx = o.vx; o.vx = vx * c - o.vy * s; o.vy = vx * s + o.vy * c; };
+    const lat = (fn) => { o.latD = (o.latD || 0) + fn(a) - fn(Math.max(0, a - dt)); };
+    switch (o.path) {
+      case 'zigzag': lat((t) => { const p = (t / 0.3) % 1; return 11 * (p < 0.5 ? p * 4 - 1 : 3 - p * 4); }); break;
+      case 'sine': lat((t) => 10 * Math.sin(t * 10)); break;
+      case 'helix': lat((t) => 9 * Math.sin(t * 11 + o.hph)); break;
+      case 'wobble': lat((t) => 7 * Math.sin(t * 6 + o.sd * 9) + 4 * Math.sin(t * 15 + o.sd * 4)); rot(Math.sin(a * 3 + o.sd * 7) * 1.4); break;
+      case 'curve': if (o.cw ? a < o.cT : a < 1) rot(o.cw || o.turn * 2.4); break;
+      case 'spiral': {
+        if (o.ox == null) { o.ox = o.x; o.oy = o.y; o.sa0 = o.spA != null ? Math.atan2(o.vy, o.vx) : Math.atan2(o.vy, o.vx); }
+        const an = o.sa0 + a * 4 * (o.turn || 1), rr = 6 + a * o.v0 * 0.6;
+        o.x = o.ox + Math.cos(an) * rr; o.y = o.oy + Math.sin(an) * rr * 0.8;
+        o.vx = -Math.sin(an) * o.v0; o.vy = Math.cos(an) * o.v0;
+        return 1;
+      }
+      case 'accel': { if (sp < Math.min(o.v0 * 3.2, 380)) { const m = 1 + 2.4 * dt; o.vx *= m; o.vy *= m; } if (Math.random() < 0.6) this.addP('smoke', o.x, o.y, rnd(-6, 6), rnd(-10, 0), 0.45, '#d8d8e8', 1.4); break; }
+      case 'decel': if (sp > o.v0 * 0.25) { o.vx *= 1 - 1.4 * dt; o.vy *= 1 - 1.4 * dt; } break;
+      case 'late': if (a > 0.5 && !o.lt) { o.lt = true; o.homing = Math.max(o.homing || 0, 1.1); this.addP('pat', o.x, o.y - 6, 0, -24, 0.5, '#ffe14a', 1, { pat: 'plus' }); } break;
+      case 'stopgo':
+        if (a > 0.22 && !o.go) {
+          const k = Math.max(0, 1 - 9 * dt); o.vx *= k; o.vy *= k;
+          if (a > 0.8) {
+            o.go = true;
+            const t = ow ? this.nearest(ow) : null, an = t ? Math.atan2(this.bodyY(t) - o.y, t.x - o.x) : o.sd * 6.28;
+            o.vx = Math.cos(an) * o.v0 * 1.7; o.vy = Math.sin(an) * o.v0 * 1.7;
+            this.addP('ring', o.x, o.y, 0, 0, 0.2, o.cl, 1, { r0: 2, r1: 9 });
+          }
+        }
+        break;
+      case 'stay':
+        if (a > 0.3) { const k = Math.max(0, 1 - 10 * dt); o.vx *= k; o.vy *= k; o.y += Math.cos(a * 6 + o.sd * 5) * 5 * dt; if (o.life < 0.5 && Math.random() < 0.5) this.addP('px', o.x + rnd(-4, 4), o.y + rnd(-4, 4), 0, -16, 0.3, '#ff4d3a', 1); }
+        break;
+      case 'blink': o.bk = (o.bk || 0) + dt; break;
+      case 'orbit':
+        if (o.orbT == null) o.orbT = 1 + (o.orbA || 0) * 0.04;
+        if (a < o.orbT && ow && ow.alive) {
+          const an = (o.orbA || 0) + a * 6.5, rr = 18 * ow.size;
+          o.x = ow.x + Math.cos(an) * rr; o.y = this.bodyY(ow) + Math.sin(an) * rr * 0.75;
+          o.vx = -Math.sin(an) * o.v0; o.vy = Math.cos(an) * o.v0;
+          return 1;
+        }
+        if (!o.go) {
+          o.go = true;
+          const t = ow ? this.nearest(ow) : null, an = t ? Math.atan2(this.bodyY(t) - o.y, t.x - o.x) : o.sd * 6.28;
+          o.vx = Math.cos(an) * o.v0; o.vy = Math.sin(an) * o.v0; o.homing = Math.max(o.homing || 0, 0.45);
+        }
+        break;
+    }
+    return 0;
+  }
+  /** 커지기·끌어당기기·길에 떨구기 */
+  shotExtras(o, ow, dt) {
+    if (o.grow > 0) o.r = Math.min(o.r0 + o.grow * 1.6, o.r0 + o.grow * o.age * 1.3);
+    if (o.pull) {
+      const RR = (o.aura || 8) * 2.4 + o.r * 2;
+      for (const v of this.fighters) if (v.owned && v.alive && v.idx !== o.owner && !v.st.invuln) { const d = Math.hypot(o.x - v.x, o.y - v.y); if (d < RR && d > 3) { v.vx += (o.x - v.x) / d * o.pull * 9 * dt; v.vy += (o.y - v.y) / d * o.pull * 9 * dt; } }
+      if (Math.random() < 0.5) { const an = Math.random() * 6.28, sgn = o.pull > 0 ? 1 : -1; this.addP('px', o.x + Math.cos(an) * (sgn > 0 ? RR : 4), o.y + Math.sin(an) * (sgn > 0 ? RR : 4), -Math.cos(an) * 60 * sgn, -Math.sin(an) * 60 * sgn, 0.35, o.cl, 1); }
+    }
+    if (o.drop > 0) {
+      o.dropT += dt;
+      if (o.dropT >= o.drop && o.dropN < 14) {
+        o.dropT -= o.drop;
+        const k = o.dropk, j = o.dropN++, B = this.map.B;
+        if (o.x > B && o.x < W - B && o.y > B && o.y < H - B) {
+          const ex = k === 'zone' ? { r: 9, life: 1.8, max: 1.8, rehit: 0.5, heal: 0, dmg: o.dmg * 0.25, kb: 0 } : k === 'spike' ? { r: 5, life: 0.34, delay: 0.05, dmg: o.dmg * 0.6, kb: 3 } : { r: 9, delay0: 0.3, life: 0.7, trig: false, dmg: o.dmg * 0.6, kb: 3 };
+          this.objs.push(this.kid(o, 'd' + j, k, Object.assign({ x: o.x, y: o.y + 2 }, ex)));
+        }
+      }
+    }
+  }
+  /** 투사체가 사라질 때: 사방으로·지뢰·장판·기둥 */
+  shotEnd(o, victim) {
+    const B = this.map.B, x = clamp(o.x, B + 2, W - B - 2), y = clamp(o.y, B + 4, H - B - 2);
+    if (o.end === 'burst') {
+      for (let k = 0; k < o.n2; k++) {
+        const an = k / o.n2 * Math.PI * 2 + (o.sd || 0) * 6, c = this.kid(o, 'e' + k, 'shot', { x, y, vx: Math.cos(an) * 180, vy: Math.sin(an) * 180, r: 1.5, dmg: o.dmg * 0.45, homing: 0, pierce: false, bounce: 0, life: 0.5, boom: 0, child: true, kb: 2 });
+        if (victim != null) c.hit.set(victim, this.t);
+        this.objs.push(c);
+      }
+      this.vfxImpact(o.vfx, o.color, x, y, 1.2); this.addP('ring', x, y, 0, 0, 0.3, o.cl, 1, { r0: 3, r1: 18 }); this.sfx('boom', o.vfx);
+    } else if (o.end === 'mine') {
+      this.objs.push(this.kid(o, 'm', 'blast', { x, y, r: 14 + o.r * 2, dmg: o.dmg * 1.5, delay0: 0.18, life: 0.6, trig: false, kb: 6 }));
+    } else if (o.end === 'zone') {
+      this.objs.push(this.kid(o, 'z', 'zone', { x, y, r: 18, dmg: o.dmg * 0.3, life: 2.5, max: 2.5, rehit: 0.5, heal: 0, kb: 0 }));
+    } else if (o.end === 'pillars') {
+      for (let k = 0; k < 6; k++) { const an = k / 6 * Math.PI * 2; this.objs.push(this.kid(o, 'p' + k, 'pillar', { x: clamp(x + Math.cos(an) * 16, B + 2, W - B - 2), y: clamp(y + Math.sin(an) * 13, B + 4, H - B - 2), r: 7, dmg: o.dmg * 0.5, delay: k * 0.04, life: 0.55, max: 0.55, trig: false })); }
+    }
   }
   wallAt(x, y) {
     for (const w of this.map.obs) if (w.k === 'wall' && x >= w.x && x <= w.x + w.w && y >= w.y - Math.min(w.hgt || 5, 9) && y <= w.y + w.h - 1) return w;
@@ -1283,6 +1473,14 @@ class Battle {
           break;
         }
         case 'shot': {
+          if (o.path && o.path !== 'line' && this.shotPath(o, ow, dt)) {
+            if (o.life <= 0 || o.x < B || o.x > W - B || o.y < B || o.y > H - B) { this.killObj(o); break; }
+            if (Math.random() < 0.7) this.vfxTrail(o.vfx, o.color, o.x, o.y, 0, 0, o.r >= 3 ? 1.1 : 0.7);
+            if (o.tr) { o.tr.push(o.x, o.y); if (o.tr.length > 10) o.tr.splice(0, 2); }
+            this.shotExtras(o, ow, dt);
+            this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y, o.r + (o.aura || 0)));
+            break;
+          }
           if (o.ret && o.age > o.retT && ow) {
             if (!o.back) { o.back = true; o.hit = new Map(); }
             const sp = Math.max(120, Math.hypot(o.vx, o.vy)), ax = ow.x - o.x, ay = this.bodyY(ow) - o.y, al = Math.hypot(ax, ay) || 1;
@@ -1299,7 +1497,15 @@ class Battle {
             }
           }
           const px = o.x, py = o.y;
-          o.x += o.vx * dt; o.y += o.vy * dt;
+          let md = dt;
+          if (o.path === 'blink') { md = o.bk >= 0.12 ? o.bk : 0; if (md) o.bk = 0; }
+          o.x += o.vx * md; o.y += o.vy * md;
+          if (o.latD) { const vl = Math.hypot(o.vx, o.vy) || 1; o.x += -o.vy / vl * o.latD; o.y += o.vx / vl * o.latD; o.latD = 0; }
+          if (o.path === 'blink' && md) {
+            this.addP('ring', px, py, 0, 0, 0.18, o.cl, 1, { r0: 1, r1: 6 }); this.addP('flash', o.x, o.y, 0, 0, 0.06, '#ffffff', 1.5);
+            for (let q = 1; q < 4 && !o.dead; q++) { const qx = px + (o.x - px) * q / 4, qy = py + (o.y - py) * q / 4; this.checkHits(o, (v) => this.bodyHit(v, qx, qy, o.r)); }
+            if (o.dead) break;
+          }
           if (o.tr) { o.tr.push(o.x, o.y); if (o.tr.length > 10) o.tr.splice(0, 2); }
           if (Math.random() < (o.child ? 0.4 : 0.9)) this.vfxTrail(o.vfx, o.color, o.x, o.y, -o.vx * 0.15, -o.vy * 0.15, o.r >= 3 ? 1.3 : 0.8);
           if (o.missile && Math.random() < 0.8) this.addP('smoke', o.x, o.y, rnd(-6, 6), rnd(-10, 0), 0.5, '#d8d8e8', 1.5);
@@ -1317,7 +1523,8 @@ class Battle {
           }
           if (!wall) for (const b of objs) if (b.kind === 'barrier' && !b.dead && b.owner !== o.owner && segDist(o.x, o.y + 4, b.ax, b.ay, b.bx, b.by) < 2 + o.r) { wall = true; break; }
           if (wall || o.life <= 0) { this.killObj(o); break; }
-          this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y, o.r));
+          if (o.r0 != null) this.shotExtras(o, ow, dt);
+          this.checkHits(o, (v) => this.bodyHit(v, o.x, o.y, o.r + (o.aura || 0)));
           break;
         }
         case 'drop':
@@ -1775,7 +1982,7 @@ class Battle {
     if (dmg > 0) {
       for (const d of v.dbs) if (d.fx.t === 'hurtst' && Math.random() < d.fx.chance / 100) { this.addStatus(v, d.fx.st.k, d.fx.st.d, 0, false); this.trig(v, d); }
       for (const d of v.dbs) if (d.fx.t === 'stack' && d.fx.hit) { const x = d.fx, cap = x.stat === 'slow' ? 0.5 : 0.8; v.stack[x.stat] = clamp(v.stack[x.stat] + x.pct / 100, -0.5, cap); }
-      for (const A of v.acts) { if (v.dbs[A.i].fx.hit && A.cd <= 0) { this.doAct(v, A.i); A.cd = 1.2; } }
+      for (const A of v.acts) { const x = v.dbs[A.i].fx; if (!x.hit) continue; if (x.nth) { A.k = (A.k || 0) + 1; if (A.k % x.nth) continue; } if (A.cd <= 0) { this.doAct(v, A.i); A.cd = x.nth ? 0.3 : 1.2; } }
       if (v.spec.passive && v.spec.passive.k === 'thorns' && a && dist2(a.x, a.y, v.x, v.y) < 40 * 40) { const ev = ['r', a.idx, 3, 2]; this.emit(ev); this.onEvent(ev); }
     }
     this.sendHit(o, v, dmg, single ? 1 : 0, 0);
@@ -1810,6 +2017,7 @@ class Battle {
   heal(f, amt, quiet) {
     if (!f.alive || f.hp >= f.maxHp) return;
     f.hp = Math.min(f.maxHp, f.hp + amt);
+    if (f.owned && amt >= 1) this.dEv(f, 'heal');
     if (!quiet || Math.random() < 0.5) this.pop(f.x + rnd(-4, 4), f.y - 12 * f.size, '+' + Math.round(amt), '#7dff8a', 0.8, 0.9);
     if (!quiet) this.sfx('heal');
   }
@@ -1822,6 +2030,7 @@ class Battle {
     }
     const fresh = !(f.st[k] > 0.3);
     f.st[k] = Math.max(f.st[k] || 0, d);
+    if (fresh && f.owned) { if (fromEnemy && DEBUFFS.includes(k)) this.dEv(f, 'debuff'); else if (BUFFS.includes(k)) this.dEv(f, 'buff'); }
     if (k === 'shield') f.stPow.shield = Math.max(f.stPow.shield || 0, pow || 25);
     if (k === 'regen') f.stPow.regen = pow || 4;
     if (hard) { f.wind = null; f.dash = null; }
@@ -1834,6 +2043,8 @@ class Battle {
     v.alive = false; v.hp = 0; v.koT = 0; v.st = {}; v.wind = null; v.dash = null; v.pose = 'ko';
     const k = this.fighters[by];
     if (k && k !== v) k.stats.ko++;
+    if (k && k !== v && k.owned) this.dEv(k, 'kill');
+    for (const g of this.fighters) if (g !== v && g !== k && g.owned && g.alive) this.dEv(g, 'ally');
     this.feed.unshift({ a: k && k !== v ? k : null, b: v, t: 5 });
     if (this.feed.length > 4) this.feed.pop();
     this.vfxImpact('holy', v.color, v.x, this.bodyY(v), 2.2);
@@ -1890,6 +2101,8 @@ class Battle {
           this.sfx(soft ? 'tick' : 'hit', o ? o.vfx : 'plain');
           if (v && !v.owned) v.flashT = 0.12;
           if (a && a.owned && a.alive && a.spec.passive && a.spec.passive.k === 'lifesteal') this.heal(a, dmg * 0.2, true);
+          if (a && a !== v && a.owned) this.dEv(a, 'hitfoe');
+          if (o) o.landed = true;
         }
         if (o && o.st && o.st.k === 'morph' && v) v.morph = { gm: o.gm || { shape: 'paw' }, color: o.color };
         if (ev[6] && o) { if (o.kind === 'shot') { o.x = x; o.y = y; } this.killObj(o, ev[2] | 0); }
@@ -2278,7 +2491,9 @@ class Battle {
         }
         case 'shot': {
           if (o.bubble) { const R = X(o.r) * 2 + 6 + Math.round(Math.sin(T * 8 + o.ph) * 1.5); g.globalAlpha = 0.25; fillDisc(g, x, y, R, o.cl); g.globalAlpha = 0.9; pixRing(g, x, y, R, o.color, 1); g.fillStyle = '#ffffff'; g.fillRect(x - Math.round(R * 0.5), y - Math.round(R * 0.5), 3, 2); g.globalAlpha = 1; drawGlyph(g, moveRows(o.gm, T + o.ph), o.color, x, y, 1, 0); break; }
-          const big = o.roll ? 3 : o.charged ? 3 : o.r >= 3 ? 2 : 1, rows = moveRows(o.gm, T + o.ph);
+          const big = o.roll ? 3 : o.charged ? 3 : o.r >= 7 ? 4 : o.r >= 4.5 ? 3 : o.r >= 3 ? 2 : 1, rows = moveRows(o.gm, T + o.ph);
+          if (o.aura) { g.globalAlpha = 0.3 + 0.15 * Math.sin(T * 10 + o.ph); fillDisc(g, x, y, X(o.r + o.aura), o.cl); g.globalAlpha = 0.8; dashRing(g, x, y, X(o.r + o.aura), o.color, T * 4, 10); g.globalAlpha = 1; }
+          if (o.path === 'stay' && o.end === 'mine' && o.life < 0.6 && Math.floor(T * 12) & 1) { g.globalAlpha = 0.7; pixRing(g, x, y, X(14 + o.r * 2), '#ff4d3a', 1); g.globalAlpha = 1; }
           if (o.roll || o.charged) { fillEll(g, x, y + 14 + X(o.r), 8 + X(o.r), 4, 'rgba(0,0,0,0.3)'); if (o.charged) { g.globalAlpha = 0.6; fillDisc(g, x, y, 22 + Math.round(Math.sin(T * 30) * 3), o.color); fillDisc(g, x, y, 14, o.cl); g.globalAlpha = 1; } drawGlyph(g, rows, o.color, x, y, big, o.roll ? (Math.floor(T * 10) & 3) : rotOf(o.vx, o.vy)); break; }
           if (o.net) { g.globalAlpha = 0.9; for (let k = -2; k <= 2; k++) { this.line(g, x + k * 4, y - 9, x + k * 4, y + 9, '#e8e8f0', 1); this.line(g, x - 9, y + k * 4, x + 9, y + k * 4, '#e8e8f0', 1); } g.globalAlpha = 1; }
           if (o.hook) {
@@ -2797,6 +3012,7 @@ class Battle {
       case 'hop': case 'swarm': return 90;
       case 'bubble': return 100;
       case 'stomp': return e.r * 0.6;
+      case 'pattern': return e.at === 'self' ? e.size * 0.6 : e.at === 'front' ? e.size : 100;
     }
     return 60;
   }
@@ -2873,6 +3089,7 @@ class Battle {
         case 'claw': return d < e.r + 12;
         case 'grab': return d < e.range;
         case 'lasergrid': case 'hop': case 'swarm': return d < 200;
+        case 'pattern': return e.at === 'self' ? d < e.size + 10 : e.at === 'front' ? d < e.size * 2 : d < 190;
         case 'stampede': return d < e.len;
         case 'crack': return d < e.len + 10;
         case 'pillar': return d < 20 + e.n * e.step;

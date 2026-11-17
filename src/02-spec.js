@@ -30,7 +30,19 @@ function sanSt(st, slot) {
   return { k, d: r1(d) };
 }
 
+/** 추가 공격 100종: 이름만 오면 기본 기술 여러 개로 펼친다 */
+function xtExpand(e, slot) {
+  const X = XT[e.t];
+  const D = num(e.dmg, 1, 60, XT_D[slot] || 10);
+  const k = e.st && typeof e.st === 'object' ? e.st.k : e.st;
+  const raw = X.make(D, DEBUFFS.includes(k) ? k : undefined);
+  if (e.n && raw[0] && raw[0].n) raw[0].n = e.n;
+  return raw.map((r) => sanFx(r, slot)).flat().filter(Boolean);
+}
+const PATTERNS = ['ring', 'double', 'star', 'cross', 'x', 'grid', 'checker', 'heart', 'square', 'triangle', 'spiral', 'line', 'zigzag', 'arrow', 'random', 'flower', 'smile', 'wave', 'kk', 'hex'];
+const SHOT_PATHS = ['line', 'zigzag', 'sine', 'helix', 'curve', 'spiral', 'orbit', 'stopgo', 'stay', 'wobble', 'late', 'blink', 'accel', 'decel'];
 function sanFx(e, slot) {
+  if (e && XT[e.t]) return xtExpand(e, slot);
   if (!e || typeof e !== 'object') return null;
   const st = sanSt(e.st, slot);
   const at = oneOf(e.at, ['self', 'front', 'target'], 'front');
@@ -38,14 +50,24 @@ function sanFx(e, slot) {
     case 'melee': case 'punch': case 'kick':
       // 맨손·무기 휘두르기는 없다. 들어오면 앞쪽 능력 폭발로 바꾼다.
       return sanFx({ t: 'blast', dmg: e.dmg, r: num(e.range, 8, 60, 24) * 0.45, at: 'front', off: 9, delay: 0, kb: e.kb, st: e.st }, slot);
-    case 'shot':
-      return {
+    case 'shot': {
+      const r = {
         t: 'shot', dmg: num(e.dmg, 1, 40, 6), n: Math.round(num(e.n, 1, 8, 1)), spread: num(e.spread, 0, 120, 0),
         speed: num(e.speed, 80, 340, 200), size: Math.round(num(e.size, 1, 4, 2)), homing: num(e.homing, 0, 1, 0),
         pierce: bool(e.pierce), bounce: Math.round(num(e.bounce, 0, 3, 0)), life: num(e.life, 0.3, 3, 1), boom: num(e.boom, 0, 34, 0),
         ret: bool(e.ret), split: Math.round(num(e.split, 0, 6, 0)),
+        path: oneOf(e.path, SHOT_PATHS, 'line'), turn: e.turn < 0 ? -1 : 1, end: oneOf(e.end, ['none', 'burst', 'mine', 'zone', 'pillars'], 'none'), n2: Math.round(num(e.n2, 2, 12, 6)),
+        drop: num(e.drop, 0, 0.5, 0) && Math.max(0.07, num(e.drop, 0, 0.5, 0)), dropk: oneOf(e.dropk, ['blast', 'zone', 'spike'], 'blast'), aura: num(e.aura, 0, 22, 0), grow: num(e.grow, 0, 10, 0), pull: num(e.pull, -16, 16, 0),
         from: oneOf(e.from, ['hand', 'sky', 'ground', 'around'], 'hand'), kb: num(e.kb, 0, 10, 2), st,
       };
+      // 기본값인 새 움직임 값은 빼서 온라인으로 보내는 글을 짧게
+      if (r.path === 'line') delete r.path;
+      if (r.turn === 1) delete r.turn;
+      if (r.end === 'none') { delete r.end; delete r.n2; }
+      if (!r.drop) { delete r.drop; delete r.dropk; }
+      for (const k of ['aura', 'grow', 'pull']) if (!r[k]) delete r[k];
+      return r;
+    }
     case 'beam':
       return { t: 'beam', dmg: num(e.dmg, 1, 20, 5), len: num(e.len, 24, 320, 110), w: num(e.w, 2, 14, 4), ticks: Math.round(num(e.ticks, 1, 6, 2)), dur: num(e.dur, 0.1, 1.5, 0.4), both: bool(e.both), sweep: num(e.sweep, 0, 220, 0), kb: num(e.kb, 0, 10, 1), st };
     case 'swing':
@@ -106,6 +128,10 @@ function sanFx(e, slot) {
     case 'crack': return { t: 'crack', dmg: num(e.dmg, 3, 35, 13), len: num(e.len, 50, 240, 140), speed: num(e.speed, 100, 300, 190), r: num(e.r, 6, 20, 11), kb: num(e.kb, 0, 10, 5), st };
     case 'stomp': return { t: 'stomp', dmg: num(e.dmg, 2, 25, 8), n: Math.round(num(e.n, 1, 4, 3)), r: num(e.r, 12, 40, 20), kb: num(e.kb, 0, 10, 5), st };
     case 'sonic': return { t: 'sonic', dmg: num(e.dmg, 1, 18, 6), n: Math.round(num(e.n, 1, 4, 2)), len: num(e.len, 40, 180, 110), arc: num(e.arc, 30, 140, 70), kb: num(e.kb, 0, 10, 3), st };
+    case 'pattern': {
+      const at = oneOf(e.at, ['self', 'target', 'front'], 'target');
+      return { t: 'pattern', shape: oneOf(e.shape, PATTERNS, 'ring'), at, kind: oneOf(e.kind, ['blast', 'pillar', 'spike', 'drop'], 'blast'), dmg: num(e.dmg, 1, 35, 8), n: Math.round(num(e.n, 3, 12, 8)), size: num(e.size, 12, 110, 40), r: num(e.r, 4, 26, 9), delay: num(e.delay, 0, 1.5, e.kind === 'blast' || !e.kind ? 0.35 : 0), step: num(e.step, 0, 0.45, 0.05), kb: num(e.kb, -10, 10, 3), st };
+    }
     case 'blast':
       return { t: 'blast', dmg: num(e.dmg, 1, 50, 14), r: num(e.r, 6, 56, 18), at, off: num(e.off, 0, 140, 26), delay: num(e.delay, 0, 1.5, 0.15), kb: num(e.kb, -10, 10, 5), st };
     case 'zone':
@@ -144,7 +170,8 @@ function sanFx(e, slot) {
 function fxExpected(e) {
   switch (e.t) {
     case 'blast': case 'dash': return e.dmg;
-    case 'shot': return e.dmg * (e.n <= 2 ? e.n : 2 + (e.n - 2) * 0.5) * (e.ret ? 1.4 : 1) + (e.boom > 0 ? e.dmg * 0.3 : 0) + (e.split ? e.dmg * 0.4 * Math.min(2, e.split) : 0);
+    case 'shot': return e.dmg * (e.n <= 2 ? e.n : 2 + (e.n - 2) * 0.5) * (e.ret ? 1.4 : 1) * (e.aura ? 2.6 : 1) * (e.path === 'orbit' || e.path === 'stay' ? 1.4 : 1) + (e.boom > 0 ? e.dmg * 0.3 : 0) + (e.split ? e.dmg * 0.4 * Math.min(2, e.split) : 0) + (e.end === 'burst' ? e.dmg * 0.45 * Math.min(3, e.n2) * 0.6 : e.end === 'mine' ? e.dmg * 1.6 : e.end === 'zone' || e.end === 'pillars' ? e.dmg * 0.8 : 0) + (e.drop ? e.dmg * 0.9 : 0);
+    case 'pattern': return e.dmg * 1.7;
     case 'trail': return e.dmg * e.dur * 1.2;
     case 'beam': return e.dmg * e.ticks;
     case 'zone': return e.dmg * (e.dur / 0.5) * 0.4;
@@ -218,7 +245,7 @@ function sanSfx(x) {
 function sanMove(m, slot, look, keep) {
   m = m && typeof m === 'object' ? m : {};
   const [lo, hi, def] = CD_RANGE[slot];
-  let fx = (Array.isArray(m.fx) ? m.fx : []).map((e) => sanFx(e, slot)).filter(Boolean).slice(0, 3);
+  let fx = (Array.isArray(m.fx) ? m.fx : []).map((e) => sanFx(e, slot)).flat().filter(Boolean).slice(0, 4);
   if (!fx.length) fx = [sanFx(slot === 'basic' ? { t: 'shot', dmg: 7 } : { t: 'shot', dmg: 12, size: 3 }, slot)];
   const exp = fx.reduce((s, e) => s + fxExpected(e), 0);
   if (!keep && exp > BUDGET[slot]) {
@@ -249,7 +276,8 @@ function sanSelfSt(st, maxD) {
   return { k, d: r1(num(st.d, 0.3, maxD, Math.min(1.5, maxD))) };
 }
 const IF_MAP = { air: 'moving', ground: 'still' };
-const IFS = ['always', 'moving', 'still', 'lowhp', 'highhp', 'near', 'far'];
+const IFS = ['always', 'moving', 'still', 'lowhp', 'highhp', 'near', 'far', 'edge', 'center', 'crowd', 'alone', 'foelow', 'foehigh', 'fullhp', 'debuffed', 'buffed', 'idle', 'busy', 'ready', 'early', 'late', 'onzone', 'dashing', 'casting', 'lead', 'behind'];
+const ACT_EVS = ['hitfoe', 'kill', 'heal', 'debuff', 'foeskill', 'dash', 'ally', 'miss', 'buff', 'crit'];
 /** 부작용 하나. look·replace는 설계서를 직접 바꾸고, 나머지는 엔진이 실행한다 */
 /** 부작용 효과 하나 검사. 쓸 때 효과에는 nth(N번째마다)·hit(맞을 때) 같은 덧붙임이 붙을 수 있다 */
 function sanDfx(d) {
@@ -285,9 +313,11 @@ function sanDfx0(d) {
     case 'hurtst': { const st = sanSelfSt(d.st, 3); return st ? { t: 'hurtst', st, chance: Math.round(num(d.chance, 20, 100, 50)) } : null; }
     case 'when': {
       const k = typeof d.st === 'object' && d.st ? d.st.k : d.st;
-      return { t: 'when', if: oneOf(IF_MAP[d.if] || d.if, IFS.slice(1), 'still'), st: oneOf(k === 'float' ? 'slip' : k, DEBUFFS, 'weak') };
+      const r = { t: 'when', if: oneOf(IF_MAP[d.if] || d.if, IFS.slice(1), 'still'), st: oneOf(k === 'float' ? 'slip' : k, DEBUFFS, 'weak') };
+      if (d.n) r.n = r1(num(d.n, 1, 120, 3));
+      return r;
     }
-    case 'drain': return { t: 'drain', amt: r1(num(d.amt, 0.5, 6, 1.5)), if: oneOf(IF_MAP[d.if] || d.if, IFS, 'always') };
+    case 'drain': { const r = { t: 'drain', amt: r1(num(d.amt, 0.5, 6, 1.5)), if: oneOf(IF_MAP[d.if] || d.if, IFS, 'always') }; if (d.n) r.n = r1(num(d.n, 1, 120, 3)); return r; }
     case 'windup': return { t: 'windup', on, time: r1(num(d.time, 0.2, 3, 0.8)) };
     case 'uses': return { t: 'uses', on, n: Math.round(num(d.n, 0, 20, 3)) };
     case 'aidfoe': return { t: 'aidfoe', on, k: oneOf(d.k, ['haste', 'power', 'regen', 'shield', 'giant', 'invuln'], 'haste'), d: r1(num(d.d, 1, 5, 2)) };
@@ -305,18 +335,22 @@ function sanDfx0(d) {
       const w = str(d.word, 8, ''); if (w) r.word = w;
       const wh = str(d.what, 14, ''); if (wh && wh !== r.text) r.what = wh;
       if (d.push) r.push = true;
+      if (d.hp) r.hp = Math.round(num(d.hp, 1, 40, 8));
       if (d.on && ON_SET.includes(d.on)) r.on = d.on;
       else if (d.hit) r.hit = true;
       else if (d.bump) r.bump = true;
+      else if (d.ev && ACT_EVS.includes(d.ev)) r.ev = d.ev;
       else if (d.if && IFS.includes(IF_MAP[d.if] || d.if) && d.if !== 'always') r.if = IF_MAP[d.if] || d.if;
       else r.every = Math.round(num(d.every, 2, 30, 9));
+      if (d.n && (r.if || r.ev)) r.n = r1(num(d.n, 1, 120, 3));
+      if (d.nth && (r.hit || r.ev)) r.nth = Math.round(num(d.nth, 2, 10, 3));
       if (!r.text) r.text = '앗!';
       return r;
     }
     case 'aim': return { t: 'aim', on, deg: Math.round(num(d.deg, 10, 90, 40)), chance: Math.round(num(d.chance, 10, 100, 60)) };
     case 'range': return { t: 'range', on, pct: Math.round(num(d.pct, 15, 80, 50)) };
     case 'ramp': return { t: 'ramp', stat: oneOf(d.stat, ['dmg', 'speed', 'size'], 'dmg'), by: oneOf(d.by, ['time', 'hp'], 'time'), pct: Math.round(num(d.pct, d.stat === 'size' ? -60 : 10, 80, 50)) || 50, why: str(d.why, 10, '') };
-    case 'flee': return { t: 'flee', if: oneOf(IF_MAP[d.if] || d.if, IFS, 'near') };
+    case 'flee': { const r = { t: 'flee', if: oneOf(IF_MAP[d.if] || d.if, IFS, 'near') }; if (d.n) r.n = r1(num(d.n, 1, 120, 3)); return r; }
     case 'weakto': {
       const V = Object.keys(VFX_KO), vfx = (Array.isArray(d.vfx) ? d.vfx : [d.vfx]).filter((v) => V.includes(v)).slice(0, 4);
       return vfx.length ? { t: 'weakto', vfx, pct: Math.round(num(d.pct, 20, 300, 100)), name: str(d.name, 8, VFX_KO[vfx[0]]) } : null;
@@ -338,6 +372,32 @@ const IF_KO = {
   moving: '움직이는', still: '가만히 있는',
   lowhp: '체력이 40% 이하인', highhp: '체력이 70% 이상인', near: '적이 가까이 있는', far: '적이 멀리 있는', always: '항상',
 };
+Object.assign(IF_KO, {
+  edge: '맵 가장자리에 있는', center: '맵 한가운데 있는', crowd: '적 둘 이상이 가까이 있는', alone: '주변에 아무도 없는', foelow: '가까운 적의 체력이 낮은', foehigh: '가까운 적의 체력이 많은',
+  fullhp: '체력이 가득 찬', debuffed: '상태이상에 걸린', buffed: '강화 효과를 받은', idle: '한동안 능력을 안 쓴', busy: '능력이 전부 재사용 대기인', ready: '궁극기가 준비된',
+  early: '경기 초반인', late: '경기 후반인', onzone: '장판 위에 서 있는', dashing: '돌진·순간이동 중인', casting: '기술을 쓰는', lead: '체력이 가장 많은', behind: '체력이 가장 적은',
+});
+const EV_KO = { hitfoe: '적을 맞힐', kill: '적을 쓰러뜨릴', heal: '회복할', debuff: '상태이상에 걸릴', foeskill: '근처 적이 능력을 쓸', dash: '돌진·순간이동할', ally: '다른 플레이어가 쓰러질', miss: '공격이 빗나갈', buff: '강화 효과를 받을', crit: '치명타가 터질' };
+const EV_N = { hitfoe: '적을 N번 맞힐', kill: '적을 N명 쓰러뜨릴', heal: 'N번 회복할', debuff: '상태이상에 N번 걸릴', foeskill: '근처 적이 능력을 N번 쓸', dash: 'N번 돌진·순간이동할', ally: '다른 플레이어가 N명 쓰러질', miss: '공격이 N번 빗나갈', buff: '강화 효과를 N번 받을', crit: '치명타가 N번 터질' };
+/** 조건 글: 숫자가 있으면 숫자까지 */
+function ifKo(f) {
+  const n = f.n;
+  switch (f.if) {
+    case 'lowhp': return `체력이 ${n || 40}% 이하인`;
+    case 'highhp': return `체력이 ${n || 70}% 이상인`;
+    case 'still': return n ? `${n}초 넘게 가만히 있는` : IF_KO.still;
+    case 'moving': return n ? `${n}초 넘게 움직인` : IF_KO.moving;
+    case 'idle': return `${n || 3}초 동안 능력을 안 쓴`;
+    case 'early': return `처음 ${n || 10}초`;
+    case 'late': return `${n || 30}초가 지난 뒤`;
+    case 'near': return n ? `적이 ${n}칸 안에 있는` : IF_KO.near;
+    case 'crowd': return n ? `적 ${n}명 이상이 가까이 있는` : IF_KO.crowd;
+    case 'foelow': return `가까운 적의 체력이 ${n || 40}% 이하인`;
+  }
+  return IF_KO[f.if] || '';
+}
+function ifDur(f) { return f.if === 'early' ? `처음 ${f.n || 10}초 동안` : f.if === 'late' ? `${f.n || 30}초가 지난 뒤로 계속` : `${ifKo(f)} 동안`; }
+function ifAt(f) { return f.if === 'early' ? '경기가 시작되자마자' : f.if === 'late' ? `${f.n || 30}초가 되는 순간` : `${ifKo(f)} 순간`; }
 /** 부작용이 게임에서 정확히 어떻게 작동하는지 한 줄로 */
 function dfxText(f) {
   const on = ON_KO[f.on] || '';
@@ -358,8 +418,8 @@ function dfxText(f) {
     case 'healfoe': return `${on} 맞은 적이 ${f.chance >= 100 ? '오히려' : f.chance + '% 확률로'} 회복함`;
     case 'random': return `${on} ${f.chance}% 확률로 엉뚱한 기술이 나감`;
     case 'hurtst': return `맞으면 ${f.chance}% 확률로 ${ST_KO[f.st.k]} ${f.st.d}초`;
-    case 'when': return `${IF_KO[f.if]} 동안 ${ST_KO[f.st]}`;
-    case 'drain': return `${f.if === 'always' ? '항상' : IF_KO[f.if] + ' 동안'} 초당 체력 -${f.amt}`;
+    case 'when': return `${ifDur(f)} ${ST_KO[f.st]}`;
+    case 'drain': return `${f.if === 'always' ? '항상' : ifDur(f)} 초당 체력 -${f.amt}`;
     case 'windup': return `${on} 쓰기 전 ${f.time}초 멈춰서 준비`;
     case 'uses': return f.n === 0 ? `${on} 봉인 (아예 못 씀)` : `${on} 한 판에 ${f.n}번씩만`;
     case 'aidfoe': return `${on} 쓸 때마다 가장 가까운 적에게 ${ST_KO[f.k]} ${f.d}초`;
@@ -369,14 +429,14 @@ function dfxText(f) {
     case 'vision': return VISION_KO[f.mode] + ' (내 화면)';
     case 'shout': return `${use(f)} “${f.text}” 외침`;
     case 'act': {
-      const when = f.on ? use(f) : f.hit ? '맞을 때마다' : f.bump ? '벽에 부딪히면' : f.if ? `${IF_KO[f.if]} 순간` : `${f.every}초마다`;
+      const when = f.on ? use(f) : f.hit ? (f.nth ? `${f.nth}번 맞을 때마다` : '맞을 때마다') : f.bump ? '벽에 부딪히면' : f.ev ? (f.nth ? `${EV_N[f.ev].replace('N', f.nth)} 때마다` : `${EV_KO[f.ev]} 때마다`) : f.if ? ifAt(f) : `${f.every}초마다`;
       const what = f.st ? ` → ${ST_KO[f.st.k] || '작아짐'} ${f.st.d}초` : f.d > 0 ? ` (${f.d}초 멈춤)` : '';
-      return `${f.chance < 100 ? f.chance + '% 확률로 ' : ''}${when} ${f.what ? `‘${f.what}’ ` : ''}“${f.text}”${what}${f.fire ? ' + 능력이 저절로 나감' : ''}${f.push ? ' + 튕겨 날아감' : ''}`;
+      return `${f.chance < 100 ? f.chance + '% 확률로 ' : ''}${when} ${f.what ? `‘${f.what}’ ` : ''}“${f.text}”${what}${f.hp ? ` + 체력 -${f.hp}` : ''}${f.fire ? ' + 능력이 저절로 나감' : ''}${f.push ? ' + 튕겨 날아감' : ''}`;
     }
     case 'aim': return `${on} ${f.chance >= 100 ? '항상' : f.chance + '% 확률로'} ±${f.deg}° 빗나감`;
     case 'range': return `${on} 사거리 -${f.pct}%`;
     case 'ramp': return `${f.why || (f.by === 'hp' ? '체력이 줄수록' : '시간이 지날수록')} ` + { dmg: `위력이 줄어듦 (최대 -${f.pct}%)`, speed: `느려짐 (최대 -${f.pct}%)`, size: f.pct < 0 ? `작아짐 (최대 ${f.pct}%)` : `커짐 (최대 +${f.pct}%)` }[f.stat];
-    case 'flee': return `${f.if === 'always' ? '항상' : IF_KO[f.if] + ' 때'} 저절로 도망침`;
+    case 'flee': return `${f.if === 'always' ? '항상' : ifDur(f)} 저절로 도망침`;
     case 'weakto': return `${f.name} 공격에 맞으면 피해 +${f.pct}%`;
     case 'pest': return `${f.on ? use(f) : f.every + '초마다'} ${josa(f.name, '이', '가')} 나타나 쫓아옴${f.st ? ` (닿으면 ${ST_KO[f.st.k]})` : ''}`;
     case 'look': return f.look && f.look.head === 'bald' ? '대머리가 됨' : f.look && f.look.hair && !f.look.body ? '머리 색이 바뀜' : '겉모습이 바뀜';
@@ -716,6 +776,7 @@ ${sideList}
 - 부작용 문장을 [언제]와 [무엇]으로 나눠 읽고 둘 다 그대로 지킨다. 숫자(2배, 절반, 3초 동안, 5번, 10초마다)와 조건(~하면, ~할 때마다, ~초마다, 맞으면, 가만히 있으면, 체력이 낮으면)을 바꾸지 않는다. 글에 없는 효과를 덧붙이지 않는다.
   · 예: "능력을 쓰면 3초 동안 못 움직인다" → {"t":"selfst","on":"skills","st":{"k":"root","d":3}} / "물에 약하다" → {"t":"weakto","vfx":["water"],"pct":100,"name":"물"} / "체력이 50밖에 없다" → {"t":"stat","stat":"hp","pct":50} / "3번 쓰면 기절한다" → {"t":"selfst","on":"skills","nth":3,"st":{"k":"stun","d":1.2}} / "가만히 있으면 체력이 준다" → {"t":"drain","amt":1.5,"if":"still"} / "체력이 낮으면 능력을 못 쓴다" → {"t":"when","if":"lowhp","st":"silence"} / "시간이 지날수록 약해진다" → {"t":"ramp","stat":"dmg","by":"time","pct":50}
 - 부작용이 어떤 행동(방귀, 울기, 똥, 재채기, 딸꾹질, 노래, 웃기, 넘어지기, 잠들기 등)을 말하면 act로 캐릭터가 정말 그 행동을 하게 한다. 말풍선(text)에 그 행동 소리를, pose에 맞는 연출을 넣는다. 예: "똥을 싼다" → {"t":"act","every":10,"text":"뿌지직!","pose":"poop","d":1.4} / "맞으면 운다" → {"t":"act","hit":true,"text":"으앙~","pose":"cry","d":1.2} / "재채기를 하면 능력이 나간다" → {"t":"act","every":8,"text":"에취!!","pose":"sneeze","d":0.6,"fire":true}
+- 조건과 사건은 최대한 글 그대로 고른다: "적을 맞히면"→"ev":"hitfoe", "적을 쓰러뜨리면"→"kill", "회복하면"→"heal", "상태이상에 걸리면"→"debuff", "적이 능력을 쓰면"→"foeskill", "순간이동하면"→"dash", "누가 죽으면"→"ally", "빗나가면"→"miss", "3번 맞으면"→{"hit":true,"nth":3}, "구석에 있으면"→"if":"edge", "가운데 있으면"→"center", "적이 여럿이면"→"crowd", "혼자 있으면"→"alone", "적 체력이 낮으면"→"foelow", "체력이 가득이면"→"fullhp", "5초 동안 능력을 안 쓰면"→{"if":"idle","n":5}, "궁극기가 준비되면"→"ready", "처음 10초"→{"if":"early","n":10}, "30초가 지나면"→{"if":"late","n":30}, "장판 위에 있으면"→"onzone", "능력을 쓰는 동안"→"casting", "1등이면"→"lead", "지고 있으면"→"behind", "5초 넘게 가만히 있으면"→{"if":"still","n":5}
 - 게임에 없는 조건("비가 오면", "밤이 되면")은 몇 초마다 그 조건이 일어난 것으로 친다(act의 every + text에 그 조건). 예: "비가 오면 능력을 못 쓴다" → {"t":"act","every":11,"text":"비가 온다!","st":{"k":"silence","d":3}}
 - 부작용 하나가 여러 효과를 뜻하면 fx에 대표 효과를, more에 나머지 효과(최대 2개)를 넣는다.
 - how에는 게임에서 실제로 벌어지는 일을 웃기게 쓰고, say에는 그 부작용이 터질 때 캐릭터가 하는 말을 쓴다.
@@ -772,6 +833,9 @@ EFFECT (아레나 480x320px, 캐릭터 키 10px, 이동 속도 약 96px/초, 거
  lasergrid 레이저망(적 주변에 경고선이 깜빡인 뒤 한꺼번에 발사) dmg n delay · hop 통통 튀는 덩어리(적에게 뛰어가 착지할 때마다 쿵) dmg n r size · swarm 떼구름(벌레·새 떼가 적을 쫓아다니며 쪼음) dmg r dur speed
  bubble 거품 감옥(맞으면 거품에 갇혀 둥둥 뜸) dmg n speed size d · grab 거대 손(땅에서 손이 솟아 잡아채 내 앞으로 패대기) dmg r range delay · claw 할퀴기(세 줄 손톱) dmg r · crack 땅 균열(갈라짐이 앞으로 달려감) dmg len speed r
  stomp 발 구르기(내 자리에서 점점 커지는 쿵쿵) dmg n r · sonic 음파(앞으로 부채꼴 고리가 퍼짐) dmg n len arc
+ shot에 붙일 수 있는 움직임: "path":"zigzag(지그재그)|sine(물결)|helix(이중나선)|curve(휘어짐, turn ±1)|spiral(나선으로 퍼짐)|orbit(내 주위를 돌다 날아감)|stopgo(멈췄다 돌진)|stay(멈춰서 떠 있음)|wobble(비틀비틀)|late(늦게 추적)|blink(순간이동하며)|accel(점점 빨라짐)|decel(점점 느려짐)", "end":"burst(사방으로 터짐, n2개)|mine(멈춘 자리에서 폭발)|zone(장판)|pillars(기둥 원)", "drop":0.07~0.5(그 초마다 길에 dropk=blast|zone|spike를 떨굼), "aura":0~22(구슬 주변이 계속 아픔), "grow":0~10(날수록 커짐), "pull":-16~16(주변을 끌어당김, 음수면 밀어냄)
+ {"t":"pattern","shape":"ring|double|star|cross|x|grid|checker|heart|square|triangle|spiral|line|zigzag|arrow|random|flower|smile|wave|kk|hex","at":"self|target|front","kind":"blast(경고 뒤 폭발)|pillar(솟는 기둥)|spike(땅 가시)|drop(하늘에서 떨어짐)","dmg":1~35,"n":3~12,"size":12~110,"r":4~26,"delay":0~1.5,"step":0~0.45(점마다 시간차),"st":ST} 모양대로 여러 곳이 한꺼번에·차례로 터짐 (smile은 웃는 얼굴, kk는 ㅋㅋ 글자)
+ 추가 공격 100종 — {"t":"이름","dmg":숫자,"st":ST}만 써도 알아서 만들어진다: ${xtDoc()}
  모든 추가 공격은 {"t":"이름", 값들..., "st":ST} 형태로 쓴다.
  {"t":"blast","dmg":4~50,"r":6~56,"at":"self|front|target","off":0~140,"delay":0~1.5,"kb":-10~10,"st":ST} 폭발(kb 음수는 끌어당김, front는 적 방향 off만큼 앞, target은 적 위치)
  {"t":"zone","dmg":0~8,"r":8~50,"dur":1.5~8,"at":"self|front|target","off":0~140,"follow":bool,"heal":0~6,"st":ST} 장판(0.5초마다 dmg, heal은 안에 선 자신 회복, follow는 자신을 따라다님)
@@ -800,7 +864,9 @@ DFX:
  {"t":"selfdmg","on":ON,"amt":1~40} 쓸 때마다 체력 소모 (또는 "pct":5~90 현재 체력의 그만큼, "체력이 절반이 된다"면 pct 50)
  {"t":"selfst","on":ON,"st":{"k":DEBUFF,"d":0.3~5}} 쓰고 나면 자신에게 상태이상
  {"t":"tick","every":3~20,"st":{"k":DEBUFF,"d":0.3~4}} 주기적으로 저절로 상태이상(갑자기 춤추기, 잠들기 등)
- {"t":"when","if":"moving|still|lowhp|highhp|near|far","st":DEBUFF} 조건인 동안 계속 상태이상
+ {"t":"when","if":IF,"n"?:숫자,"st":DEBUFF} 조건인 동안 계속 상태이상
+ IF(조건): moving 움직임 · still 가만히 · lowhp 체력 n% 이하 · highhp · fullhp 체력 가득 · near 적이 가까이 · far · edge 맵 가장자리 · center 한가운데 · crowd 적 n명 이상 근처 · alone 주변에 아무도 없음 · foelow 가까운 적 체력 낮음 · foehigh · debuffed 상태이상 걸림 · buffed 강화 받음 · idle n초 동안 능력 안 씀 · busy 능력 전부 대기 · ready 궁극기 준비됨 · early 처음 n초 · late n초 이후 · onzone 장판 위 · dashing 돌진 중 · casting 기술 쓰는 중 · lead 체력 1등 · behind 체력 꼴찌. still·moving에 n을 주면 n초 넘게 그럴 때
+ act에는 "ev"도 쓸 수 있다: hitfoe 적을 맞힐 때 · kill 적을 쓰러뜨릴 때 · heal 회복할 때 · debuff 상태이상 걸릴 때 · foeskill 근처 적이 능력 쓸 때 · dash 돌진·순간이동할 때 · ally 다른 플레이어가 쓰러질 때 · miss 공격이 빗나갈 때 · buff 강화 받을 때 · crit 치명타 터질 때 ("nth":N이면 N번째마다). hit에도 "nth"를 주면 N번 맞을 때마다
  {"t":"move","mode":"reverse|slide|drunk|nostop|backward|hop|spin"} 걸음이 이상해짐(reverse 방향키 반대, slide 빙판, drunk 비틀비틀, nostop 멈출 수 없음, backward 뒷걸음질, hop 깡총깡총, spin 뱅글뱅글)
  {"t":"vision","mode":"dark|flip|mirror|shake|tiny|zoom"} 그 플레이어 화면만 이상해짐(dark 앞이 거의 안 보임, flip 위아래 뒤집힘, mirror 좌우 뒤집힘, shake 계속 흔들림, tiny 너무 멀리 보임, zoom 코앞만 보임)
  {"t":"pest","every":3~20,"dmg":0~8,"name":"쫓아오는 것 이름","color":"#rrggbb","pix":[12글자 12줄],"st":ST} 주기적으로 무언가가 나타나 자기를 쫓아와 괴롭힘(벌, 비둘기, 엄마 등)
@@ -817,7 +883,7 @@ DFX:
  {"t":"aidfoe","on":ON,"k":"haste|power|regen|shield|giant|invuln","d":1~5} 쓸 때마다 가장 가까운 적이 강해짐
  {"t":"stack","on":ON,"stat":"size|slow|taken","pct":3~25} 쓸수록 불이익이 쌓임
  {"t":"tele","on":ON} 쓰고 나면 아무 데로나 튕겨감
- {"t":"act","text":"말풍선(16자 이내)","pose":"gas|sneeze|hiccup|poop|cry|laugh|sing|yawn|coin|heart|bow|snap|eat|sweat|zzz|star|fall|shout|word","d":0~4,"st"?:{"k":DEBUFF,"d":0.3~4},"fire"?:true,"push"?:true, 언제: "on":ON | "every":2~30 | "hit":true | "if":"moving|still|lowhp|highhp|near|far" | "bump":true} 부작용에 쓴 행동을 정말로 함. on 쓸 때, every 몇 초마다, hit 맞을 때, if 그 조건이 되는 순간, bump 벽에 부딪힐 때. d초 동안 멈추거나 st 상태이상. fire 능력이 저절로 나감, push 튕겨 날아감
+ {"t":"act","text":"말풍선(16자 이내)","pose":"gas|sneeze|hiccup|poop|cry|laugh|sing|yawn|coin|heart|bow|snap|eat|sweat|zzz|star|fall|shout|word","d":0~4,"st"?:{"k":DEBUFF,"d":0.3~4},"fire"?:true,"push"?:true,"hp"?:1~40(그때 체력도 잃음), 언제: "on":ON | "every":2~30 | "hit":true | "ev":사건 | "if":IF ("n"?:숫자) | "bump":true} 부작용에 쓴 행동을 정말로 함. on 쓸 때, every 몇 초마다, hit 맞을 때, if 그 조건이 되는 순간, bump 벽에 부딪힐 때. d초 동안 멈추거나 st 상태이상. fire 능력이 저절로 나감, push 튕겨 날아감
  {"t":"aim","on":ON,"deg":10~90,"chance":10~100} 조준이 빗나감
  {"t":"range","on":ON,"pct":15~80} 사거리가 짧아짐
  {"t":"ramp","stat":"dmg|speed|size","by":"time|hp","pct":10~80} 시간이 지날수록(time)·체력이 줄수록(hp) 점점 약해짐·느려짐·커짐(size는 -60이면 작아짐)
