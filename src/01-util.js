@@ -113,7 +113,7 @@ const onMatch = (on, slot) => on === 'skills' || on === 'any' || on === slot;
 const FIGHTER_COLORS = ['#ff4d6d', '#3fb8ff', '#ffcf3a', '#5be37a'];
 
 const HARD_ST = ['stun', 'freeze', 'dance', 'sleep', 'air'];
-const MOVE_MODES = ['reverse', 'slide', 'drunk', 'nostop', 'backward', 'hop', 'spin', 'left', 'right', 'side', 'vertical'];
-const MOVE_KO = { reverse: '방향키가 반대로', slide: '빙판처럼 미끄러짐', drunk: '비틀비틀 걸음', nostop: '멈출 수 없음', backward: '뒷걸음질로만 걸음', hop: '깡총깡총 뛰어다님', spin: '뱅글뱅글 돌며 걸음', left: '왼쪽으로만 움직일 수 있음', right: '오른쪽으로만 움직일 수 있음', side: '옆으로만 움직일 수 있음', vertical: '위아래로만 움직일 수 있음' };
-const ACT_POSES = ['gas', 'sneeze', 'hiccup', 'poop', 'cry', 'laugh', 'sing', 'yawn', 'coin', 'heart', 'bow', 'snap', 'eat', 'sweat', 'zzz', 'star', 'fall', 'shout', 'word'];
-const VISION_KO = { dark: '앞이 거의 안 보임', flip: '화면이 뒤집힘', mirror: '화면 좌우가 바뀜', shake: '화면이 계속 흔들림', tiny: '화면이 엄청 멀어짐', zoom: '화면이 코앞만 보임' };
+const MOVE_MODES = ['reverse', 'slide', 'drunk', 'nostop', 'backward', 'hop', 'spin', 'left', 'right', 'side', 'vertical', 'frozen'];
+const MOVE_KO = { frozen: '걸어서는 한 발짝도 못 움직임 (기술로 움직이는 건 됨)', reverse: '방향키가 반대로', slide: '빙판처럼 미끄러짐', drunk: '비틀비틀 걸음', nostop: '멈출 수 없음', backward: '뒷걸음질로만 걸음', hop: '깡총깡총 뛰어다님', spin: '뱅글뱅글 돌며 걸음', left: '왼쪽으로만 움직일 수 있음', right: '오른쪽으로만 움직일 수 있음', side: '옆으로만 움직일 수 있음', vertical: '위아래로만 움직일 수 있음' };
+const ACT_POSES = ['gas', 'sneeze', 'hiccup', 'poop', 'cry', 'laugh', 'sing', 'yawn', 'coin', 'heart', 'bow', 'snap', 'eat', 'sweat', 'zzz', 'star', 'fall', 'shout', 'word', 'rain', 'night', 'snow', 'thunder', 'hot', 'cold', 'wind', 'change', 'boom', 'breath'];
+const VISION_KO = { noself: '내 캐릭터가 안 보임', cute: '적이 전부 귀엽게 보임', dark: '앞이 거의 안 보임', flip: '화면이 뒤집힘', mirror: '화면 좌우가 바뀜', shake: '화면이 계속 흔들림', tiny: '화면이 엄청 멀어짐', zoom: '화면이 코앞만 보임' };

@@ -46,6 +46,28 @@ const PAT = {
   heart: ['#.#', '###', '.#.'], z: ['###', '.#.', '###'], plus: ['.#.', '###', '.#.'], x: ['#.#', '.#.', '#.#'],
   note: ['.##', '.#.', '##.'], leaf: ['.##', '##.', '#..'], ghost: ['.#.', '###', '#.#'], coin: ['.#.', '#.#', '.#.'],
 };
+/* 글 그대로 "못 한다": 그 기술 효과는 아예 안 나온다 */
+const NOFX_MAP = { jump: ['leap', 'hop'], dash: ['dash', 'phantom'], tele: ['blink', 'swap'], fly: ['st:fly'], heal: ['heal'], shield: ['st:shield', 'st:armor'], invis: ['st:invis'], buff: ['st:haste', 'st:power', 'st:shield', 'st:armor', 'st:regen', 'st:giant', 'st:fly', 'st:invis', 'st:reflect', 'st:invuln'], clone: ['clone'], summon: ['summon'] };
+const NOFX_NOTE = { leap: '점프 못 함!', hop: '점프 못 함!', dash: '돌진 못 함!', phantom: '돌진 못 함!', blink: '순간이동 못 함!', swap: '순간이동 못 함!', heal: '회복 못 함!', clone: '분신 못 함!', summon: '소환 못 함!' };
+/* "내 공격에 나도 맞는다": 손을 떠난 것만 */
+const SELF_KINDS = new Set(['shot', 'blast', 'drop', 'spike', 'pillar', 'zone', 'mine', 'tornado', 'storm', 'roll', 'surge', 'crack', 'bubble']);
+/** 총알 속도 부작용: 느리게 날아가되 날아가는 거리는 그대로 */
+function speedScale(e, k) {
+  if (k === 1 || typeof e.speed !== 'number') return e;
+  const o = Object.assign({}, e);
+  o.speed = Math.max(20, o.speed * k);
+  if (typeof o.life === 'number') o.life = Math.min(6, o.life / k);
+  return o;
+}
+/** 공격 크기 부작용: 크기·반지름만 */
+function sizeScale(e, k) {
+  if (k === 1) return e;
+  const o = Object.assign({}, e);
+  for (const q of ['r', 'w']) if (typeof o[q] === 'number') o[q] = Math.max(2, o[q] * k);
+  if (typeof o.size === 'number') o.size = o.t === 'shot' ? Math.max(1, Math.min(4, Math.round(o.size * k))) : Math.max(4, o.size * k);
+  if (o.t === 'shot' && k < 1 && o.size <= 1) o.tinyK = k;
+  return o;
+}
 /** 사거리 줄이기 부작용: 기술 효과의 거리 값만 줄인다 */
 function rangeScale(e, k) {
   const o = Object.assign({}, e);
@@ -110,7 +132,8 @@ class Battle {
     this.net = o.net || null;
     this.decider = o.decider !== false;
     this.onEnd = o.onEnd || (() => {});
-    this.sfx = o.sfx || (() => {});
+    const sf0 = o.sfx || (() => {});
+    this.sfx = (...a) => { if (!this.mute) sf0(...a); };
     this.focus = o.focus || [];
     this.t = 0; this.objs = []; this.parts = []; this.pops = []; this.decals = []; this.feed = []; this.amb = [];
     this.shake = 0; this.flash = null; this.banner = null; this.hs = 0; this.bursts = []; this.punch = 0; this.slowT = 0; this.lastN = -1; this.firstKO = false;
@@ -119,6 +142,13 @@ class Battle {
     if (this.practice) this.count = 0;
     this.cam = null;
     this.fighters = o.roster.map((e, i) => this.mkFighter(e, i));
+    for (const f of this.fighters) for (const x of f.foeStat) for (const g of this.fighters) {
+      if (g === f) continue;
+      const p = x.pct / 100;
+      if (x.stat === 'hp') { g.maxHp = Math.max(1, Math.round(g.maxHp * (1 + p))); g.hp = g.maxHp; g.hpShow = g.maxHp; }
+      else if (x.stat in g.base) g.base[x.stat] = Math.max(x.stat === 'taken' ? 0.05 : 0.2, g.base[x.stat] * (1 + p));
+    }
+    { const me1 = this.fighters.find((f) => o.focus && o.focus[0] === f.idx); this.mute = !!(me1 && me1.mute); }
     // 연습장: 허수아비를 내 캐릭터 가까이에 세운다 (벽·구덩이를 피해서)
     if (this.practice) {
       const me0 = this.fighters.find((f) => !f.dummy), B = this.map.B;
@@ -146,7 +176,7 @@ class Battle {
   }
 
   mkFighter(e, i) {
-    const sp = e.spec, base = { hp: 1, speed: 1, size: 1, dmg: 1, taken: 1 };
+    const sp = e.spec, base = { hp: 1, speed: 1, size: 1, dmg: 1, taken: 1, kb: 1 };
     const uses = { basic: Infinity, s1: Infinity, s2: Infinity, ult: Infinity };
     // 부작용 효과 하나하나를 {fx, say} 목록으로 (more 포함)
     const dbs = [];
@@ -154,10 +184,22 @@ class Battle {
     const lock = {}, rev = {}, hfoe = {}, rnds = {}, shout = {}, back = {}, mulS = { basic: 1, s1: 1, s2: 1, ult: 1 };
     let moveMode = null, vision = null;
     const pests = [], acts = [], aimS = {}, rangeS = { basic: 1, s1: 1, s2: 1, ult: 1 }, ramps = [], flees = [], weaks = [];
+    const pSpd = { basic: 1, s1: 1, s2: 1, ult: 1 }, pSz = { basic: 1, s1: 1, s2: 1, ult: 1 }, foeStat = [], nofxT = new Set(), blockSt = new Set(), X = { hpSet: 0, dmgFix: null, selfHit: false, lure: false, exposed: false, mute: false, noHeal: false, dtrail: null };
     dbs.forEach((d, i) => {
       const x = d.fx, each = (fn) => SLOTS.forEach((s) => { if (onMatch(x.on, s)) fn(s); });
       switch (x.t) {
-        case 'stat': if (x.stat in base) { const p = x.pct / 100; base[x.stat] *= x.stat === 'size' || x.stat === 'taken' ? 1 + p : 1 - p; } break;
+        case 'stat': if (x.stat in base) { const p = x.pct / 100; base[x.stat] *= x.stat === 'size' || x.stat === 'taken' || x.stat === 'kb' ? 1 + p : 1 - p; } break;
+        case 'hpset': X.hpSet = x.hp; break;
+        case 'foestat': foeStat.push(x); break;
+        case 'dmgfix': if (x.on === 'skills') X.dmgFix = x.n; else { if (!X.dmgFix || typeof X.dmgFix !== 'object') X.dmgFix = {}; each((s) => { X.dmgFix[s] = x.n; }); } break;
+        case 'pspeed': each((s) => { pSpd[s] *= 1 + x.pct / 100; }); break;
+        case 'psize': each((s) => { pSz[s] *= 1 + x.pct / 100; }); break;
+        case 'nofx': for (const q of NOFX_MAP[x.what] || []) { if (q.startsWith('st:')) blockSt.add(q.slice(3)); else nofxT.add(q); } if (x.what === 'heal') X.noHeal = true; break;
+        case 'selfhit': X.selfHit = true; break;
+        case 'lure': X.lure = true; break;
+        case 'exposed': X.exposed = true; blockSt.add('invis'); break;
+        case 'mute': X.mute = true; break;
+        case 'dtrail': X.dtrail = x; break;
         case 'uses': each((s) => { uses[s] = Math.min(uses[s], x.n); if (x.n === 0) lock[s] = d; }); break;
         case 'lock': each((s) => { lock[s] = d; }); break;
         case 'reverse': each((s) => { rev[s] = Math.max(rev[s] || 0, x.chance); }); break;
@@ -180,7 +222,7 @@ class Battle {
     base.hp = Math.max(base.hp, 0.2); base.speed = Math.max(base.speed, 0.2); base.dmg = Math.max(base.dmg, 0.05);
     base.size = clamp(base.size, 0.45, 3); base.taken = Math.min(base.taken, 4);
     const s0 = this.map.spawns[i % this.map.spawns.length];
-    const maxHp = Math.round(sp.stats.hp * base.hp * HP_SCALE);
+    const maxHp = X.hpSet ? X.hpSet : Math.round(sp.stats.hp * base.hp * HP_SCALE);
     const m = makeCanvas(SW, SH);
     const ucd = sp.moves.ult.cd * 0.4;
     const aim = Math.atan2(H / 2 - s0[1], W / 2 - s0[0]);
@@ -189,10 +231,11 @@ class Battle {
       x: s0[0], y: s0[1], px: s0[0], py: s0[1], vx: 0, vy: 0, aim, mdir: aim, dir: ang2dir(aim),
       maxHp, hp: maxHp, hpShow: maxHp, alive: true, koT: 0, cd: this.practice ? { basic: 0, s1: 0, s2: 0, ult: 0 } : { basic: 0, s1: 0.5, s2: 0.8, ult: ucd }, cdMax: { basic: 1, s1: 0.5, s2: 0.8, ult: Math.max(ucd, 1) }, uses, base,
       st: {}, stPow: {}, castT: 0, castC: null, hurtT: 0, flashT: 0, invT: 0, tenT: 0, wind: null, dash: null,
-      stack: { size: 0, slow: 0, taken: 0 },
+      stack: { size: 0, slow: 0, taken: 0, weak: 0 }, look: Object.assign({}, sp.look), pSpd, pSz, foeStat, nofxT, blockSt, trD: 0, trN: 0,
+      hpSet: X.hpSet, dmgFix: X.dmgFix, selfHit: X.selfHit, lure: X.lure, exposed: X.exposed, mute: X.mute, noHeal: X.noHeal, dtrail: X.dtrail,
       tickT: dbs.map((d) => (d.fx.t === 'tick' ? d.fx.every * (0.6 + Math.random() * 0.4) : 0)),
       dbs, lock, rev, hfoe, rnds, shout, back, mulS, moveMode, vision, pests, morph: null,
-      acts, aimS, rangeS, ramps, flees, weaks, nthC: {}, dLast: {}, stopT: 0, rampD: 1, rampS: 1, rampZ: 1, stillT: 0, moveT: 0, lastSkT: 0,
+      later: [], acts, aimS, rangeS, ramps, flees, weaks, nthC: {}, dLast: {}, stopT: 0, rampD: 1, rampS: 1, rampZ: 1, stillT: 0, moveT: 0, lastSkT: 0,
       say: null, sayCd: 0, popCd: 0, stats: { dealt: 0, taken: 0, ko: 0 }, revived: false, actN: 0,
       size: sp.stats.size * base.size, dotT: 0, pose: 'idle', warn: false, stepT: 0, seed: Math.random() * 10,
       spr: m[0], sg: m[1], net: null, ai: null, auraT: Math.random(), gone: false,
@@ -225,7 +268,11 @@ class Battle {
       } else this.stepRemote(f, dt);
       if (this.practice && f.alive && f.hp < f.maxHp && this.t - f.hitT > 1.6) f.hp = Math.min(f.maxHp, f.hp + f.maxHp * 0.7 * dt);
       this.stepLook(f, dt);
+      if (f.dtrail && f.alive && live) this.stepTrail(f);
     }
+    if (this.wx) { this.wx.t -= dt; if (this.wx.t <= 0) this.wx = null; }
+    if (this.visT) { this.visT.t -= dt; if (this.visT.t <= 0) this.visT = null; }
+    this.lureF = this.fighters.find((f) => f.lure && f.alive) || null;
     this.stepObjs(dt);
     this.stepFx(dt);
     this.stepAmbient(dt);
@@ -374,10 +421,11 @@ class Battle {
     if (live) for (const A of f.acts) {
       const x = f.dbs[A.i].fx;
       A.cd -= dt;
-      if (x.every) { A.t -= dt; if (A.t < 1) warn = true; if (A.t <= 0) { A.t = x.every; this.doAct(f, A.i); } }
-      else if (x.if) { const c = this.cond(f, x.if, nd, x.n); if (c && !A.prev && A.cd <= 0) { this.doAct(f, A.i); A.cd = 3; } A.prev = c; }
+      if (x.every) { A.t -= dt * (x.accel ? 1 + clamp((this.t - 3) / 30, 0, 2) : 1); if (A.t < 1) warn = true; if (A.t <= 0) { A.t = x.every; this.doAct(f, A.i); } }
+      else if (x.if) { const c = this.cond(f, x.if, nd, x.n); const once = x.die || x.later || x.if === 'late' || x.if === 'early'; if (c && A.cd <= 0 && (!A.prev || !once)) { this.doAct(f, A.i); A.cd = 4; } A.prev = c; }
     }
     f.stopT -= dt;
+    if (live) for (let k = f.later.length - 1; k >= 0; k--) { const L = f.later[k]; L.t -= dt; if (L.t <= 0) { f.later.splice(k, 1); this.doAct(f, L.i, true); } }
     // 시간·체력에 따라 점점
     f.rampD = 1; f.rampS = 1; f.rampZ = 1;
     for (const x of f.ramps) {
@@ -410,6 +458,7 @@ class Battle {
       if (st.confuse) { mx = -mx; my = -my; }
       const mm = f.moveMode;
       if (mm === 'reverse') { mx = -mx; my = -my; }
+      if (mm === 'frozen') { mx = 0; my = 0; }
       if (mm === 'nostop' && Math.hypot(mx, my) < 0.15) { mx = Math.cos(f.mdir); my = Math.sin(f.mdir); }
       if (mm === 'left') mx = Math.min(mx, 0); else if (mm === 'right') mx = Math.max(mx, 0); else if (mm === 'side') my = 0; else if (mm === 'vertical') mx = 0;
       if (flee) { const a = Math.atan2(f.y - flee.y, f.x - flee.x); mx = Math.cos(a); my = Math.sin(a); }
@@ -602,9 +651,10 @@ class Battle {
     f.dir = ang2dir(f.aim);
     const ca = Math.cos(f.aim), sa = Math.sin(f.aim);
     const crit = sp.passive && sp.passive.k === 'crit' && Math.random() < 0.2;
-    const mul = f.base.dmg * f.rampD * f.mulS[as] * (f.st.power ? 1.5 : 1) * (f.st.weak ? 0.6 : 1) * (f.st.giant ? 1.25 : 1) * (sp.passive && sp.passive.k === 'rage' && f.hp / f.maxHp <= 0.4 ? 1.35 : 1) * (crit ? 1.8 : 1);
+    const mul = f.base.dmg * (1 - (f.stack.weak || 0)) * f.rampD * f.mulS[as] * (f.st.power ? 1.5 : 1) * (f.st.weak ? 0.6 : 1) * (f.st.giant ? 1.25 : 1) * (sp.passive && sp.passive.k === 'rage' && f.hp / f.maxHp <= 0.4 ? 1.35 : 1) * (crit ? 1.8 : 1);
     let sw = null;
     for (const e of mv.fx) {
+      if (f.nofxT.has(e.t)) continue;
       if (e.t === 'blink') {
         if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
         this.doBlink(f, e, tgt, mv);
@@ -615,7 +665,7 @@ class Battle {
         if (tgt.owned) { tgt.x = sw[0]; tgt.y = sw[1]; tgt.vx = 0; tgt.vy = 0; }
       }
     }
-    if (f.shout[slot]) { const ev = ['t', f.idx, f.shout[slot], 2]; this.emit(ev); this.onEvent(ev); }
+    if (f.shout[slot]) { const ev = ['t', f.idx, f.shout[slot] === '@name' ? cut(mv.name + '!!', 16) : f.shout[slot], 2]; this.emit(ev); this.onEvent(ev); this.dEv(f, 'talk'); }
     if (f.back[slot]) {
       const amt = r1(Math.max(1, mv.fx.reduce((t, e) => t + fxExpected(e), 0) * mul * f.back[slot] / 100));
       if (f.hp > 0) { this.damage(f, amt, -1); this.pop(f.x, f.y - 12 * f.size, '-' + amt, '#c5f24a', 0.9); f.flashT = 0.12; this.vfxImpact(mv.vfx, mv.color, f.x, this.bodyY(f), 0.6); }
@@ -623,6 +673,7 @@ class Battle {
     const act = ['a', f.idx, SLOT_IDX[as], Math.round(f.x), Math.round(f.y), Math.round(f.aim * 180 / Math.PI), ++f.actN, Math.round(mul * 100), crit ? 1 : 0,
       tgt ? Math.round(tgt.x) : -1, tgt ? Math.round(tgt.y) : -1, tgt ? tgt.idx : -1, (Math.random() * 1e9) | 0, sw ? sw[0] : -1, sw ? sw[1] : -1];
     for (const e of mv.fx) {
+      if (f.nofxT.has(e.t)) { this.note(f, NOFX_NOTE[e.t] || '안 돼!', '#c5f24a', true); continue; }
       if (e.t === 'leap') {
         if (f.st.heavy) { this.note(f, '무거움', ST_COLOR.heavy); continue; }
         const [lx, ly] = this.leapTarget(f.x, f.y, tgt ? tgt.x : f.x + ca * 70, tgt ? tgt.y : f.y + sa * 70, f.aim, e.dist * f.rangeS[as]);
@@ -734,14 +785,34 @@ class Battle {
     this.vfxImpact(mv.vfx, mv.color, f.x, this.bodyY(f), 0.7);
   }
   /** 부작용에 쓴 행동을 정말로 한다: 말풍선, 멈춤(또는 상태이상), 그 행동의 연출 */
-  doAct(f, i) {
+  doAct(f, i, now) {
     const d = f.dbs[i], x = d && d.fx;
-    if (!x || !f.alive || (x.chance < 100 && Math.random() * 100 >= x.chance)) return;
-    const ev = ['t', f.idx, x.text || '앗!', 3, x.pose || 'sweat', x.word || ''];
+    if (!x || !f.alive || (!now && x.chance < 100 && Math.random() * 100 >= x.chance)) return;
+    if (x.later && !now) { f.later.push({ t: x.later, i }); this.note(f, x.later + '초 뒤에…', '#c5f24a', true); return; }
+    const ev = ['t', f.idx, x.text || '앗!', 3, x.pose || 'sweat', x.pose === 'change' ? pick(OUTFITS) + '|' + pick(['#ff4d6d', '#3fb8ff', '#ffcf3a', '#5be37a', '#ff9ad0', '#b48aff', '#ffffff', '#2a2a3a']) : x.word || ''];
     this.emit(ev); this.onEvent(ev);
     if (x.st) this.addStatus(f, x.st.k, x.st.d, 0, false);
     else if (x.d > 0) { f.stopT = Math.max(f.stopT, x.d); f.vx *= 0.2; f.vy *= 0.2; f.wind = null; }
     if (x.hp && f.hp > 1) { this.damage(f, Math.min(x.hp, f.hp - 1), -1); this.pop(f.x, f.y - 12 * f.size, '-' + x.hp, '#c5f24a', 0.9); }
+    if (x.heal) this.heal(f, x.heal);
+    if (x.buff) this.addStatus(f, x.buff.k, x.buff.d, x.buff.k === 'shield' ? 20 : 4, false);
+    const foes = (r) => this.fighters.filter((g) => g !== f && g.alive && Math.hypot(g.x - f.x, g.y - f.y) < r);
+    if (x.fst) for (const g of foes(x.boom ? 60 : 80)) { const e2 = ['x', g.idx, ST_ALL.indexOf(x.fst.k), x.fst.d]; this.emit(e2); this.onEvent(e2); }
+    if (x.fdmg || x.boom) for (const g of foes(x.boom ? 60 : 80)) { const e2 = ['r', g.idx, x.fdmg || 20, 2]; this.emit(e2); this.onEvent(e2); }
+    if (x.fheal) { const g = this.nearest(f, false); if (g) { const e2 = ['g', g.idx, x.fheal]; this.emit(e2); this.onEvent(e2); } }
+    if (x.tele) {
+      this.vfxImpact('arcane', '#c5f24a', f.x, this.bodyY(f), 0.8);
+      const B = this.map.B, ne = this.nearest(f, false);
+      let p = this.freePoint();
+      if (x.tele === 'foe' && ne) { const an = Math.random() * 6.28; p = [clamp(ne.x + Math.cos(an) * 16, B + 8, W - B - 8), clamp(ne.y + Math.sin(an) * 12, B + 10, H - B - 6)]; }
+      else if (x.tele === 'corner') p = [Math.random() < 0.5 ? B + 14 : W - B - 14, Math.random() < 0.5 ? B + 16 : H - B - 12];
+      else if (x.tele === 'center') p = [W / 2, H / 2];
+      f.x = p[0]; f.y = p[1]; this.solid(f, 3 * f.size, !!f.st.fly); f.vx = 0; f.vy = 0; f.dash = null;
+      this.vfxImpact('arcane', '#c5f24a', f.x, this.bodyY(f), 0.8);
+    }
+    if (x.vis && this.visionOf === f) this.visT = { k: x.vis, t: x.visd || 2 };
+    if (x.fpull || x.fpush) for (const g of foes(x.fpull ? 170 : 90)) { const e2 = ['m', g.idx, Math.round(f.x), Math.round(f.y), x.fpull ? 1 : -1]; this.emit(e2); this.onEvent(e2); }
+    if (x.die) { f.invT = 0; delete f.st.invuln; delete f.st.shield; this.damage(f, f.hp + 9999, -1); }
     if (x.push) { const a = Math.random() * 6.283; f.vx = Math.cos(a) * 320; f.vy = Math.sin(a) * 320; f.hurtT = Math.max(f.hurtT, 0.3); f.dash = null; }
     if (x.fire) { const s = ['basic', 's1', 's2'].find((q) => f.cd[q] <= 0 && !f.lock[q] && f.uses[q] > 0); if (s) this.fire(f, s); }
   }
@@ -759,6 +830,10 @@ class Battle {
       case 'laugh': for (let k = 0; k < 5; k++) P('pat', x + rnd(-8, 8), up, rnd(-20, 20), rnd(-35, -15), 0.8, '#ffe14a', 1, { pat: 'plus' }); snd('chirp', 1.3, 0.8); break;
       case 'sing': for (let k = 0; k < 4; k++) P('pat', x + rnd(-6, 6), up, rnd(-15, 15), rnd(-30, -15), 1, ['#ff9ad0', '#7fd8ff', '#ffe14a'][k % 3], 1, { pat: 'note' }); snd('kazoo', 1.1, 0.9); break;
       case 'shout': P('ring', x, y, 0, 0, 0.35, '#ffffff', 1, { r0: 4, r1: 22 }); this.shake = Math.max(this.shake, 1.5); snd('roar', 1.2, 0.7); break;
+      case 'rain': case 'night': case 'snow': case 'thunder': case 'hot': case 'cold': case 'wind': { const d = clamp(+word || 3, 1, 6); this.wx = { k: pose, t: d, max: d }; if (pose === 'thunder') { this.flash = { c: '#ffffff', t: 0.2, max: 0.2, a: 0.8 }; snd('roar', 0.5, 1); } else snd('whoosh', pose === 'rain' ? 0.6 : 0.9, 1.2); break; }
+      case 'change': { const [of, bc] = String(word || '').split('|'); f.look = Object.assign({}, f.look, { outfit: OUTFITS.includes(of) ? of : f.look.outfit, body: bc || f.look.body }); for (let k = 0; k < 14; k++) P('smoke', x + rnd(-6, 6), y + rnd(-6, 6), rnd(-20, 20), rnd(-20, 0), 0.6, '#ffffff', 2); snd('whoosh', 1.4, 0.5); break; }
+      case 'breath': { const vs = VFX.includes(word) ? word : 'fire', c = { fire: '#ff8a3a', ice: '#9fe8ff', electric: '#fff36a', poison: '#9adf5a', water: '#5ab8ff', wind: '#e8f4ff', earth: '#b48a5a', sound: '#ff9ad0' }[vs] || '#ffffff'; for (let k = 0; k < 26; k++) { const a = f.aim + rnd(-0.5, 0.5), sp = rnd(80, 200); P('px', x + Math.cos(f.aim) * 5, y, Math.cos(a) * sp, Math.sin(a) * sp, 0.5, k & 1 ? c : '#ffffff', 2); } this.vfxImpact(vs, c, x + Math.cos(f.aim) * 30, y + Math.sin(f.aim) * 30, 1.4); snd('roar', 0.8, 0.8); break; }
+      case 'boom': this.vfxImpact('fire', '#ff8a3a', x, y, 3); P('ring', x, y, 0, 0, 0.5, '#ffcf3a', 1, { r0: 4, r1: 60 }); this.shake = Math.max(this.shake, 8); this.flash = { c: '#ffffff', t: 0.15, max: 0.15, a: 0.6 }; this.sfx('boom', 'fire'); break;
       case 'yawn': case 'zzz': for (let k = 0; k < 3; k++) P('pat', x + 4 + k * 3, up - k * 4, 10, -18, 1.1, '#bcd0ff', 1, { pat: 'z' }); snd('whistle', 0.6, 1); break;
       case 'coin': for (let k = 0; k < 8; k++) P('pat', x + rnd(-4, 4), y, rnd(-50, 50), rnd(-20, 10), 0.8, '#ffcf3a', 1, { pat: 'coin', g: 160, vz: rnd(40, 80) }); snd('chime', 1.2, 0.6); break;
       case 'heart': for (let k = 0; k < 5; k++) P('pat', x + rnd(-6, 6), up, rnd(-15, 15), rnd(-30, -10), 1, '#ff6a9a', 1, { pat: 'heart' }); snd('chime', 1.5, 0.7); break;
@@ -802,7 +877,7 @@ class Battle {
       this.objs.push({ uid: 'cc' + a[1] + '.' + n, owner: c.idx, kind: 'circle', follow: c, r: 14, life: 0.7, max: 0.7, color: mv.color, cl: light(mv.color, 0.5), age: 0, delay: 0, hit: new Map() });
       this.shake = Math.max(this.shake, 3); this.punch = 1; this.slowT = 0.3;
       this.sfx('move', style, { mv, slot });
-      if (mv.say) Voice.say(mv.say, c.seed / 10, true);
+      if (mv.say && !this.mute) Voice.say(mv.say, c.seed / 10, true);
     } else if (slot !== 'basic') {
       this.objs.push({ uid: 'cc' + a[1] + '.' + n, owner: c.idx, kind: 'circle', follow: c, r: 8, life: 0.45, max: 0.45, color: mv.color, cl: light(mv.color, 0.5), age: 0, delay: 0, hit: new Map() });
       this.pop(x, y - 15 * sz, mv.name, mv.color, 0.8, 0.95);
@@ -813,7 +888,7 @@ class Battle {
     this.addP('flash', x + ca * 5, cy + sa * 5, 0, 0, 0.06, '#ffffff', slot === 'basic' ? 1.5 : 2.5);
     this.lightFlash(x + ca * 5, cy + sa * 5, slot === 'basic' ? 14 : 24, mv.color);
     for (let i = 0; i < (slot === 'basic' ? 6 : slot === 'ult' ? 24 : 12); i++) this.vfxTrail(style, mv.color, x + ca * 5, cy + sa * 5, ca * 40, sa * 40, 1);
-    if (mv.say && slot !== 'basic' && (slot !== 's1' || (a[12] & 1))) c.say = { text: mv.say, t: 1.3, cast: true };
+    if (mv.say && slot !== 'basic' && (slot !== 's1' || (a[12] & 1))) { c.say = { text: mv.say, t: 1.3, cast: true }; if (c.owned) this.dEv(c, 'talk'); }
     if (crit) this.pop(x, y - 20 * sz, '치명타!', '#ffcf3a', 0.8, 1.1);
     c.lastSkT = this.t;
     if (crit && c.owned) this.dEv(c, 'crit');
@@ -824,7 +899,9 @@ class Battle {
     const cx = (v) => clamp(v, B + 2, W - B - 2), cyy = (v) => clamp(v, B + 4, H - B - 2);
     const rk = c.rangeS ? c.rangeS[slot] : 1;
     mv.fx.forEach((e0, i) => {
-      const e = rk < 1 ? rangeScale(e0, rk) : e0;
+      if (c.nofxT.has(e0.t) || (e0.t === 'buff' && c.blockSt.has(e0.k))) return;
+      const ps = c.pSpd[slot], pz = c.pSz[slot];
+      const e = sizeScale(speedScale(rk < 1 ? rangeScale(e0, rk) : e0, ps), pz);
       const R = mulberry((a[12] | 0) + i * 977);
       switch (e.t) {
         case 'dash':
@@ -1321,7 +1398,8 @@ class Battle {
   bodyHit(v, x, y, r) { const R = r + 4 * v.size; return dist2(v.x, this.bodyY(v), x, y) <= R * R; }
   checkHits(o, test) {
     for (const v of this.fighters) {
-      if (!v.owned || !v.alive || v.idx === o.owner) continue;
+      if (!v.owned || !v.alive) continue;
+      if (v.idx === o.owner && !(o.all && o.age > 0.5) && !(v.selfHit && o.age > 0.3 && SELF_KINDS.has(o.kind) && !o.follow)) continue;
       const last = o.hit.get(v.idx);
       if (last !== undefined && (!o.rehit || this.t - last < o.rehit)) continue;
       if (!test(v)) continue;
@@ -1356,6 +1434,21 @@ class Battle {
     }
   }
   /** 투사체에서 나오는 작은 것들 (모든 기기에서 같은 이름) */
+  /** 걸어간 자리에 남는 것 (모든 기기에서) */
+  stepTrail(f) {
+    const d = Math.hypot(f.x - f.px, f.y - f.py);
+    if (d > 20) return;
+    f.trD += d;
+    if (f.trD < 13) return;
+    f.trD = 0;
+    const k = f.dtrail.kind, n = ++f.trN;
+    if (k === 'squeak') { if (n % 2) this.addP('pat', f.x, f.y - 14 * f.size, rnd(-6, 6), -14, 0.6, '#ffe14a', 1, { pat: 'note' }); if (n % 3 === 0) this.sfx('move', 'plain', { mv: { name: 'step', sfx: { kind: 'squeak', pitch: 1.6 + (n % 2) * 0.3, len: 0.25 } }, slot: 's1' }); return; }
+    if (k === 'flower') { this.decal(f.x, f.y + 1, 3, pick(['#ff9ad0', '#ffe14a', '#ffffff'])); return; }
+    if (k === 'money') { this.addP('pat', f.x, f.y, rnd(-20, 20), rnd(-10, 0), 1, '#ffcf3a', 1, { pat: 'coin', g: 160, vz: 30 }); return; }
+    const T = { fire: ['#ff8a3a', 'fire', { k: 'burn', d: 1.5 }, 1.5], poop: ['#7a4a1a', 'earth', { k: 'slip', d: 1 }, 0], ice: ['#cff4ff', 'ice', { k: 'slip', d: 1 }, 0], slime: ['#7fdf5a', 'poison', { k: 'slow', d: 1 }, 0], water: ['#7fd8ff', 'water', { k: 'slip', d: 0.8 }, 0] }[k] || ['#ffffff', 'plain', null, 0];
+    this.objs.push({ uid: f.idx + 'tr' + n, owner: f.idx, all: true, kind: 'zone', x: f.x, y: f.y + 1, r: 7, life: 3, max: 3, dmg: T[3], mul: 1, st: T[2], kb: 0, color: T[0], cl: light(T[0], 0.5), dk: dark(T[0], 0.4), rows: null, gm: { shape: 'dot' }, ph: 0, vfx: T[1], hit: new Map(), age: 0, rehit: 0.6, delay: 0, heal: 0, tr: [], slotN: 'basic', small: true });
+    if (k === 'poop') this.decal(f.x, f.y + 1, 3, '#6a3a12');
+  }
   kid(o, suf, kind, ex) {
     return Object.assign({ uid: o.uid + suf, owner: o.owner, kind, dmg: o.dmg, mul: o.mul, st: o.st, kb: o.kb || 0, color: o.color, cl: o.cl, dk: o.dk, rows: o.rows, gm: o.gm, ph: Math.random() * 3, custom: o.custom, vfx: o.vfx, hit: new Map(), age: 0, rehit: 0, delay: 0, slotN: o.slotN, tr: [] }, ex);
   }
@@ -1952,8 +2045,8 @@ class Battle {
       this.sendHit(o, v, 0, single ? 1 : 0, 3);
       return;
     }
-    let wk = 1;
-    for (const x of v.weaks) if (x.vfx.includes(o.vfx)) wk *= 1 + x.pct / 100;
+    let wk = 1, wdie = false, wst = null;
+    for (const x of v.weaks) if (x.vfx.includes(o.vfx)) { wk *= 1 + x.pct / 100; if (x.die) wdie = true; if (x.st) wst = x.st; }
     if (wk > 1 && o.dmg > 0) this.note(v, '약점!', '#ff8a5a', true);
     const tm = wk * v.base.taken * (1 + v.stack.taken) * (v.st.vuln ? 1.4 : 1) * (v.st.armor ? 0.5 : 1) * (v.spec.passive && v.spec.passive.k === 'armor' ? 0.85 : 1);
     let dmg = o.dmg * o.mul * tm;
@@ -1964,6 +2057,9 @@ class Battle {
       if (dmg <= 0) this.note(v, '막음', ST_COLOR.shield);
     }
     dmg = Math.round(dmg * 10) / 10;
+    if (a && a.dmgFix != null) { const fd = typeof a.dmgFix === 'number' ? a.dmgFix : a.dmgFix[o.slotN]; if (fd != null && o.dmg > 0) dmg = fd; }
+    if (wdie && o.dmg > 0) { dmg = v.hp + 1; this.note(v, '닿으면 죽음!', '#ff4d6d', true); }
+    if (wst) this.addStatus(v, wst.k, wst.d, 0, false);
     const soft = o.kind === 'zone' || o.kind === 'orbit' || o.kind === 'cone';
     if (dmg > 0 || o.kb) {
       let dx, dy;
@@ -1973,7 +2069,7 @@ class Battle {
       else if ((o.kind === 'hb' || o.kind === 'all' || o.kind === 'swing' || o.kind === 'cone' || o.kind === 'chain') && a) { dx = v.x - a.x; dy = v.y - a.y; }
       else { dx = v.x - o.x; dy = this.bodyY(v) - o.y; }
       const l = Math.hypot(dx, dy) || 1; dx /= l; dy /= l;
-      if (o.kb) { const s = o.kb * KB / Math.sqrt(v.size); v.vx = dx * s; v.vy = dy * s; }
+      if (o.kb) { const s = o.kb * KB / Math.sqrt(v.size) * (v.base.kb || 1); v.vx = dx * s; v.vy = dy * s; }
       if (!soft) { v.hurtT = Math.max(v.hurtT, 0.12 + Math.abs(o.kb) * 0.015); v.wind = null; v.dash = null; }
       v.flashT = 0.12;
     }
@@ -2016,6 +2112,7 @@ class Battle {
   }
   heal(f, amt, quiet) {
     if (!f.alive || f.hp >= f.maxHp) return;
+    if (f.noHeal) { if (!quiet && f.owned) this.note(f, '회복 못 함', '#c5f24a'); return; }
     f.hp = Math.min(f.maxHp, f.hp + amt);
     if (f.owned && amt >= 1) this.dEv(f, 'heal');
     if (!quiet || Math.random() < 0.5) this.pop(f.x + rnd(-4, 4), f.y - 12 * f.size, '+' + Math.round(amt), '#7dff8a', 0.8, 0.9);
@@ -2023,6 +2120,7 @@ class Battle {
   }
   addStatus(f, k, d, pow, fromEnemy) {
     if (!f.alive) return;
+    if (f.blockSt && f.blockSt.has(k)) { if (f.owned) this.note(f, (ST_KO[k] || k) + ' 안 됨', '#c5f24a'); return; }
     const hard = HARD_ST.includes(k);
     if (fromEnemy && hard) {
       if (f.tenT > 0) { this.note(f, '저항', '#d8d0f0'); return; }
@@ -2118,6 +2216,13 @@ class Battle {
         }
         break;
       }
+      case 'x': {
+        const f = this.fighters[ev[1] | 0], k = ST_ALL[ev[2] | 0];
+        if (f && f.alive) { this.vfxImpact('arcane', ST_COLOR[k] || '#c5f24a', f.x, this.bodyY(f), 0.5); if (f.owned && k) this.addStatus(f, k, clamp(+ev[3] || 1, 0.3, 5), 4, DEBUFFS.includes(k)); }
+        break;
+      }
+      case 'g': { const f = this.fighters[ev[1] | 0]; if (f && f.owned) this.heal(f, clamp(+ev[2] || 0, 0, 80)); break; }
+      case 'm': { const f = this.fighters[ev[1] | 0]; if (f && f.alive) { const dx = (+ev[2] || 0) - f.x, dy = (+ev[3] || 0) - f.y, l = Math.hypot(dx, dy) || 1, s = (+ev[4] > 0 ? 1 : -1) * Math.min(340, 120 + l * 2); this.addP('ring', f.x, this.bodyY(f), 0, 0, 0.25, '#ffffff', 1, { r0: 2, r1: 12 }); if (f.owned) { f.vx = dx / l * s; f.vy = dy / l * s; f.hurtT = Math.max(f.hurtT, 0.3); f.dash = null; } } break; }
       case 'b': {
         const f = this.fighters[ev[1] | 0], k = ST_ALL[ev[2] | 0];
         if (f && f.owned && k && BUFFS.includes(k)) this.addStatus(f, k, clamp(+ev[3] || 1, 0.5, 4), clamp(+ev[4] || 0, 0, 30), false);
@@ -2781,11 +2886,14 @@ class Battle {
     }
     if (f.alive && f.st.dance && Math.random() < 0.15) this.addP('pat', f.x + rnd(-5, 5), f.y - 12, rnd(-6, 6), -14, 0.6, pick(['#ff8ad0', '#ffe14a', '#7fd8ff']), 1, { pat: 'note' });
     if (f.alive && f.st.sleep && Math.random() < 0.06) this.addP('pat', f.x + 3, f.y - 12, 6, -10, 0.9, '#c8d8ff', 1, { pat: 'z' });
-    renderSprite(f.spr, f.spec.look, { pose: f.st.dance ? (Math.floor(T * 6) % 2 ? 'cast' : 'run') : f.pose, t: T + f.idx * 0.37, seed: f.seed, dir: f.dir === 3 ? 2 : f.dir, hurt: f.pose === 'hurt' || !!f.st.sleep, st: f.st, hurtFlash: f.flashT > 0, glow: f.castC });
+    if (f.alive && this.vision === 'cute' && this.visionOf && f !== this.visionOf && Math.random() < 0.12) this.addP('pat', f.x + rnd(-6, 6), f.y - 14 * f.size, rnd(-8, 8), -16, 0.8, pick(['#ff8ad0', '#ffb3d9', '#ff5a9a']), 1, { pat: 'heart' });
+    if (f.alive && f.exposed) { const ay = fy - Math.round(30 * sz) - Math.round(Math.abs(Math.sin(T * 6)) * 3); g.fillStyle = '#ff4d6d'; for (let k = 0; k < 4; k++) g.fillRect(fx - 3 + k, ay + k, 7 - k * 2, 1); }
+    renderSprite(f.spr, f.look || f.spec.look, { pose: f.st.dance ? (Math.floor(T * 6) % 2 ? 'cast' : 'run') : f.pose, t: T + f.idx * 0.37, seed: f.seed, dir: f.dir === 3 ? 2 : f.dir, hurt: f.pose === 'hurt' || !!f.st.sleep, st: f.st, hurtFlash: f.flashT > 0, glow: f.castC });
     const dw = Math.round(SW * sz), dh = Math.round(SH * sz);
     let alpha = 1;
     if (f.st.invis) alpha = f.owned && !f.bot ? 0.4 : 0.1;
     if (f.invT > 0 && (Math.floor(T * 20) & 1)) alpha *= 0.5;
+    if (this.vision === 'noself' && this.visionOf === f && f.alive) alpha = 0.05;
     g.globalAlpha = alpha;
     if (!f.alive) {
       g.save(); g.translate(fx, fy - 6); g.rotate(Math.PI / 2);
@@ -2830,7 +2938,7 @@ class Battle {
     const cv = this.scv, sg = this.sg, v = this.viewRect();
     const SWp = cv.width, SHp = cv.height, k = SWp / v.w;
     let ox = 0, oy = 0;
-    const vis = this.visionOf && this.visionOf.alive ? this.vision : null;
+    const vis = this.visT && this.visT.t > 0 ? this.visT.k : this.visionOf && this.visionOf.alive ? this.vision : null;
     if (vis === 'shake') this.shake = Math.max(this.shake, 2.2);
     if (this.shake > 0.4) { ox = (Math.random() * 2 - 1) * this.shake * k * 0.8; oy = (Math.random() * 2 - 1) * this.shake * k * 0.8; }
     sg.setTransform(1, 0, 0, 1, 0, 0);
@@ -2855,6 +2963,17 @@ class Battle {
       vg.fillStyle = gr; vg.fillRect(0, 0, SWp, SHp); this.vig = m;
     }
     sg.drawImage(this.vig, 0, 0);
+    if (this.wx) {
+      const w = this.wx, a = Math.min(1, w.t / 0.4, (w.max - w.t) / 0.4 + 0.2), T = this.t;
+      sg.save(); sg.globalAlpha = a;
+      if (w.k === 'rain' || w.k === 'thunder') { sg.fillStyle = 'rgba(20,30,60,0.35)'; sg.fillRect(0, 0, SWp, SHp); sg.strokeStyle = 'rgba(170,200,255,0.75)'; sg.lineWidth = Math.max(1, k * 0.5); sg.beginPath(); for (let i = 0; i < 90; i++) { const x0 = ((i * 97.3 + T * 40) % (SWp + 40)) - 20, y0 = ((i * 53.7 + T * 900) % (SHp + 60)) - 30; sg.moveTo(x0, y0); sg.lineTo(x0 - 4 * k * 0.3, y0 + 14 * k * 0.4); } sg.stroke(); }
+      if (w.k === 'night') { sg.fillStyle = 'rgba(5,5,25,0.72)'; sg.fillRect(0, 0, SWp, SHp); sg.fillStyle = '#fff7c2'; sg.beginPath(); sg.arc(SWp * 0.85, SHp * 0.15, 18 * k * 0.4, 0, 6.3); sg.fill(); }
+      if (w.k === 'snow' || w.k === 'cold') { sg.fillStyle = 'rgba(200,230,255,0.22)'; sg.fillRect(0, 0, SWp, SHp); sg.fillStyle = '#ffffff'; for (let i = 0; i < 70; i++) { const x0 = ((i * 71.3 + Math.sin(T + i) * 20) % SWp + SWp) % SWp, y0 = ((i * 41.7 + T * 60) % SHp); sg.fillRect(x0, y0, 2 * k * 0.4, 2 * k * 0.4); } }
+      if (w.k === 'hot') { sg.fillStyle = 'rgba(255,120,40,0.22)'; sg.fillRect(0, 0, SWp, SHp); }
+      if (w.k === 'wind') { sg.strokeStyle = 'rgba(255,255,255,0.5)'; sg.lineWidth = Math.max(1, k * 0.4); sg.beginPath(); for (let i = 0; i < 24; i++) { const y0 = (i * 37.3) % SHp, x0 = ((i * 113 + T * 700) % (SWp + 200)) - 100; sg.moveTo(x0, y0); sg.lineTo(x0 + 60 * k * 0.3, y0); } sg.stroke(); }
+      if (w.k === 'thunder' && Math.sin(T * 13) > 0.97) { sg.fillStyle = 'rgba(255,255,255,0.5)'; sg.fillRect(0, 0, SWp, SHp); }
+      sg.restore();
+    }
     this.drawText(v, k);
   }
 

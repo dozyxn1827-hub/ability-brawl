@@ -792,102 +792,109 @@ function smartDrawback(side, ctx) {
   let customHow = '', newAura = null;
   const add = (fx) => { if (fx && out.length < 3 && !out.some((x) => x.t === fx.t && (x.t !== 'lock' || x.on === fx.on))) out.push(fx); };
   const SL = [[/궁극기|궁|필살기/, 'ult'], [/능력\s?1|첫\s?번째|기본/, 'basic'], [/능력\s?2|두\s?번째/, 's1'], [/능력\s?3|세\s?번째/, 's2']];
-  // "~을 못 쓴다": 글자 그대로. 그 소재·행동이 들어간 기술은 정말로 그 소재가 안 나오는 기술로 바뀐다
-  const NEG = /못\s?[가-힣]|안\s?(나(온|와|옴)|된|돼|써|쓰|생|통|먹)|사용\s?(불가|금지)|봉인|쓸 수 없|금지|할 수 없|사라(진|져|짐)|잃(는|어|었|음)|없어(진|져|짐)|빼앗|뺏|막힌|막혀/;
-  const [dCond] = dSplit(t), DW = dWhen(t, dCond);
-  const condOnly = !!(DW.if || DW.hit || DW.ev || DW.every || DW.gate || DW.bump || DW.byAct || DW.time || DW.hpr);
-  if (ctx && has(NEG) && !condOnly && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못|못 자|못 걷|못 뛰|못 피|멀리 못|멀리\s?(못|안)|못 맞|못 이기|못 참/)) {
-    const slot = SL.find(([re]) => re.test(t));
-    // 부작용 글에 나온 소재(사전으로 같은 주제까지) + 행동
-    const keys = new Set(), words = [];
-    for (const f of ctx.themes) if (f.word && t.includes(f.word)) { keys.add(f.fam ? 'f:' + f.fam : f.key); words.push(f.word); }
-    for (const [re, key] of LEX) { const m = t.match(re); if (m && ctx.themes.some((f) => !f.fam && f.key === key)) { keys.add(key); words.push(m[0]); } }
-    for (const h of wfFind(t)) if (ctx.themes.some((f) => f.fam === h.fam)) { keys.add('f:' + h.fam); words.push(h.word); }
-    const mechHit = MECH.filter(([re]) => re.test(t.replace(/못\s?쓴|안\s?쓴/g, ''))).map(([, k]) => k);
-    let slots = [];
-    if (slot) slots = [slot[1]];
-    else {
-      slots = SLOTS.filter((s) => keys.has(ctx.moves[s]._k) || words.some((w) => w && ctx.moves[s].name.includes(cut(w, 5))));
-      if (!slots.length) slots = SLOTS.filter((s) => mechHit.includes(ctx.moves[s]._m));
-      if (has(/능력|기술|스킬|모든|전부|아무것도|다 못|하나도|모두/) && !slot) slots = SLOTS.slice();
-      // 능력 글의 핵심 단어를 짚었는데 주제가 하나뿐이면 전부 해당
-      if (!slots.length && keys.size && new Set(ctx.themes.map((f) => (f.fam ? 'f:' + f.fam : f.key))).size === 1) slots = SLOTS.slice();
-    }
-    if (slots.length) {
-      // "불 대신 물이 나온다", "불이 물로 바뀐다": 바뀐 소재로 다시 만든다
-      const subM = t.match(/(?:대신|아니라|말고)\s*([가-힣]{1,6}?)(?:이|가|을|를|만|만이)?\s*(?:나온|나와|나감|쏟|뿜|발사|튀어|써|쓴|된)/) || t.match(/([가-힣]{1,6}?)(?:으로|로)\s*(?:바뀐|바뀜|변한|변함|대체)/);
-      const sub = subM && subM[1] && !STOP.has(subM[1]) ? subM[1] : '';
-      let rep;
-      if (sub) {
-        const old = words[0] || (ctx.themes[0] && ctx.themes[0].word) || '';
-        const altRaw = composeRaw(old ? ctx.text.split(old).join(sub) : `${sub} ${ctx.text}`, [], true), alt = altRaw.moves;
-        if (slots.length === 4) newAura = altRaw.look;
-        rep = {}; for (const s of slots) rep[s] = alt[s];
-      } else {
-        const lame = lameMoves(words[0] || ctx.n1); rep = {}; for (const s of slots) rep[s] = lame[s];
+  // 문장 뜻을 그대로 알아들으면 그것만 (일반적인 마이너스 효과를 덧붙이지 않는다)
+  const EX = exactDrawback(t, ctx);
+  if (EX) for (const x of EX) add(x);
+  let generic = false;
+  if (!EX) {
+    // "~을 못 쓴다": 글자 그대로. 그 소재·행동이 들어간 기술은 정말로 그 소재가 안 나오는 기술로 바뀐다
+    const NEG = /못\s?[가-힣]|안\s?(나(온|와|옴|간|가|감)|된|돼|써|쓰|생|통|먹)|사용\s?(불가|금지)|봉인|쓸 수 없|금지|할 수 없|사라(진|져|짐)|잃(는|어|었|음)|없어(진|져|짐)|빼앗|뺏|막힌|막혀/;
+    const [dCond] = dSplit(t), DW = dWhen(t, dCond);
+    const condOnly = !!(DW.if || DW.hit || DW.ev || DW.every || DW.gate || DW.bump || DW.byAct || DW.time || DW.hpr);
+    if (ctx && has(NEG) && !condOnly && !has(/(?<![가-힣])말을 못|못 움직|못 멈|못 보|잠을 못|못 자|못 걷|못 뛰|못 피|멀리 못|멀리\s?(못|안)|못 맞|못 이기|못 참/)) {
+      const slot = SL.find(([re]) => re.test(t));
+      // 부작용 글에 나온 소재(사전으로 같은 주제까지) + 행동
+      const keys = new Set(), words = [];
+      for (const f of ctx.themes) if (f.word && t.includes(f.word)) { keys.add(f.fam ? 'f:' + f.fam : f.key); words.push(f.word); }
+      for (const [re, key] of LEX) { const m = t.match(re); if (m && ctx.themes.some((f) => !f.fam && f.key === key)) { keys.add(key); words.push(m[0]); } }
+      for (const h of wfFind(t)) if (ctx.themes.some((f) => f.fam === h.fam)) { keys.add('f:' + h.fam); words.push(h.word); }
+      const mechHit = MECH.filter(([re]) => re.test(t.replace(/못\s?쓴|안\s?쓴/g, ''))).map(([, k]) => k);
+      let slots = [];
+      if (slot) slots = [slot[1]];
+      else {
+        slots = SLOTS.filter((s) => keys.has(ctx.moves[s]._k) || words.some((w) => w && ctx.moves[s].name.includes(cut(w, 5))));
+        if (!slots.length) slots = SLOTS.filter((s) => mechHit.includes(ctx.moves[s]._m));
+        if (has(/능력|기술|스킬|모든|전부|아무것도|다 못|하나도|모두/) && !slot) slots = SLOTS.slice();
+        // 능력 글의 핵심 단어를 짚었는데 주제가 하나뿐이면 전부 해당
+        if (!slots.length && keys.size && new Set(ctx.themes.map((f) => (f.fam ? 'f:' + f.fam : f.key))).size === 1) slots = SLOTS.slice();
       }
-      if (slot && !sub) add({ t: 'lock', on: slot[1] });
-      else add({ t: 'replace', moves: rep });
-      if (newAura) add({ t: 'look', aura: newAura.aura, body: newAura.body, hair: newAura.hair });
-      const what = cut(words[0] || '능력', 6);
-      customHow = sub ? `${what} 대신 ${sub}: ${slots.map((s) => SLOT_KO[s]).join('·')}이(가) ${sub} 기술로 바뀜`
-        : slot ? `${SLOT_KO[slot[1]]} 아예 못 씀`
-        : slots.length === 4 ? `${josa(what, '을', '를')} 진짜 못 씀 — 네 기술 모두 버둥대기로`
-        : `${what} 기술(${slots.map((s) => SLOT_KO[s]).join('·')})은 진짜 못 씀`;
-      // 능력 전부가 사라지면 몸에 두르던 기운(불꽃 오라 등)도 꺼진다
-      if (slots.length === 4 && ctx.aura && ctx.aura !== 'none' && !sub) add({ t: 'look', aura: 'none' });
+      if (slots.length) {
+        // "불 대신 물이 나온다", "불이 물로 바뀐다": 바뀐 소재로 다시 만든다
+        const subM = t.match(/(?:대신|아니라|말고)\s*([가-힣]{1,6}?)(?:이|가|을|를|만|만이)?\s*(?:나온|나와|나감|나간|나가|쏟|뿜|발사|튀어|써|쓴|된)/) || t.match(/([가-힣]{1,6}?)(?:으로|로)\s*(?:바뀐|바뀜|변한|변함|대체)/);
+        const sub = subM && subM[1] && !STOP.has(subM[1]) ? subM[1] : '';
+        let rep;
+        if (sub) {
+          const old = words[0] || (ctx.themes[0] && ctx.themes[0].word) || '';
+          const altRaw = composeRaw(old ? ctx.text.split(old).join(sub) : `${sub} ${ctx.text}`, [], true), alt = altRaw.moves;
+          if (slots.length === 4) newAura = altRaw.look;
+          rep = {}; for (const s of slots) rep[s] = alt[s];
+        } else {
+          const lame = lameMoves(words[0] || ctx.n1); rep = {}; for (const s of slots) rep[s] = lame[s];
+        }
+        if (slot && !sub) add({ t: 'lock', on: slot[1] });
+        else add({ t: 'replace', moves: rep });
+        if (newAura) add({ t: 'look', aura: newAura.aura, body: newAura.body, hair: newAura.hair });
+        const what = cut(words[0] || '능력', 6);
+        customHow = sub ? `${what} 대신 ${sub}: ${slots.map((s) => SLOT_KO[s]).join('·')}이(가) ${sub} 기술로 바뀜`
+          : slot ? `${SLOT_KO[slot[1]]} 아예 못 씀`
+          : slots.length === 4 ? `${josa(what, '을', '를')} 진짜 못 씀 — 네 기술 모두 버둥대기로`
+          : `${what} 기술(${slots.map((s) => SLOT_KO[s]).join('·')})은 진짜 못 씀`;
+        // 능력 전부가 사라지면 몸에 두르던 기운(불꽃 오라 등)도 꺼진다
+        if (slots.length === 4 && ctx.aura && ctx.aura !== 'none' && !sub) add({ t: 'look', aura: 'none' });
+      }
     }
-  }
-  if (ctx && !out.length) {
-    const sw = t.match(/([가-힣]{1,6}?)(?:이|가|을|를|은|는)?\s*대신(?:에)?\s*([가-힣]{1,6}?)(?:이|가|을|를|만)?\s*(?:나온|나와|나감|쏟|뿜|발사|튀어|써|쓴|된|생|만들|$)/)
-      || t.match(/([가-힣]{1,6}?)(?:이|가|은|는|을|를)\s*([가-힣]{1,6}?)(?:으로|로)\s*(?:바뀐|바뀜|바뀌|변한|변함|변해|대체|둔갑)/);
-    if (sw && !STOP.has(sw[2])) {
-      const from = sw[1], to = sw[2], ft = themesInText(from)[0];
-      let slots = SLOTS.filter((s) => (ft && (ctx.moves[s]._k === ft.key || (ft.fam && ctx.moves[s]._k === 'f:' + ft.fam))) || (ctx.moves[s]._w && (from.includes(ctx.moves[s]._w) || ctx.moves[s]._w.includes(from))));
-      if (!slots.length) slots = SLOTS.slice();
-      const altRaw = composeRaw(ctx.text.includes(from) ? ctx.text.split(from).join(to) : `${to} ${ctx.text}`, [], true), alt = altRaw.moves;
-      add({ t: 'replace', moves: Object.fromEntries(slots.map((s) => [s, alt[s]])) });
-      if (slots.length === 4) add({ t: 'look', aura: altRaw.look.aura, body: altRaw.look.body, hair: altRaw.look.hair });
-      customHow = `${from} 대신 ${to}: ${slots.length === 4 ? '네 기술 모두' : slots.map((s) => SLOT_KO[s]).join('·')} ${to} 기술로 바뀜`;
+    if (ctx && !out.length) {
+      const sw = t.match(/([가-힣]{1,6}?)(?:이|가|을|를|은|는)?\s*대신(?:에)?\s*([가-힣]{1,6}?)(?:이|가|을|를|만)?\s*(?:나온|나와|나감|나간|나가|쏟|뿜|발사|튀어|써|쓴|된|생|만들|$)/)
+        || t.match(/([가-힣]{1,6}?)(?:이|가|은|는|을|를)\s*([가-힣]{1,6}?)(?:으로|로)\s*(?:바뀐|바뀜|바뀌|변한|변함|변해|대체|둔갑)/);
+      if (sw && !STOP.has(sw[2])) {
+        const from = sw[1], to = sw[2], ft = themesInText(from)[0];
+        let slots = SLOTS.filter((s) => (ft && (ctx.moves[s]._k === ft.key || (ft.fam && ctx.moves[s]._k === 'f:' + ft.fam))) || (ctx.moves[s]._w && (from.includes(ctx.moves[s]._w) || ctx.moves[s]._w.includes(from))));
+        if (!slots.length) slots = SLOTS.slice();
+        const altRaw = composeRaw(ctx.text.includes(from) ? ctx.text.split(from).join(to) : `${to} ${ctx.text}`, [], true), alt = altRaw.moves;
+        add({ t: 'replace', moves: Object.fromEntries(slots.map((s) => [s, alt[s]])) });
+        if (slots.length === 4) add({ t: 'look', aura: altRaw.look.aura, body: altRaw.look.body, hair: altRaw.look.hair });
+        customHow = `${from} 대신 ${to}: ${slots.length === 4 ? '네 기술 모두' : slots.map((s) => SLOT_KO[s]).join('·')} ${to} 기술로 바뀜`;
+      }
     }
-  }
-  const dOn = (SL.find(([re]) => re.test(t)) || [])[1] || 'skills';
-  if (has(/외친|외쳐|소리친|말한|말해야|소리 질|라고 한|이라고 한|하고 외/) && say) add({ t: 'shout', on: dOn, text: say, nth: DW.skill ? DW.nth : undefined });
-  if (has(/(적|상대|남).*(회복|치료|체력이 찬|낫|힐|피가 찬)/)) add({ t: 'healfoe', on: dOn, chance: DW.rare ? 40 : 100 });
-  if (has(/(적|상대|남).*(강해|빨라|커|좋아|세져|신나)/)) add({ t: 'aidfoe', on: dOn, k: has(/커/) ? 'giant' : has(/빨/) ? 'haste' : 'power', d: 3 });
-  if (has(/(반대|뒤|거꾸로)\s?(방향)?.*(나간|날아|쏜|발사|나와|나감)|엉뚱한 방향|뒤로 나/)) add({ t: 'reverse', on: dOn, chance: DW.rare ? 40 : 100 });
-  if (has(/랜덤|무작위|아무거나 나|엉뚱한 (기술|능력)|다른 기술|다른 능력이 나/)) add({ t: 'random', on: dOn, chance: DW.rare ? 40 : 60 });
-  if (has(/앞이 (잘\s?)?안|눈이 안|시야|어두|장님|눈을 감|안 보(여|인|임)|앞을 못 봐|앞을 못 본/)) add({ t: 'vision', mode: 'dark' });
-  else if (has(/화면이 뒤집|세상이 뒤집|거꾸로 보|뒤집혀 보/)) add({ t: 'vision', mode: 'flip' });
-  else if (has(/좌우가 바뀌어 보|거울처럼/)) add({ t: 'vision', mode: 'mirror' });
-  else if (has(/멀미|흔들려 보|화면이 흔들|술에 취/)) add({ t: 'vision', mode: 'shake' });
-  // 글에 나온 말 그대로: [언제] + [무엇]
-  literalDrawback(t, ctx, add, say, out);
-  const PEST = t.match(/(벌|모기|파리|비둘기|강아지|고양이|닭|오리|거위|엄마|아빠|선생님|경찰|좀비|귀신|바퀴벌레|까마귀|팬|기자|빚쟁이|할머니|선배|형|누나|동생|개)(?:가|이|들이|떼가|한테|에게)/);
-  const chaser = t.match(/([가-힣]{1,6}?)(?:이|가|들이|들)?\s*(?:계속\s*|자꾸\s*|하루 종일\s*)?(?:쫓아|따라다|따라온|따라와|달려들|달려든|나타나|찾아와|찾아온)/);
-  if ((PEST && has(/쫓아|따라|달려들|나타|찾아|혼난|혼나|잔소리|괴롭|물어|쏘|공격|때린|(?<![가-힣])온다|와서|와요|등장/)) || chaser) {
-    const nm = chaser && !STOP.has(chaser[1]) ? chaser[1] : PEST ? PEST[1] : '무언가', pic = pixFor(nm);
-    add({ t: 'pest', every: DW.every || (DW.often ? 5 : 7), on: DW.skill ? dOn : undefined, dmg: has(/혼난|혼나|잔소리/) ? 1 : 3, name: nm, color: pic ? pic.color : '#ffe14a', pix: pic ? pic.pix : undefined, st: has(/혼난|혼나|잔소리/) ? { k: 'stun', d: 0.6 } : undefined });
-  }
-  if (has(/대머리|머리가 (빠|다 빠|없)/)) add({ t: 'look', head: 'bald' });
-  if (has(/분홍|핑크/)) add({ t: 'look', body: '#ff9ad0', hair: '#ff7ab0' });
-  if (has(/초록|녹색/)) add({ t: 'look', body: '#4fbf5f', skin: '#a8e08a' });
-  const plain = !DW.skill && !DW.hit && !DW.ev && !DW.if && !DW.every && !DW.gate && !DW.byAct;
-  if (has(/반대로 (움직|걸)|방향이 반대|조작이 반대|좌우가 바뀌|방향키가 반대|거꾸로 (걷|움직)/)) add({ t: 'move', mode: 'reverse' });
-  else if (plain && has(/미끄|빙판/)) add({ t: 'move', mode: 'slide' });
-  else if (plain && has(/비틀|취한|술에|갈지자/)) add({ t: 'move', mode: 'drunk' });
-  else if (has(/멈출 수 없|계속 (달|뛰|걸)|못 멈|멈추지 못/)) add({ t: 'move', mode: 'nostop' });
-  else if (has(/뒷걸음|문워크|뒤로 걷|뒤로만/)) add({ t: 'move', mode: 'backward' });
-  else if (plain && has(/깡총|토끼처럼|뛰어다/)) add({ t: 'move', mode: 'hop' });
-  else if (plain && has(/빙글빙글|뱅글뱅글|돌면서 걷/)) add({ t: 'move', mode: 'spin' });
-  if (has(/순간이동|텔레포트|엉뚱한 곳|아무 데로|어딘가로/) && DW.ev !== 'dash') add({ t: 'tele', on: dOn, nth: DW.skill ? DW.nth : undefined });
-  if (has(/(조건|상황)이? ?(되면|오면)/) && DW.gate && !out.length) add({ t: 'act', every: 11, text: cut(DW.gate + '면…!', 14), pose: 'sweat', d: 1 });
-  // 그래도 아무것도 못 읽었으면: 일반적인 마이너스 효과 대신, 쓴 글 그대로 캐릭터가 한다
-  if (!out.length) {
-    const [, effTxt] = dSplit(t), pm = PIXBOOK.find(([re]) => re.test(t)), word = pm ? (t.match(pm[0]) || [''])[0] : '';
-    const A = { t: 'act', text: cut((say || effTxt || t).replace(/[.!~]+$/, ''), 14), pose: word ? 'word' : 'sweat', word, d: 1 };
-    if (DW.skill) Object.assign(A, { on: dOn, nth: DW.nth }); else if (DW.ev) Object.assign(A, { ev: DW.ev, nth: DW.nth }); else if (DW.hit) Object.assign(A, { hit: true, nth: DW.nth }); else if (DW.if) Object.assign(A, { if: DW.if, n: DW.n }); else if (DW.bump) A.bump = true; else A.every = DW.every || (DW.often ? 6 : 9);
-    add(A);
+    const dOn = (SL.find(([re]) => re.test(t)) || [])[1] || 'skills';
+    if (has(/외친|외쳐|소리친|말한|말해야|소리 질|라고 한|이라고 한|하고 외/) && say) add({ t: 'shout', on: dOn, text: say, nth: DW.skill ? DW.nth : undefined });
+    if (has(/(적|상대|남).*(회복|치료|체력이 찬|낫|힐|피가 찬)/)) add({ t: 'healfoe', on: dOn, chance: DW.rare ? 40 : 100 });
+    if (has(/(적|상대|남).*(강해|빨라|커|좋아|세져|신나)/)) add({ t: 'aidfoe', on: dOn, k: has(/커/) ? 'giant' : has(/빨/) ? 'haste' : 'power', d: 3 });
+    if (has(/(반대|뒤|거꾸로)\s?(방향)?.*(나간|날아|쏜|발사|나와|나감)|엉뚱한 방향|뒤로 나/)) add({ t: 'reverse', on: dOn, chance: DW.rare ? 40 : 100 });
+    if (has(/랜덤|무작위|아무거나 나|엉뚱한 (기술|능력)|다른 기술|다른 능력이 나/)) add({ t: 'random', on: dOn, chance: DW.rare ? 40 : 60 });
+    if (has(/앞이 (잘\s?)?안|눈이 안|시야|어두|장님|눈을 감|안 보(여|인|임)|앞을 못 봐|앞을 못 본/)) add({ t: 'vision', mode: 'dark' });
+    else if (has(/화면이 뒤집|세상이 뒤집|거꾸로 보|뒤집혀 보/)) add({ t: 'vision', mode: 'flip' });
+    else if (has(/좌우가 바뀌어 보|거울처럼/)) add({ t: 'vision', mode: 'mirror' });
+    else if (has(/멀미|흔들려 보|화면이 흔들|술에 취/)) add({ t: 'vision', mode: 'shake' });
+    // 글에 나온 말 그대로: [언제] + [무엇]
+    literalDrawback(t, ctx, add, say, out);
+    const PEST = t.match(/(벌|모기|파리|비둘기|강아지|고양이|닭|오리|거위|엄마|아빠|선생님|경찰|좀비|귀신|바퀴벌레|까마귀|팬|기자|빚쟁이|할머니|선배|형|누나|동생|개)(?:가|이|들이|떼가|한테|에게)/);
+    const chaser = t.match(/([가-힣]{1,6}?)(?:이|가|들이|들)?\s*(?:계속\s*|자꾸\s*|하루 종일\s*)?(?:쫓아|따라다|따라온|따라와|달려들|달려든|나타나|찾아와|찾아온)/);
+    if ((PEST && has(/쫓아|따라|달려들|나타|찾아|혼난|혼나|잔소리|괴롭|물어|쏘|공격|때린|(?<![가-힣])온다|와서|와요|등장/)) || chaser) {
+      const nm = chaser && !STOP.has(chaser[1]) ? chaser[1] : PEST ? PEST[1] : '무언가', pic = pixFor(nm);
+      add({ t: 'pest', every: DW.every || (DW.often ? 5 : 7), on: DW.skill ? dOn : undefined, dmg: has(/혼난|혼나|잔소리/) ? 1 : 3, name: nm, color: pic ? pic.color : '#ffe14a', pix: pic ? pic.pix : undefined, st: has(/혼난|혼나|잔소리/) ? { k: 'stun', d: 0.6 } : undefined });
+    }
+    if (has(/대머리|머리가 (빠|다 빠|없)/)) add({ t: 'look', head: 'bald' });
+    if (has(/분홍|핑크/)) add({ t: 'look', body: '#ff9ad0', hair: '#ff7ab0' });
+    if (has(/초록|녹색/)) add({ t: 'look', body: '#4fbf5f', skin: '#a8e08a' });
+    const plain = !DW.skill && !DW.hit && !DW.ev && !DW.if && !DW.every && !DW.gate && !DW.byAct;
+    if (has(/반대로 (움직|걸)|방향이 반대|조작이 반대|좌우가 바뀌|방향키가 반대|거꾸로 (걷|움직)/)) add({ t: 'move', mode: 'reverse' });
+    else if (plain && has(/미끄|빙판/)) add({ t: 'move', mode: 'slide' });
+    else if (plain && has(/비틀|취한|술에|갈지자/)) add({ t: 'move', mode: 'drunk' });
+    else if (has(/멈출 수 없|계속 (달|뛰|걸)|못 멈|멈추지 못/)) add({ t: 'move', mode: 'nostop' });
+    else if (has(/뒷걸음|문워크|뒤로 걷|뒤로만/)) add({ t: 'move', mode: 'backward' });
+    else if (plain && has(/깡총|토끼처럼|뛰어다/)) add({ t: 'move', mode: 'hop' });
+    else if (plain && has(/빙글빙글|뱅글뱅글|돌면서 걷/)) add({ t: 'move', mode: 'spin' });
+    if (has(/순간이동|텔레포트|엉뚱한 곳|아무 데로|어딘가로/) && DW.ev !== 'dash') add({ t: 'tele', on: dOn, nth: DW.skill ? DW.nth : undefined });
+    if (has(/(조건|상황)이? ?(되면|오면)/) && DW.gate && !out.length) add({ t: 'act', every: 11, text: cut(DW.gate + '면…!', 14), pose: 'sweat', d: 1 });
+    // 그래도 아무것도 못 읽었으면: 일반적인 마이너스 효과 대신, 쓴 글 그대로 캐릭터가 한다
+    if (!out.length) {
+      const [, effTxt] = dSplit(t), pm = PIXBOOK.find(([re]) => re.test(t)), word = pm ? (t.match(pm[0]) || [''])[0] : '';
+      const A = { t: 'act', text: cut((say || effTxt || t).replace(/[.!~]+$/, ''), 14), pose: word ? 'word' : 'sweat', word, d: 0 };
+      generic = true;
+      if (DW.skill) Object.assign(A, { on: dOn, nth: DW.nth }); else if (DW.ev) Object.assign(A, { ev: DW.ev, nth: DW.nth }); else if (DW.hit) Object.assign(A, { hit: true, nth: DW.nth }); else if (DW.if) Object.assign(A, { if: DW.if, n: DW.n }); else if (DW.bump) A.bump = true; else A.every = DW.every || (DW.often ? 6 : 9);
+      add(A);
+    }
   }
   if (has(/가끔|때때로|종종|어쩌다|확률|랜덤하게|간혹/) && !/\d+\s*(%|퍼센트|프로)|번\s*(중|에)/.test(t)) for (const x of out) if (x.chance != null && x.t !== 'aim') x.chance = 40;
   if (ctx && ctx.moves) {
@@ -897,9 +904,9 @@ function smartDrawback(side, ctx) {
     if (slot) for (const x of out) if (x.on === 'skills') x.on = slot;
   }
   const clean = out.map((x) => [x, sanDfx(x)]).filter(([, c]) => c);
-  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'act', every: 9, text: cut(t, 14) || '앗!', pose: 'sweat', d: 1 });
+  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'act', every: 9, text: cut(t, 14) || '앗!', pose: 'sweat', d: 0 });
   const f = fx, more = clean.slice(1).map(([, c]) => c), rawMore = clean.slice(1).map(([x]) => x);
-  return { how: (customHow ? [customHow].concat(more.filter((x) => !['look', 'replace', 'lock'].includes(x.t)).map(dfxText)) : [f].concat(more).filter((x) => x.t !== 'look' || clean.length === 1).map(dfxText)).join(' + ').slice(0, 70), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: clean.length ? clean[0][0] : f, more: rawMore };
+  return { generic: generic || !clean.length, how: (customHow ? [customHow].concat(more.filter((x) => !['look', 'replace', 'lock'].includes(x.t)).map(dfxText)) : [f].concat(more).filter((x) => x.t !== 'look' || clean.length === 1).map(dfxText)).join(' + ').slice(0, 70), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: clean.length ? clean[0][0] : f, more: rawMore };
 }
 /** 능력을 못 쓰게 됐을 때 대신 나오는 버둥대는 기술 (능력 이름을 살려서) */
 function lameMoves(n) {
