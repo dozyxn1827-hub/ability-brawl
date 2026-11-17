@@ -383,11 +383,26 @@ function exactDrawback(t0, ctx) {
     act({ die: true, pose: 'fall', text: pick(['꽥!', '으억…', '안녕히…']) });
     return out;
   }
+  // ── 능력을 쓸수록 ──
+  if (H(/((능력|기술|스킬|공격|마법|궁극기)[을를]?\s*)?(쓸|사용할|부릴|공격할|쏠|때릴)\s?수록/)) {
+    if (E(/약해|위력이\s?(줄|떨어|약)/)) return [{ t: 'stack', on, stat: 'weak', pct: Math.round(10 * K) }];
+    if (E(/느려|느리/)) return [{ t: 'stack', on, stat: 'slow', pct: Math.round(10 * K) }];
+    if (E(/커지|커진|뚱뚱/)) return [{ t: 'stack', on, stat: 'size', pct: Math.round(15 * K) }];
+    if (E(/작아/)) return [{ t: 'stack', on, stat: 'size', pct: -Math.round(10 * K) }];
+    if (E(/아파|받는\s?피해|약해진다/)) return [{ t: 'stack', on, stat: 'taken', pct: Math.round(10 * K) }];
+  }
   // ── 원소가 무서움: 그 공격에 맞으면 겁먹고 굳음 ──
   const fearEl = t.match(/^([가-힣]{1,4}?)[을를이가]?\s*(무서워|겁내|무섭|싫어해|싫어한|질색|기겁)/);
   if (fearEl && elem(fearEl[1]) && !/고양이|강아지|개|벌|쥐|뱀|엄마|아빠|선생/.test(fearEl[1])) { const el = elem(fearEl[1]); return [{ t: 'weakto', vfx: el[1], pct: 0, name: el[2], st: { k: 'stun', d: 1 } }]; }
   // ── 기술이 가끔 안 나감 ──
   if (H(/(능력|기술|스킬|공격|마법|궁극기)[이가은는]?\s*(가끔|자주|종종|때때로|어쩌다|가끔씩)?\s*(안\s?나|불발|실패|씹|먹통|헛나|헛방)/) && !H(/\d/)) return [{ t: 'fail', on, chance: H(/자주/) ? 60 : H(/가끔|종종|때때로|어쩌다/) ? 40 : 50, back: 'fizzle' }];
+  // ── 쓰기 전에 무언가를 해야 함: 정말로 그걸 하고 나서 나간다 ──
+  const preM = t.match(/(?:쓰기|공격하기|쏘기|던지기|싸우기|때리기)\s*전에\s*(?:꼭\s*|반드시\s*|매번\s*)?(.+?)(?:해야|춰야|불러야|외쳐야|먹어야|싸야|뀌어야|해야만|야\s?(?:한|된|함|해))/);
+  if (preM && !/\d+\s*초/.test(preM[1])) {
+    const w = preM[1], a = D_ACT.find(([re]) => re.test(w)), s2 = D_ST.find(([re]) => re.test(w));
+    const pose = a ? a[1] : s2 ? s2[4] : /춤/.test(w) ? 'star' : 'word';
+    return [{ t: 'windup', on, time: 1 }, { t: 'act', on, pose, text: a ? pick(a[2]) : s2 ? pick(s2[3]) : cut(w.replace(/[을를]\s*$/, '') + '!', 14), word: pose === 'word' ? cut(w, 4) : '', d: 0, st: s2 && s2[1] !== 'tiny' ? { k: s2[1], d: 1 } : undefined }];
+  }
   // ── 쓰기 전에 N초 준비 ──
   const wuM = t.match(/(?:쓰기|공격하기|나가기|쏘기)\s*전에\s*(\d+(?:\.\d+)?)\s*초/) || t.match(/(\d+(?:\.\d+)?)\s*초\s*(?:동안)?\s*(?:기를\s?모아|모아야|충전해야|준비해야|기다려야|집중해야)/);
   if (wuM) return [{ t: 'windup', on, time: clamp(+wuM[1], 0.2, 5) }];
@@ -528,14 +543,6 @@ function exactDrawback(t0, ctx) {
       const bk = E(/빠르|빨라/) ? 'haste' : E(/무적/) ? 'invuln' : E(/(크|커|거대)/) ? 'giant' : E(/(세|강해)/) ? 'power' : E(/단단/) ? 'armor' : E(/보호막/) ? 'shield' : E(/투명/) ? 'invis' : null;
       if (bk) return [{ t: 'aidfoe', on, k: bk, d: sec || 3, nth: W.nth }];
     }
-  }
-  // ── 능력을 쓸수록 ──
-  if (H(/(능력|기술|스킬|공격)[을를]?\s*(쓸|할|사용할|부릴)수록/)) {
-    if (E(/약해|위력이\s?(줄|떨어|약)/)) return [{ t: 'stack', on, stat: 'weak', pct: Math.round(10 * K) }];
-    if (E(/느려|느리/)) return [{ t: 'stack', on, stat: 'slow', pct: Math.round(10 * K) }];
-    if (E(/커지|커진|뚱뚱/)) return [{ t: 'stack', on, stat: 'size', pct: Math.round(15 * K) }];
-    if (E(/작아/)) return [{ t: 'stack', on, stat: 'size', pct: -Math.round(10 * K) }];
-    if (E(/아파|받는\s?피해|약해진다/)) return [{ t: 'stack', on, stat: 'taken', pct: Math.round(10 * K) }];
   }
   // ── 몸집 (늘 그렇다) ──
   if (!T0 && H(/(몸|덩치|키|체구|캐릭터|나)[이가은는]?\s*(엄청|너무|아주|진짜|매우|되게)?\s*(크다|거대하|커다랗|뚱뚱하|거인)/)) return [{ t: 'stat', stat: 'size', pct: Math.round(80 * K) }];

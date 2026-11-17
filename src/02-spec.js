@@ -356,6 +356,7 @@ function sanDfx0(d) {
       if (d.fheal) r.fheal = Math.round(num(d.fheal, 1, 60, 10));
       if (d.tele) r.tele = oneOf(d.tele, ['rand', 'foe', 'corner', 'center'], 'rand');
       if (d.accel) r.accel = true;
+      if (d.gen) r.gen = true;
       if (d.later) r.later = Math.round(num(d.later, 1, 120, 10));
       if (d.vis && ['dark', 'flip', 'mirror', 'shake', 'zoom'].includes(d.vis)) { r.vis = d.vis; r.visd = r1(num(d.visd, 0.5, 8, 2)); }
       if (d.fpull) r.fpull = true; else if (d.fpush) r.fpush = true;
@@ -458,6 +459,7 @@ function dfxText(f) {
       return `${use(f)} “${f.text}” 외침`;
     case 'act': {
       const when = f.on ? use(f) : f.hit ? (f.nth ? `${f.nth}번 맞을 때마다` : '맞을 때마다') : f.bump ? '벽에 부딪히면' : f.ev ? (f.nth ? `${EV_N[f.ev].replace('N', f.nth)} 때마다` : `${EV_KO[f.ev]} 때마다`) : f.if ? (f.die || f.later || f.if === 'late' || f.if === 'early' ? ifAt(f) : `${ifDur(f)} 4초마다`) : `${f.every}초마다`;
+      if (f.gen) return `${when} “${f.text}” 말풍선만 뜸 (게임 규칙으로 바꿀 수 없는 문장이라 불이익 없음)`;
       const WX = { rain: '비가 옴', night: '밤이 됨', snow: '눈이 옴', thunder: '천둥번개', hot: '엄청 더워짐', cold: '엄청 추워짐', wind: '바람이 붊' };
       const what = (WX[f.pose] ? ` (${WX[f.pose]})` : '') + (f.st ? ` → ${ST_KO[f.st.k] || '작아짐'} ${f.st.d}초` : f.d > 0 ? ` (${f.d}초 멈춤)` : '');
       const ex = [f.vis ? `${f.visd}초 동안 ${VISION_KO[f.vis]} (내 화면)` : '', f.fpull ? '주변 적을 나한테 끌어당김' : '', f.fpush ? '주변 적을 밀쳐냄' : '', f.die ? (f.boom ? '쾅! 폭발해서 죽음 (주변 적도 피해)' : '죽음') : f.boom ? '쾅! 폭발 (주변 적 피해)' : '', f.hp ? `체력 -${f.hp}` : '', f.heal ? `체력 +${f.heal}` : '', f.buff ? `${ST_KO[f.buff.k]} ${f.buff.d}초` : '', f.fst ? `주변 적 ${ST_KO[f.fst.k]} ${f.fst.d}초` : '', f.fdmg && !f.boom ? `주변 적 -${f.fdmg}` : '', f.fheal ? `가장 가까운 적 체력 +${f.fheal}` : '', f.tele ? { rand: '아무 데로나 순간이동', foe: '적 바로 옆으로 순간이동', corner: '맵 구석으로 순간이동', center: '맵 한가운데로 순간이동' }[f.tele] : '', f.fire ? '능력이 저절로 나감' : '', f.push ? '튕겨 날아감' : '', f.pose === 'change' ? '옷이 바뀜' : ''].filter(Boolean);

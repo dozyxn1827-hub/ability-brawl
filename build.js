@@ -1,6 +1,7 @@
 const fs = require('fs');
 const src = (f) => fs.readFileSync(__dirname + '/src/' + f, 'utf8');
 const js = ['01-util.js', '02-spec.js', '025-compose.js', '026-pix.js', '027-words-a.js', '027-words-b.js', '027-words-c.js', '028-drawback.js', '029-xtypes.js', '03-art.js', '04-engine.js', '05-input.js', '055-audio.js', '06-net.js', '07-ui.js', '075-mc.js', '076-stage.js', '08-flow.js'].map(src).join('\n');
+const BUILD = require('crypto').createHash('md5').update(js + src('style.css')).digest('hex').slice(0, 8);
 const html = `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -15,6 +16,7 @@ ${src('style.css')}
 <body>
 <div id="app"></div>
 <script>
+const BUILD = '${BUILD}';
 ${js}
 </script>
 </body>
@@ -24,4 +26,4 @@ fs.writeFileSync(__dirname + '/dist/index.html', html);
 // 독립 서버용: 연결 장치를 게임 코드보다 먼저 넣는다
 fs.mkdirSync(__dirname + '/server/public', { recursive: true });
 fs.writeFileSync(__dirname + '/server/public/index.html', html.replace('<script>\n', '<script>\n' + fs.readFileSync(__dirname + '/server/shim.js', 'utf8') + '\n'));
-console.log('built', (html.length / 1024).toFixed(1) + ' KB');
+console.log('built', (html.length / 1024).toFixed(1) + ' KB', BUILD);

@@ -351,6 +351,8 @@ body.ss-on { overflow: hidden; }
 .pad-act .pb .lbl { font-size: 12px; }
 .pad:not(.keys) .pad-act { grid-auto-rows: 62px; }
 
+p.warn { color: #ffe14a; background: rgba(255, 77, 109, 0.16); border: 2px solid #ff4d6d; padding: 8px 10px; margin: 10px 0; font-weight: 600; line-height: 1.5; }
+
 </style>
 </head>
 <body>
@@ -420,6 +422,7 @@ body.ss-on { overflow: hidden; }
   };
 })();
 
+const BUILD = '37e2ef76';
 'use strict';
 /* ===== 공통 상수와 도구 ===== */
 const W = 480, H = 320; // 탑뷰 아레나 전체 (픽셀)
@@ -898,6 +901,7 @@ function sanDfx0(d) {
       if (d.fheal) r.fheal = Math.round(num(d.fheal, 1, 60, 10));
       if (d.tele) r.tele = oneOf(d.tele, ['rand', 'foe', 'corner', 'center'], 'rand');
       if (d.accel) r.accel = true;
+      if (d.gen) r.gen = true;
       if (d.later) r.later = Math.round(num(d.later, 1, 120, 10));
       if (d.vis && ['dark', 'flip', 'mirror', 'shake', 'zoom'].includes(d.vis)) { r.vis = d.vis; r.visd = r1(num(d.visd, 0.5, 8, 2)); }
       if (d.fpull) r.fpull = true; else if (d.fpush) r.fpush = true;
@@ -1000,6 +1004,7 @@ function dfxText(f) {
       return `${use(f)} “${f.text}” 외침`;
     case 'act': {
       const when = f.on ? use(f) : f.hit ? (f.nth ? `${f.nth}번 맞을 때마다` : '맞을 때마다') : f.bump ? '벽에 부딪히면' : f.ev ? (f.nth ? `${EV_N[f.ev].replace('N', f.nth)} 때마다` : `${EV_KO[f.ev]} 때마다`) : f.if ? (f.die || f.later || f.if === 'late' || f.if === 'early' ? ifAt(f) : `${ifDur(f)} 4초마다`) : `${f.every}초마다`;
+      if (f.gen) return `${when} “${f.text}” 말풍선만 뜸 (게임 규칙으로 바꿀 수 없는 문장이라 불이익 없음)`;
       const WX = { rain: '비가 옴', night: '밤이 됨', snow: '눈이 옴', thunder: '천둥번개', hot: '엄청 더워짐', cold: '엄청 추워짐', wind: '바람이 붊' };
       const what = (WX[f.pose] ? ` (${WX[f.pose]})` : '') + (f.st ? ` → ${ST_KO[f.st.k] || '작아짐'} ${f.st.d}초` : f.d > 0 ? ` (${f.d}초 멈춤)` : '');
       const ex = [f.vis ? `${f.visd}초 동안 ${VISION_KO[f.vis]} (내 화면)` : '', f.fpull ? '주변 적을 나한테 끌어당김' : '', f.fpush ? '주변 적을 밀쳐냄' : '', f.die ? (f.boom ? '쾅! 폭발해서 죽음 (주변 적도 피해)' : '죽음') : f.boom ? '쾅! 폭발 (주변 적 피해)' : '', f.hp ? `체력 -${f.hp}` : '', f.heal ? `체력 +${f.heal}` : '', f.buff ? `${ST_KO[f.buff.k]} ${f.buff.d}초` : '', f.fst ? `주변 적 ${ST_KO[f.fst.k]} ${f.fst.d}초` : '', f.fdmg && !f.boom ? `주변 적 -${f.fdmg}` : '', f.fheal ? `가장 가까운 적 체력 +${f.fheal}` : '', f.tele ? { rand: '아무 데로나 순간이동', foe: '적 바로 옆으로 순간이동', corner: '맵 구석으로 순간이동', center: '맵 한가운데로 순간이동' }[f.tele] : '', f.fire ? '능력이 저절로 나감' : '', f.push ? '튕겨 날아감' : '', f.pose === 'change' ? '옷이 바뀜' : ''].filter(Boolean);
@@ -2404,9 +2409,9 @@ function smartDrawback(side, ctx) {
     // 그래도 아무것도 못 읽었으면: 일반적인 마이너스 효과 대신, 쓴 글 그대로 캐릭터가 한다
     if (!out.length) {
       const [, effTxt] = dSplit(t), pm = PIXBOOK.find(([re]) => re.test(t)), word = pm ? (t.match(pm[0]) || [''])[0] : '';
-      const A = { t: 'act', text: cut((say || effTxt || t).replace(/[.!~]+$/, ''), 14), pose: word ? 'word' : 'sweat', word, d: 0 };
+      const A = { t: 'act', text: cut((say || effTxt || t).replace(/[.!~]+$/, ''), 14), pose: word ? 'word' : 'sweat', word, d: 0, gen: true };
       generic = true;
-      if (DW.skill) Object.assign(A, { on: dOn, nth: DW.nth }); else if (DW.ev) Object.assign(A, { ev: DW.ev, nth: DW.nth }); else if (DW.hit) Object.assign(A, { hit: true, nth: DW.nth }); else if (DW.if) Object.assign(A, { if: DW.if, n: DW.n }); else if (DW.bump) A.bump = true; else A.every = DW.every || (DW.often ? 6 : 9);
+      if (DW.skill) Object.assign(A, { on: dOn, nth: DW.nth }); else if (DW.ev) Object.assign(A, { ev: DW.ev, nth: DW.nth }); else if (DW.hit) Object.assign(A, { hit: true, nth: DW.nth }); else if (DW.if) Object.assign(A, { if: DW.if, n: DW.n }); else if (DW.bump) A.bump = true; else A.every = DW.every || (DW.often ? 6 : 12);
       add(A);
     }
   }
@@ -2418,7 +2423,7 @@ function smartDrawback(side, ctx) {
     if (slot) for (const x of out) if (x.on === 'skills') x.on = slot;
   }
   const clean = out.map((x) => [x, sanDfx(x)]).filter(([, c]) => c);
-  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'act', every: 9, text: cut(t, 14) || '앗!', pose: 'sweat', d: 0 });
+  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'act', every: 12, text: cut(t, 14) || '앗!', pose: 'sweat', d: 0, gen: true });
   const f = fx, more = clean.slice(1).map(([, c]) => c), rawMore = clean.slice(1).map(([x]) => x);
   return { generic: generic || !clean.length, how: (customHow ? [customHow].concat(more.filter((x) => !['look', 'replace', 'lock'].includes(x.t)).map(dfxText)) : [f].concat(more).filter((x) => x.t !== 'look' || clean.length === 1).map(dfxText)).join(' + ').slice(0, 70), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: clean.length ? clean[0][0] : f, more: rawMore };
 }
@@ -3869,11 +3874,26 @@ function exactDrawback(t0, ctx) {
     act({ die: true, pose: 'fall', text: pick(['꽥!', '으억…', '안녕히…']) });
     return out;
   }
+  // ── 능력을 쓸수록 ──
+  if (H(/((능력|기술|스킬|공격|마법|궁극기)[을를]?\s*)?(쓸|사용할|부릴|공격할|쏠|때릴)\s?수록/)) {
+    if (E(/약해|위력이\s?(줄|떨어|약)/)) return [{ t: 'stack', on, stat: 'weak', pct: Math.round(10 * K) }];
+    if (E(/느려|느리/)) return [{ t: 'stack', on, stat: 'slow', pct: Math.round(10 * K) }];
+    if (E(/커지|커진|뚱뚱/)) return [{ t: 'stack', on, stat: 'size', pct: Math.round(15 * K) }];
+    if (E(/작아/)) return [{ t: 'stack', on, stat: 'size', pct: -Math.round(10 * K) }];
+    if (E(/아파|받는\s?피해|약해진다/)) return [{ t: 'stack', on, stat: 'taken', pct: Math.round(10 * K) }];
+  }
   // ── 원소가 무서움: 그 공격에 맞으면 겁먹고 굳음 ──
   const fearEl = t.match(/^([가-힣]{1,4}?)[을를이가]?\s*(무서워|겁내|무섭|싫어해|싫어한|질색|기겁)/);
   if (fearEl && elem(fearEl[1]) && !/고양이|강아지|개|벌|쥐|뱀|엄마|아빠|선생/.test(fearEl[1])) { const el = elem(fearEl[1]); return [{ t: 'weakto', vfx: el[1], pct: 0, name: el[2], st: { k: 'stun', d: 1 } }]; }
   // ── 기술이 가끔 안 나감 ──
   if (H(/(능력|기술|스킬|공격|마법|궁극기)[이가은는]?\s*(가끔|자주|종종|때때로|어쩌다|가끔씩)?\s*(안\s?나|불발|실패|씹|먹통|헛나|헛방)/) && !H(/\d/)) return [{ t: 'fail', on, chance: H(/자주/) ? 60 : H(/가끔|종종|때때로|어쩌다/) ? 40 : 50, back: 'fizzle' }];
+  // ── 쓰기 전에 무언가를 해야 함: 정말로 그걸 하고 나서 나간다 ──
+  const preM = t.match(/(?:쓰기|공격하기|쏘기|던지기|싸우기|때리기)\s*전에\s*(?:꼭\s*|반드시\s*|매번\s*)?(.+?)(?:해야|춰야|불러야|외쳐야|먹어야|싸야|뀌어야|해야만|야\s?(?:한|된|함|해))/);
+  if (preM && !/\d+\s*초/.test(preM[1])) {
+    const w = preM[1], a = D_ACT.find(([re]) => re.test(w)), s2 = D_ST.find(([re]) => re.test(w));
+    const pose = a ? a[1] : s2 ? s2[4] : /춤/.test(w) ? 'star' : 'word';
+    return [{ t: 'windup', on, time: 1 }, { t: 'act', on, pose, text: a ? pick(a[2]) : s2 ? pick(s2[3]) : cut(w.replace(/[을를]\s*$/, '') + '!', 14), word: pose === 'word' ? cut(w, 4) : '', d: 0, st: s2 && s2[1] !== 'tiny' ? { k: s2[1], d: 1 } : undefined }];
+  }
   // ── 쓰기 전에 N초 준비 ──
   const wuM = t.match(/(?:쓰기|공격하기|나가기|쏘기)\s*전에\s*(\d+(?:\.\d+)?)\s*초/) || t.match(/(\d+(?:\.\d+)?)\s*초\s*(?:동안)?\s*(?:기를\s?모아|모아야|충전해야|준비해야|기다려야|집중해야)/);
   if (wuM) return [{ t: 'windup', on, time: clamp(+wuM[1], 0.2, 5) }];
@@ -4014,14 +4034,6 @@ function exactDrawback(t0, ctx) {
       const bk = E(/빠르|빨라/) ? 'haste' : E(/무적/) ? 'invuln' : E(/(크|커|거대)/) ? 'giant' : E(/(세|강해)/) ? 'power' : E(/단단/) ? 'armor' : E(/보호막/) ? 'shield' : E(/투명/) ? 'invis' : null;
       if (bk) return [{ t: 'aidfoe', on, k: bk, d: sec || 3, nth: W.nth }];
     }
-  }
-  // ── 능력을 쓸수록 ──
-  if (H(/(능력|기술|스킬|공격)[을를]?\s*(쓸|할|사용할|부릴)수록/)) {
-    if (E(/약해|위력이\s?(줄|떨어|약)/)) return [{ t: 'stack', on, stat: 'weak', pct: Math.round(10 * K) }];
-    if (E(/느려|느리/)) return [{ t: 'stack', on, stat: 'slow', pct: Math.round(10 * K) }];
-    if (E(/커지|커진|뚱뚱/)) return [{ t: 'stack', on, stat: 'size', pct: Math.round(15 * K) }];
-    if (E(/작아/)) return [{ t: 'stack', on, stat: 'size', pct: -Math.round(10 * K) }];
-    if (E(/아파|받는\s?피해|약해진다/)) return [{ t: 'stack', on, stat: 'taken', pct: Math.round(10 * K) }];
   }
   // ── 몸집 (늘 그렇다) ──
   if (!T0 && H(/(몸|덩치|키|체구|캐릭터|나)[이가은는]?\s*(엄청|너무|아주|진짜|매우|되게)?\s*(크다|거대하|커다랗|뚱뚱하|거인)/)) return [{ t: 'stat', stat: 'size', pct: Math.round(80 * K) }];
@@ -9459,7 +9471,21 @@ const forgeNote = () => (App.sample
   : 'AI에 연결되지 않아 기본 해석기가 낱말을 보고 만들어요.');
 
 /* ---------- 첫 화면 ---------- */
+/** 서버에 새 버전이 올라오면 알려 준다 (서버로 할 때만) */
+let buildTimer = null;
+function watchBuild() {
+  if (buildTimer || typeof fetch !== 'function' || !/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent/.test(location.hostname)) return;
+  const check = () => fetch('/build', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((d) => {
+    if (!d || !d.build || d.build === BUILD) return;
+    clearInterval(buildTimer);
+    const bar = h('div.toast', { role: 'status', style: { cursor: 'pointer' }, on: { click: () => location.reload() } }, '새 버전이 올라왔어요! 눌러서 새로고침 (친구들도 다 같이)');
+    document.body.append(bar);
+  }).catch(() => {});
+  buildTimer = setInterval(check, 45000);
+  setTimeout(check, 3000);
+}
 function goHome() {
+  watchBuild();
   Music.play('menu');
   const stage = mkStage();
   let stopDemo = null, demoT = 0, alive = true;
@@ -9634,14 +9660,14 @@ const Online = {
 
   enter() {
     this.on = true; this.view = ''; this.hostPh = null; this.wasHost = false; this.prevHost = null; this.specs = null; this.specKey = null; this.curBn = -1; this.bview = null;
-    Net.set({ g: 1, n: App.name, j: Date.now(), ph: null, lb: null, rid: null, ab: null, sd: null, got: null, ch: null, f: null, ev: null, eb: null, pr: null });
+    Net.set({ g: 1, v: BUILD, n: App.name, j: Date.now(), ph: null, lb: null, rid: null, ab: null, sd: null, got: null, ch: null, f: null, ev: null, eb: null, pr: null });
     clearInterval(this.timer);
     this.timer = setInterval(() => this.tick(), 120);
     this.tick();
   },
   leave() {
     this.on = false; clearInterval(this.timer); Net.docStop(); this.forgeToken++;
-    Net.set({ g: null, n: null, j: null, ph: null, lb: null, rid: null, ab: null, sd: null, got: null, ch: null, f: null, ev: null, eb: null, pr: null });
+    Net.set({ g: null, v: null, n: null, j: null, ph: null, lb: null, rid: null, ab: null, sd: null, got: null, ch: null, f: null, ev: null, eb: null, pr: null });
     goHome();
   },
   render(key, build, opts) {
@@ -9806,9 +9832,10 @@ const Online = {
         const humans = players.slice(0, 4), maxBots = 4 - humans.length;
         if (amHost && this.bots > maxBots) { this.bots = Math.max(0, maxBots); Net.set({ lb: { bots: this.bots, map: this.map } }); }
         const nb = clamp(lb.bots | 0, 0, Math.max(0, maxBots));
-        const key = 'lobby|' + players.map((p) => p.peer + this.name(p)).join(',') + '|' + amHost + '|' + nb + '|' + lb.map + '|' + host.peer;
+        const old = players.slice(0, 4).filter((p) => p.presence.v !== BUILD), hostOld = host.presence.v !== BUILD;
+        const key = 'lobby|' + players.map((p) => p.peer + this.name(p) + (p.presence.v === BUILD ? '' : '!')).join(',') + '|' + amHost + '|' + nb + '|' + lb.map + '|' + host.peer;
         this.render(key, () => {
-          const rows = players.map((p, i) => ({ name: this.name(p), color: i < 4 ? FIGHTER_COLORS[i] : 'var(--line)', sub: (p.peer === me.peer ? '나' : '') + (i >= 4 ? ' · 다음 판 대기' : ''), badge: p.peer === host.peer ? 'HOST' : null, host: true }));
+          const rows = players.map((p, i) => ({ name: this.name(p), color: i < 4 ? FIGHTER_COLORS[i] : 'var(--line)', sub: (p.peer === me.peer ? '나' : '') + (i >= 4 ? ' · 다음 판 대기' : '') + (p.presence.v !== BUILD ? ' · ⚠ 옛날 버전' : ''), badge: p.peer === host.peer ? 'HOST' : null, host: true }));
           for (let i = 0; i < nb; i++) rows.push({ name: BOT_NAMES[i], color: FIGHTER_COLORS[(humans.length + i) % 4], sub: '봇', badge: 'BOT' });
           const botOpts = [];
           for (let i = 0; i <= Math.max(0, maxBots); i++) botOpts.push([i, i + '명']);
@@ -9816,8 +9843,9 @@ const Online = {
           const controls = amHost
             ? [h('div', h('label', '봇 추가'), seg(botOpts, nb, (v) => { this.bots = v; setLb(); }, '봇 수')),
               h('div', h('label', '맵'), seg([[-1, '랜덤']].concat(MAPS.map((m, i) => [i, m.short])), this.map, (v) => { this.map = v; setLb(); }, '맵')),
-              h('div.row', h('button.btn.primary', { type: 'button', disabled: humans.length + nb < 2, on: { click: () => { Sfx.init(); Sfx.play('ui'); this.startRound(); } } }, '게임 시작'), leaveBtn(quit))]
-            : [h('p.hint', '방장이 시작하면 바로 능력 쓰기로 넘어가요.'), h('div.row', leaveBtn(quit))];
+              old.length ? h('p.warn', `⚠ ${old.map((p) => this.name(p)).join(', ')} 화면이 옛날 버전이에요. 그 사람이 새로고침(F5)해야 부작용이 글 그대로 적용돼요.`) : null,
+              h('div.row', h('button.btn.primary', { type: 'button', disabled: humans.length + nb < 2 || old.length > 0, on: { click: () => { Sfx.init(); Sfx.play('ui'); this.startRound(); } } }, '게임 시작'), leaveBtn(quit))]
+            : [hostOld ? h('p.warn', '⚠ 방장 화면이 옛날 버전이에요. 이대로면 부작용이 예전 방식(9초마다…)으로 적용돼요. 방장이 새로고침(F5)해 주세요.') : old.length ? h('p.warn', `⚠ ${old.map((p) => this.name(p)).join(', ')} 화면이 옛날 버전이에요. 새로고침(F5)해 주세요.`) : null, h('p.hint', '방장이 시작하면 바로 능력 쓰기로 넘어가요.'), h('div.row', leaveBtn(quit))];
           return listView('대기실', '이 페이지를 지금 열고 입장한 사람이 여기에 보여요. 최대 4명까지 한 판에 들어갑니다.', rows, controls, 'ONLINE LOBBY');
         });
         break;

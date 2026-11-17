@@ -48,7 +48,21 @@ const forgeNote = () => (App.sample
   : 'AI에 연결되지 않아 기본 해석기가 낱말을 보고 만들어요.');
 
 /* ---------- 첫 화면 ---------- */
+/** 서버에 새 버전이 올라오면 알려 준다 (서버로 할 때만) */
+let buildTimer = null;
+function watchBuild() {
+  if (buildTimer || typeof fetch !== 'function' || !/^https?:$/.test(location.protocol) || /claude\.ai|claudeusercontent/.test(location.hostname)) return;
+  const check = () => fetch('/build', { cache: 'no-store' }).then((r) => r.ok ? r.json() : null).then((d) => {
+    if (!d || !d.build || d.build === BUILD) return;
+    clearInterval(buildTimer);
+    const bar = h('div.toast', { role: 'status', style: { cursor: 'pointer' }, on: { click: () => location.reload() } }, '새 버전이 올라왔어요! 눌러서 새로고침 (친구들도 다 같이)');
+    document.body.append(bar);
+  }).catch(() => {});
+  buildTimer = setInterval(check, 45000);
+  setTimeout(check, 3000);
+}
 function goHome() {
+  watchBuild();
   Music.play('menu');
   const stage = mkStage();
   let stopDemo = null, demoT = 0, alive = true;
@@ -223,14 +237,14 @@ const Online = {
 
   enter() {
     this.on = true; this.view = ''; this.hostPh = null; this.wasHost = false; this.prevHost = null; this.specs = null; this.specKey = null; this.curBn = -1; this.bview = null;
-    Net.set({ g: 1, n: App.name, j: Date.now(), ph: null, lb: null, rid: null, ab: null, sd: null, got: null, ch: null, f: null, ev: null, eb: null, pr: null });
+    Net.set({ g: 1, v: BUILD, n: App.name, j: Date.now(), ph: null, lb: null, rid: null, ab: null, sd: null, got: null, ch: null, f: null, ev: null, eb: null, pr: null });
     clearInterval(this.timer);
     this.timer = setInterval(() => this.tick(), 120);
     this.tick();
   },
   leave() {
     this.on = false; clearInterval(this.timer); Net.docStop(); this.forgeToken++;
-    Net.set({ g: null, n: null, j: null, ph: null, lb: null, rid: null, ab: null, sd: null, got: null, ch: null, f: null, ev: null, eb: null, pr: null });
+    Net.set({ g: null, v: null, n: null, j: null, ph: null, lb: null, rid: null, ab: null, sd: null, got: null, ch: null, f: null, ev: null, eb: null, pr: null });
     goHome();
   },
   render(key, build, opts) {
@@ -395,9 +409,10 @@ const Online = {
         const humans = players.slice(0, 4), maxBots = 4 - humans.length;
         if (amHost && this.bots > maxBots) { this.bots = Math.max(0, maxBots); Net.set({ lb: { bots: this.bots, map: this.map } }); }
         const nb = clamp(lb.bots | 0, 0, Math.max(0, maxBots));
-        const key = 'lobby|' + players.map((p) => p.peer + this.name(p)).join(',') + '|' + amHost + '|' + nb + '|' + lb.map + '|' + host.peer;
+        const old = players.slice(0, 4).filter((p) => p.presence.v !== BUILD), hostOld = host.presence.v !== BUILD;
+        const key = 'lobby|' + players.map((p) => p.peer + this.name(p) + (p.presence.v === BUILD ? '' : '!')).join(',') + '|' + amHost + '|' + nb + '|' + lb.map + '|' + host.peer;
         this.render(key, () => {
-          const rows = players.map((p, i) => ({ name: this.name(p), color: i < 4 ? FIGHTER_COLORS[i] : 'var(--line)', sub: (p.peer === me.peer ? '나' : '') + (i >= 4 ? ' · 다음 판 대기' : ''), badge: p.peer === host.peer ? 'HOST' : null, host: true }));
+          const rows = players.map((p, i) => ({ name: this.name(p), color: i < 4 ? FIGHTER_COLORS[i] : 'var(--line)', sub: (p.peer === me.peer ? '나' : '') + (i >= 4 ? ' · 다음 판 대기' : '') + (p.presence.v !== BUILD ? ' · ⚠ 옛날 버전' : ''), badge: p.peer === host.peer ? 'HOST' : null, host: true }));
           for (let i = 0; i < nb; i++) rows.push({ name: BOT_NAMES[i], color: FIGHTER_COLORS[(humans.length + i) % 4], sub: '봇', badge: 'BOT' });
           const botOpts = [];
           for (let i = 0; i <= Math.max(0, maxBots); i++) botOpts.push([i, i + '명']);
@@ -405,8 +420,9 @@ const Online = {
           const controls = amHost
             ? [h('div', h('label', '봇 추가'), seg(botOpts, nb, (v) => { this.bots = v; setLb(); }, '봇 수')),
               h('div', h('label', '맵'), seg([[-1, '랜덤']].concat(MAPS.map((m, i) => [i, m.short])), this.map, (v) => { this.map = v; setLb(); }, '맵')),
-              h('div.row', h('button.btn.primary', { type: 'button', disabled: humans.length + nb < 2, on: { click: () => { Sfx.init(); Sfx.play('ui'); this.startRound(); } } }, '게임 시작'), leaveBtn(quit))]
-            : [h('p.hint', '방장이 시작하면 바로 능력 쓰기로 넘어가요.'), h('div.row', leaveBtn(quit))];
+              old.length ? h('p.warn', `⚠ ${old.map((p) => this.name(p)).join(', ')} 화면이 옛날 버전이에요. 그 사람이 새로고침(F5)해야 부작용이 글 그대로 적용돼요.`) : null,
+              h('div.row', h('button.btn.primary', { type: 'button', disabled: humans.length + nb < 2 || old.length > 0, on: { click: () => { Sfx.init(); Sfx.play('ui'); this.startRound(); } } }, '게임 시작'), leaveBtn(quit))]
+            : [hostOld ? h('p.warn', '⚠ 방장 화면이 옛날 버전이에요. 이대로면 부작용이 예전 방식(9초마다…)으로 적용돼요. 방장이 새로고침(F5)해 주세요.') : old.length ? h('p.warn', `⚠ ${old.map((p) => this.name(p)).join(', ')} 화면이 옛날 버전이에요. 새로고침(F5)해 주세요.`) : null, h('p.hint', '방장이 시작하면 바로 능력 쓰기로 넘어가요.'), h('div.row', leaveBtn(quit))];
           return listView('대기실', '이 페이지를 지금 열고 입장한 사람이 여기에 보여요. 최대 4명까지 한 판에 들어갑니다.', rows, controls, 'ONLINE LOBBY');
         });
         break;

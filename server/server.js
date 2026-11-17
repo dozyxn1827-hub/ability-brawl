@@ -67,8 +67,13 @@ http.createServer(async (req, res) => {
   const u = new URL(req.url, 'http://x');
   try {
     if (req.method === 'GET' && (u.pathname === '/' || u.pathname === '/index.html')) {
-      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store, max-age=0' });
       return fs.createReadStream(PAGE).pipe(res);
+    }
+    if (u.pathname === '/build') {
+      let b = '';
+      try { const m = fs.readFileSync(PAGE, 'utf8').match(/const BUILD = '([0-9a-f]+)'/); b = m ? m[1] : ''; } catch (e) {}
+      return json(res, 200, { build: b });
     }
     if (u.pathname === '/events') {
       const id = (u.searchParams.get('room') || 'main').slice(0, 40), peer = (u.searchParams.get('peer') || '').slice(0, 20);

@@ -342,3 +342,5 @@ body.ss-on { overflow: hidden; }
 .pad-act .pb .glyph { width: 21px; height: 21px; }
 .pad-act .pb .lbl { font-size: 12px; }
 .pad:not(.keys) .pad-act { grid-auto-rows: 62px; }
+
+p.warn { color: #ffe14a; background: rgba(255, 77, 109, 0.16); border: 2px solid #ff4d6d; padding: 8px 10px; margin: 10px 0; font-weight: 600; line-height: 1.5; }

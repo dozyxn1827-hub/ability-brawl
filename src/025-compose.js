@@ -890,9 +890,9 @@ function smartDrawback(side, ctx) {
     // 그래도 아무것도 못 읽었으면: 일반적인 마이너스 효과 대신, 쓴 글 그대로 캐릭터가 한다
     if (!out.length) {
       const [, effTxt] = dSplit(t), pm = PIXBOOK.find(([re]) => re.test(t)), word = pm ? (t.match(pm[0]) || [''])[0] : '';
-      const A = { t: 'act', text: cut((say || effTxt || t).replace(/[.!~]+$/, ''), 14), pose: word ? 'word' : 'sweat', word, d: 0 };
+      const A = { t: 'act', text: cut((say || effTxt || t).replace(/[.!~]+$/, ''), 14), pose: word ? 'word' : 'sweat', word, d: 0, gen: true };
       generic = true;
-      if (DW.skill) Object.assign(A, { on: dOn, nth: DW.nth }); else if (DW.ev) Object.assign(A, { ev: DW.ev, nth: DW.nth }); else if (DW.hit) Object.assign(A, { hit: true, nth: DW.nth }); else if (DW.if) Object.assign(A, { if: DW.if, n: DW.n }); else if (DW.bump) A.bump = true; else A.every = DW.every || (DW.often ? 6 : 9);
+      if (DW.skill) Object.assign(A, { on: dOn, nth: DW.nth }); else if (DW.ev) Object.assign(A, { ev: DW.ev, nth: DW.nth }); else if (DW.hit) Object.assign(A, { hit: true, nth: DW.nth }); else if (DW.if) Object.assign(A, { if: DW.if, n: DW.n }); else if (DW.bump) A.bump = true; else A.every = DW.every || (DW.often ? 6 : 12);
       add(A);
     }
   }
@@ -904,7 +904,7 @@ function smartDrawback(side, ctx) {
     if (slot) for (const x of out) if (x.on === 'skills') x.on = slot;
   }
   const clean = out.map((x) => [x, sanDfx(x)]).filter(([, c]) => c);
-  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'act', every: 9, text: cut(t, 14) || '앗!', pose: 'sweat', d: 0 });
+  const fx = clean.length ? clean[0][1] : sanDfx({ t: 'act', every: 12, text: cut(t, 14) || '앗!', pose: 'sweat', d: 0, gen: true });
   const f = fx, more = clean.slice(1).map(([, c]) => c), rawMore = clean.slice(1).map(([x]) => x);
   return { generic: generic || !clean.length, how: (customHow ? [customHow].concat(more.filter((x) => !['look', 'replace', 'lock'].includes(x.t)).map(dfxText)) : [f].concat(more).filter((x) => x.t !== 'look' || clean.length === 1).map(dfxText)).join(' + ').slice(0, 70), say: say || pick(['아 왜!!', '이게 뭐야', '망했다', '살려 줘', '말도 안 돼']), fx: clean.length ? clean[0][0] : f, more: rawMore };
 }
